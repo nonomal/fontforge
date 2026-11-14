@@ -70,7 +70,7 @@ the fourth argument you must specify the second and third arguments too.
 
 .. function:: AddDHint(x1,y1,x2,y2,unit.x,unit.y)
 
-   Adds a diagonal hint. A diagonal hint requires two points on oposite sides of
+   Adds a diagonal hint. A diagonal hint requires two points on opposite sides of
    the stem and a unit vector in the direction of the stem.
 
 .. function:: AddExtrema([all])
@@ -83,6 +83,22 @@ the fourth argument you must specify the second and third arguments too.
    more information). If the "all" argument is specified and is a nonzero
    integer, then all extrema will be added; otherwise, some that would be very
    close to existing endpoints will not be added.
+   
+.. function:: AddInflections()
+
+   If the curvature of a spline in a glyph changes sign then break the spline 
+   so that there will be a point at all points of inflection. 
+   
+.. function:: Balance()
+
+   For all cubic bezier splines of the glyph make the line between the control 
+   points parallel to the chord such that the area is preserved. This is an
+   improved version of the algorithm known as "tunnify".
+   
+.. function:: Harmonize()
+
+   For all bezier splines of the glyph move the smooth on-curve points between 
+   its adjacent control points such that the adjacent curvatures become equal.
 
 .. function:: AddHHint(start,width)
 
@@ -326,7 +342,7 @@ the fourth argument you must specify the second and third arguments too.
 .. function:: BuildAccented()
 
    If any of the selected glyphs are accented, then clear them and create a new
-   glyph by inserting references to the approriate base glyph and accents.
+   glyph by inserting references to the appropriate base glyph and accents.
 
 .. function:: BuildComposite()
 
@@ -699,7 +715,7 @@ the fourth argument you must specify the second and third arguments too.
 .. function:: DontAutoHint()
 
    Mark any selected glyphs so that they will not be AutoHinted when saving the
-   font. (This flag is cleared if the user explicitely AutoHints the glyph
+   font. (This flag is cleared if the user explicitly AutoHints the glyph
    himself).
 
 .. function:: DrawsSomething([arg])
@@ -845,7 +861,7 @@ the fourth argument you must specify the second and third arguments too.
       "Glyph %n from font %f.svg"
       "U+%U.bmp"
 
-   If the format constists entirely of a filetype then FontForge will use a
+   If the format consists entirely of a filetype then FontForge will use a
    format of ``"%n_%f.<filetype>"``
 
    All characters in the format string except for % are copied verbatim. If
@@ -1022,7 +1038,7 @@ the fourth argument you must specify the second and third arguments too.
    * fmflags&0x80 => generate tables so the font will work on both Apple and MS
      platforms.
 
-     Apple has screwed up and in Mac 10.4 (Tigger), if OpenType tables are present
+     Apple has screwed up and in Mac 10.4 (Tiger), if OpenType tables are present
      in a font then the AAT tables will be ignored -- or so I'm told (I can't test
      this myself). Unfortunately Apple does not implement all of OpenType, so the
      result is almost certain to be wrong).
@@ -1294,7 +1310,7 @@ the fourth argument you must specify the second and third arguments too.
    * "LayerCount" returns the number of layers in the glyph. This will always be 2
      (foreground & background) except in the case of a multilayered font.
    * "RefCount" returns the number of references in the glyph
-   * "RefNames" returns an array containing the names of all glyphs refered to.
+   * "RefNames" returns an array containing the names of all glyphs referred to.
      This may contain 0 elements. This may contain a glyph twice ("colon" might
      refer twice to period)
    * "RefTransform" returns an array of arrays. The bottom most arrays are 6
@@ -1695,8 +1711,8 @@ the fourth argument you must specify the second and third arguments too.
 .. function:: MoveReference(delta-x,delta-y,[refname/ref-unicode]+)
 
    References may be identified either by a string containing the name of the
-   glyph being refered to, or an integer containing the unicode code point of
-   the glyph being refered to, there may be an arbetrary (positive) number of
+   glyph being referred to, or an integer containing the unicode code point of
+   the glyph being referred to, there may be an arbetrary (positive) number of
    references specified. Each selected glyph will be searched for references
    that match the name/unicode-values given, all references found will be moved
    by the specified offsets.
@@ -1721,7 +1737,7 @@ the fourth argument you must specify the second and third arguments too.
 
 .. function:: NearlyHvCps([error[,err-denom]])
 
-   Checks for control points which are almost, but not quite horzontal or
+   Checks for control points which are almost, but not quite horizontal or
    vertical (where almost means (say) that
    ``abs( (control point).x - point.x ) < error``, where error is either:
 
@@ -1734,7 +1750,7 @@ the fourth argument you must specify the second and third arguments too.
 
 .. function:: NearlyHvLines([error[,err-denom]])
 
-   Checks for lines which are almost, but not quite horzontal or vertical (where
+   Checks for lines which are almost, but not quite horizontal or vertical (where
    almost means (say) that ``abs( (end point).x - (start point).x ) < error``,
    where error is either:
 
@@ -1856,8 +1872,8 @@ the fourth argument you must specify the second and third arguments too.
 .. function:: PositionReference(x,y,[refname/ref-unicode]+)
 
    References may be identified either by a string containing the name of the
-   glyph being refered to, or an integer containing the unicode code point of
-   the glyph being refered to, there may be an arbetrary (positive) number of
+   glyph being referred to, or an integer containing the unicode code point of
+   the glyph being referred to, there may be an arbetrary (positive) number of
    references specified. Each selected glyph will be searched for references
    that match the name/unicode-values given, all references found will be at the
    specified location.
@@ -2219,7 +2235,7 @@ the fourth argument you must specify the second and third arguments too.
      set the selection of the glyph at encoding 0 and so forth. The array may have
      a different number of elements from that number of glyphs in the font but
      should otherwise be in the same format as that returned by the $selection
-     psuedo-variable.
+     pseudo-variable.
 
 .. function:: SelectAll
 
@@ -2673,8 +2689,13 @@ the fourth argument you must specify the second and third arguments too.
 
 .. function:: SmallCaps([v-scale[,h-scale[,stemw-scale[,stemh-scale]]]])
 
-   Create small capitals from the selected glyphs. The following optional
-   arguments are accepted:
+   Create small capitals from the selected glyphs.  When the function
+   generates a new glyph from an (uppercase) letter it names it like
+   the lowercase letter and appends ".sc", e.g., "A" becomes "a.sc".
+   Anything not a letter, i.e., digits and symbols, gets the extension
+   ".taboldstyle".
+
+   The following optional arguments are accepted:
 
    .. object:: v-scale
 
@@ -2732,7 +2753,7 @@ the fourth argument you must specify the second and third arguments too.
 
    Same as the c strftime routine. By default it formats the current time in
    gmt, but if that argument is 0 it will use the local timezone. By default it
-   will format the argument acording to the current locale, but if a locale is
+   will format the argument according to the current locale, but if a locale is
    specified it will be used.
 
 .. function:: StrJoin(string-array,delimiter)
@@ -2762,7 +2783,7 @@ the fourth argument you must specify the second and third arguments too.
 
 .. function:: StrSplit(str,delimiter[,max-cnt])
 
-   Splits the string at every occurance of the delimiter and produces an array
+   Splits the string at every occurrence of the delimiter and produces an array
    of sub-strings. ::
 
       StrSplit("The quick brown box"," ")
@@ -2845,16 +2866,16 @@ the fourth argument you must specify the second and third arguments too.
    .. math::
 
       \begin{bmatrix}
-         \frac{t_1}{100} & \frac{t_2}{100} & \frac{t_3}{100} \\
-         \frac{t_4}{100} & \frac{t_5}{100} & \frac{t_6}{100}
+         \frac{t_1}{100} & \frac{t_3}{100} & \frac{t_5}{100} \\
+         \frac{t_2}{100} & \frac{t_4}{100} & \frac{t_6}{100}
       \end{bmatrix}
 
    This is a standard PostScript transformation matrix where
 
    .. math::
 
-      x' &= \frac{t_1}{100}x + \frac{t_2}{100}y + \frac{t_3}{100} \\
-      y' &= \frac{t_4}{100}x + \frac{t_5}{100}y + \frac{t_6}{100}
+      x' &= \frac{t_1}{100}x + \frac{t_3}{100}y + \frac{t_5}{100} \\
+      y' &= \frac{t_2}{100}x + \frac{t_4}{100}y + \frac{t_6}{100}
 
    The peculiar notion of dividing by 100 was to overcome the fact that
    fontforge's scripting language formerly could not handle real numbers. We've

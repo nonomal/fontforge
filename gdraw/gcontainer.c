@@ -31,7 +31,6 @@
 #include "ggadget.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "gwidgetP.h"
 #include "utype.h"
 
@@ -134,7 +133,7 @@ return;
 /*  strictly needed */
 	if ( /*top == current_focus_window &&*/ td->gfocus!=NULL &&
 		td->gfocus->funcs->handle_focus!=NULL ) {
-            // We use the focus handler provided by the presently focussed gadget and process a loss-of-focus event for the currently focused object.
+            // We use the focus handler provided by the presently focused gadget and process a loss-of-focus event for the currently focused object.
             memset(&e, 0, sizeof(GEvent));
 	    e.type = et_focus;
 	    e.w = top;
@@ -316,7 +315,7 @@ return( true );
 	    }
 	} else {
 	    for ( gadget = gd->gadgets; gadget!=NULL && !handled ; gadget=gadget->prev ) {
-		if ( !gadget->state!=gs_disabled && gadget->state!=gs_invisible &&
+		if ( gadget->state!=gs_disabled && gadget->state!=gs_invisible &&
 			/*gadget->takes_input &&*/	/* everybody needs mouse moves for popups, even labels */
 			GGadgetWithin(gadget,event->u.mouse.x,event->u.mouse.y)) {
 		    if ( gd->lastwiggle!=NULL && gd->lastwiggle!=gadget )
@@ -424,18 +423,12 @@ static int GWidgetCheckMn(GContainerD *gd,GEvent *event) {
     int handled = false;
     GGadget *gadget, *last;
     struct gwidgetdata *widget;
-    unichar_t keysym = event->u.chr.keysym;
     int mask = GMenuMask() & (ksm_control|ksm_cmdmacosx);
 
-    if ( (mask&ksm_cmdmacosx) && keysym>0x7f &&
-	    (event->u.chr.state&ksm_meta) && !(event->u.chr.state&mask) )
-	keysym = GGadgetUndoMacEnglishOptionCombinations(event);
-
-    if ( islower(keysym)) keysym = toupper(keysym);
     for ( gadget = gd->gadgets; gadget!=NULL && !handled ; gadget=gadget->prev ) {
 	if ( (event->u.chr.state&ksm_meta) && !(event->u.chr.state&mask) &&
-		gadget->mnemonic==keysym &&
-		gadget->state != gs_invisible && gadget->state != gs_disabled ) {
+		gadget->state != gs_invisible && gadget->state != gs_disabled &&
+		GDrawShortcutKeyMatches(event, gadget->mnemonic) ) {
 	    if ( gadget->focusable ) {	/* labels may have a mnemonic */
 		    /* (ie. because textfields can't display mnemonics) */
 		    /* but they don't act on it */
@@ -448,8 +441,8 @@ static int GWidgetCheckMn(GContainerD *gd,GEvent *event) {
 		_GWidget_IndicateFocusGadget(last,mf_mnemonic);
 		handled = true;
 	    }
-	} else if ( gadget->shortcut == keysym &&
-		(gadget->short_mask&event->u.chr.state)==gadget->short_mask ) {
+	} else if ( (gadget->short_mask&event->u.chr.state)==gadget->short_mask &&
+		 GDrawShortcutKeyMatches(event, gadget->shortcut)) {
 	    _GWidget_IndicateFocusGadget(gadget,mf_shortcut);
 	    handled = true;
 	} else if ( gadget->state != gs_invisible &&
@@ -925,7 +918,7 @@ return;
 	GRect wsize;
 	GDrawGetSize(gw, &wsize);
 
-	/* Make any offset simmetrical */
+	/* Make any offset symmetrical */
 	if (wsize.width >= 2*gadget->r.x) wsize.width -= 2*gadget->r.x;
 	else wsize.width = 0;
 	

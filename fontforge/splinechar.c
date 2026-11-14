@@ -30,10 +30,9 @@
 
 #include "cvundoes.h"
 #include "dumppfa.h"
-#include "ffglib.h"
+#include "ffglib_compat.h"
 #include "fontforgevw.h"
 #include "fvfonts.h"
-#include "gresource.h"
 #include "lookups.h"
 #include "mem.h"
 #include "parsettf.h"
@@ -45,6 +44,7 @@
 #include "tottf.h"
 #include "ttf.h"
 #include "ustring.h"
+#include "utanvec.h"
 #include "utype.h"
 
 #include <locale.h>
@@ -176,7 +176,7 @@ return;
 /* If they change the left bearing of a character, then in all chars */
 /*  that depend on it should be adjusted too. */
 /* Also all vstem hints */
-/* I deliberately don't set undoes in the dependants. The change is not */
+/* I deliberately don't set undoes in the dependents. The change is not */
 /*  in them, after all */
 void SCSynchronizeLBearing(SplineChar *sc,real off,int layer) {
     struct splinecharlist *dlist;
@@ -472,7 +472,6 @@ return;
 	free(sc->ttf_instrs);
 	sc->ttf_instrs = NULL;
 	sc->ttf_instrs_len = 0;
-	SCOutOfDateBackground(sc);
     }
 }
 
@@ -508,7 +507,6 @@ return;
 return;
     SCPreserveBackground(sc);
     SCClearLayer(sc,ly_back);
-    SCOutOfDateBackground(sc);
     SCCharChangedUpdate(sc,ly_back);
 }
 
@@ -598,11 +596,39 @@ return( false );
 return( len2>=0 && len2<=len );
 }
 
+/* This is a fast computable measure for linearity. */
+/* First, we norm the spline: Scale and rotate the spline such that */
+/* one end lies on (0,0) and the other on (100,0). */
+/* Then the maximal y coordinate of the horizontal extrema is returned. */
+static bigreal Linearity(Spline *s) {
+    if ( s->islinear ) return 0;  
+    BasePoint ftunit = BPSub(s->to->me, s->from->me);
+    bigreal ftlen = BPNorm(ftunit);
+    if ( ftlen==0 ) return -1; /* flag for error, no norming possible */
+    ftunit = BPScale(ftunit, 1/ftlen);
+    BasePoint nextcpscaled = BPScale(BPSub(s->from->nextcp, s->from->me),100./ftlen);
+    if ( s->order2 ) return .5*fabs(BPCross(ftunit, nextcpscaled));
+    BasePoint prevcpscaled = BPScale(BPSub(s->to->prevcp, s->from->me),100./ftlen);
+    /* we just look a the bezier coefficients of the polynomial in t */
+    /* in y dimension (divided by 3): */
+    Spline1D ys1d;
+    ys1d.d = 0;
+    ys1d.c = BPCross(ftunit, nextcpscaled); /* rotate it to horizontal*/
+    ys1d.b = BPCross(ftunit, prevcpscaled)-2*ys1d.c;
+    ys1d.a = -ys1d.b-ys1d.c;
+    extended te1, te2;
+    SplineFindExtrema(&ys1d, &te1, &te2);
+    if ( te1==-1 && te2==-1 ) return 0;
+    if ( te2==-1 ) return 3*fabs(((ys1d.a*te1+ys1d.b)*te1+ys1d.c)*te1);
+return 3*fmax(fabs(((ys1d.a*te1+ys1d.b)*te1+ys1d.c)*te1), 
+fabs(((ys1d.a*te2+ys1d.b)*te2+ys1d.c)*te2));
+}
+
 void SPChangePointType(SplinePoint *sp, int pointtype) {
     BasePoint unitnext, unitprev;
     bigreal nextlen, prevlen;
     int makedflt;
-    /*int oldpointtype = sp->pointtype;*/
+    int oldpointtype = sp->pointtype;
 
     if ( sp->pointtype==pointtype ) {
 	if ( pointtype==pt_curve || pointtype == pt_hvcurve ) {
@@ -620,25 +646,50 @@ return;
 	sp->nextcpdef = sp->nonextcp;
 	sp->prevcpdef = sp->noprevcp;
     } else if ( pointtype==pt_tangent ) {
-	if ( sp->next!=NULL && !sp->nonextcp && sp->next->knownlinear ) {
-	    sp->nextcp = sp->me;
-        SplineRefigure(sp->next);
-	} else if ( sp->prev!=NULL && !sp->nonextcp &&
-		BpColinear(&sp->prev->from->me,&sp->me,&sp->nextcp) ) {
-	    /* The current control point is reasonable */
-	} else {
-	    SplineCharTangentNextCP(sp);
-	    if ( sp->next ) SplineRefigure(sp->next);
-	}
-	if ( sp->prev!=NULL && !sp->noprevcp && sp->prev->knownlinear ) {
-	    sp->prevcp = sp->me;
-        SplineRefigure(sp->prev);
-	} else if ( sp->next!=NULL && !sp->noprevcp &&
-		BpColinear(&sp->next->to->me,&sp->me,&sp->prevcp) ) {
-	    /* The current control point is reasonable */
-	} else {
-	    SplineCharTangentPrevCP(sp);
-	    if ( sp->prev ) SplineRefigure(sp->prev);
+	if ( sp->next!=NULL && sp->prev!=NULL ) {
+		bigreal prevlinearity = Linearity(sp->prev);
+		bigreal nextlinearity = Linearity(sp->next);
+		if ( prevlinearity>=0 && nextlinearity>=0 ) {
+			if ( nextlinearity >= prevlinearity ) { /* make prev linear */
+				sp->prev->islinear = true;
+				sp->prev->from->nextcp = sp->prev->from->me;
+				sp->prevcp = sp->me; 
+				if ( sp->prev->from->pointtype!=pt_tangent) 
+					sp->prev->from->pointtype = pt_corner;
+				SplineRefigure(sp->prev); /* display straight line */
+				if ( sp->next->order2 ) {
+					BasePoint inter;
+					if ( IntersectLines(&inter,&sp->me,&sp->prev->from->me,&sp->nextcp,&sp->next->to->me) ) {
+						sp->nextcp = inter;
+						sp->next->to->prevcp = inter;
+						SplineRefigure(sp->next); /* update curve */
+					} /* else just leave things as they are */
+				} else {
+					unitnext = NormVec(BPSub(sp->me,sp->prev->from->me));
+					sp->nextcp = BPAdd(sp->me, BPScale(unitnext,fabs(BPDot(BPSub(sp->nextcp, sp->me), unitnext))));
+					SplineRefigure(sp->next); /* update curve */
+				}
+			} else { /* make next linear */
+				sp->next->islinear = true;
+				sp->next->to->prevcp = sp->next->to->me;
+				sp->nextcp = sp->me; 
+				if ( sp->next->to->pointtype!=pt_tangent) 
+					sp->next->to->pointtype = pt_corner;
+				SplineRefigure(sp->next); /* display straight line */
+				if ( sp->prev->order2 ) {
+					BasePoint inter;
+					if ( IntersectLines(&inter,&sp->me,&sp->next->to->me,&sp->prevcp,&sp->prev->from->me) ) {
+						sp->prevcp = inter;
+						sp->prev->from->nextcp = inter;
+						SplineRefigure(sp->prev); /* update curve */
+					} /* else just leave things as they are */
+				} else {
+					unitprev = NormVec(BPSub(sp->me,sp->next->to->me));
+					sp->prevcp = BPAdd(sp->me, BPScale(unitprev,fabs(BPDot(BPSub(sp->prevcp, sp->me), unitprev))));
+					SplineRefigure(sp->prev); /* update curve */
+				}
+			}
+		} /* else do nothing - this would not make any sense */
 	}
     } else if ( pointtype!=pt_curve
 		&& ((BpColinear(&sp->prevcp,&sp->me,&sp->nextcp) ||
@@ -682,16 +733,63 @@ return;
 	    ncp.y = sp->me.y + unitnext.y*nextlen;
 	    sp->nextcp = ncp;
 	    if ( sp->next!=NULL && sp->next->order2 )
-		sp->next->to->prevcp = ncp;
+			sp->next->to->prevcp = ncp;
+		SplineRefigure(sp->next);
 	    pcp.x = sp->me.x + unitprev.x*prevlen;
 	    pcp.y = sp->me.y + unitprev.y*prevlen;
 	    sp->prevcp = pcp;
 	    if ( sp->prev!=NULL && sp->prev->order2 )
-		sp->prev->from->nextcp = pcp;
+			sp->prev->from->nextcp = pcp;
+		SplineRefigure(sp->prev);
 	    makedflt = false;
 	}
-	if( pointtype==pt_curve )
-	    makedflt = true;
+	if( pointtype==pt_curve ) { 
+		if ( oldpointtype==pt_corner ) { 
+			makedflt = false; 	
+			if ( sp->prev!=NULL && sp->next!=NULL) {
+				if ( prevlen!=0 && nextlen!=0 ) { /* take the average direction */
+					sp->nextcp = BPAdd(sp->me, BPScale(BPSub(unitnext, unitprev), .5*nextlen));
+					sp->prevcp = BPSub(sp->me, BPScale(BPSub(unitnext, unitprev), .5*prevlen));	
+					if ( sp->next->order2 ) { /* sp->nextcp and sp->next->to->prevcp are not necessary equal */
+						BasePoint inter; 
+						if ( IntersectLines(&inter,&sp->me,&sp->nextcp,&sp->next->to->prevcp,&sp->next->to->me) 
+						/* check if inter is on the same side of sp->me as sp->nextcp: */ 
+						&& BPDot( BPSub(inter, sp->me), BPSub(sp->nextcp, sp->me) ) >= 0 
+						/* check if inter is on the same side of sp->next->to->me as sp->nextcp: */ 
+						&& BPDot( BPSub(inter, sp->me), BPSub(sp->next->to->me, sp->me) ) >= 0 ) {
+							sp->nextcp = inter;
+							sp->next->to->prevcp = inter;
+							SplineRefigure(sp->next);
+						} else { /* undo things, the user has to interact (no clear solution) */
+							sp->nextcp = sp->next->to->prevcp;
+						}
+					}
+					if ( sp->prev->order2 ) { /* sp->prevcp and sp->prev->from->nextcp are not necessary equal */
+						BasePoint inter; /* this is suboptimal when the intersection is on the wrong side */
+						if ( IntersectLines(&inter,&sp->me,&sp->prevcp,&sp->prev->from->nextcp,&sp->prev->from->me) 
+						/* check if inter is on the same side of sp->me as sp->prevcp: */ 
+						&& BPDot( BPSub(inter, sp->me), BPSub(sp->prevcp, sp->me) ) >= 0 
+						/* check if inter is on the same side of sp->prev->from->me as sp->prevcp: */ 
+						&& BPDot( BPSub(inter, sp->me), BPSub(sp->prev->from->me, sp->me) ) >= 0 ) {
+							sp->prevcp = inter;
+							sp->prev->from->nextcp = inter;
+							SplineRefigure(sp->prev);
+						} else { /* undo things, the user has to interact (no clear solution) */
+							sp->prevcp = sp->prev->from->nextcp;
+						}
+					}
+				} else if ( prevlen!=0 && !sp->next->order2 ) { /* and therefore nextlen==0 */
+					sp->nextcp = BPSub(sp->me, BPScale(NormVec(unitprev), 
+					NICE_PROPORTION*BPNorm(BPSub(sp->next->to->me, sp->me))));
+				} else if ( nextlen!=0 && !sp->prev->order2 ) { /* and therefore prevlen==0 */
+					sp->prevcp = BPSub(sp->me, BPScale(NormVec(unitnext), 
+					NICE_PROPORTION*BPNorm(BPSub(sp->prev->from->me, sp->me))));
+				} else makedflt = true;
+			}
+		} else if ( oldpointtype==pt_tangent || oldpointtype==pt_hvcurve ) { 
+			makedflt = false; 	
+		} else makedflt = true; /* original behaviour */
+	}
 	
 	if ( makedflt ) {
 	    sp->nextcpdef = sp->prevcpdef = true;
@@ -990,7 +1088,7 @@ return;
 
 void UnlinkThisReference(FontViewBase *fv,SplineChar *sc,int layer) {
     /* We are about to clear out sc. But somebody refers to it and that we */
-    /*  aren't going to delete. So (if the user asked us to) instanciate sc */
+    /*  aren't going to delete. So (if the user asked us to) instantiate sc */
     /*  into all characters which refer to it and which aren't about to be */
     /*  cleared out */
     struct splinecharlist *dep, *dnext;
@@ -1015,19 +1113,10 @@ void UnlinkThisReference(FontViewBase *fv,SplineChar *sc,int layer) {
     }
 }
 
-static int MultipleValues(char *name, int local) {
-    char *buts[3];
-    buts[0] = _("_Yes"); buts[1]=_("_No"); buts[2] = NULL;
-    if ( ff_ask(_("Multiple"),(const char **) buts,0,1,_("There is already a glyph with this Unicode encoding\n(named %1$.40s, at local encoding %2$d).\nIs that what you want?"),name,local)==0 )
-return( true );
-
-return( false );
-}
-
-static int MultipleNames(void) {
+static int MultipleNames(const char *name) {
     char *buts[3];
     buts[0] = _("_Yes"); buts[1]=_("_Cancel"); buts[2] = NULL;
-    if ( ff_ask(_("Multiple"),(const char **) buts,0,1,_("There is already a glyph with this name,\ndo you want to swap names?"))==0 )
+    if ( ff_ask(_("Multiple"),(const char **) buts,0,1,_("There is already a glyph with name %.40s,\ndo you want to swap names?"), name)==0 )
 return( true );
 
 return( false );
@@ -1035,8 +1124,7 @@ return( false );
 
 int SCSetMetaData(SplineChar *sc,const char *name,int unienc,const char *comment) {
     SplineFont *sf = sc->parent;
-    int i, mv=0;
-    int isnotdef, samename=false, sameuni=false;
+    int samename=false, sameuni=false;
     struct altuni *alt;
 
     if ( sf->glyphs[sc->orig_pos]!=sc )
@@ -1049,33 +1137,48 @@ int SCSetMetaData(SplineChar *sc,const char *name,int unienc,const char *comment
 	samename = true;	/* No change, it must be good */
     }
     if ( alt!=NULL || !samename ) {
-	isnotdef = strcmp(name,".notdef")==0;
-	for ( i=0; i<sf->glyphcnt; ++i ) if ( sf->glyphs[i]!=NULL && sf->glyphs[i]->orig_pos!=sc->orig_pos ) {
-	    if ( unienc!=-1 && sf->glyphs[i]->unicodeenc==unienc ) {
-		if ( !mv && !MultipleValues(sf->glyphs[i]->name,i)) {
-return( false );
-		}
-		mv = 1;
-	    } else if ( !isnotdef && strcmp(name,sf->glyphs[i]->name)==0 ) {
-		if ( !MultipleNames()) {
-return( false );
-		}
-		free(sf->glyphs[i]->name);
-		sf->glyphs[i]->namechanged = true;
-		if ( strncmp(sc->name,"uni",3)==0 && sf->glyphs[i]->unicodeenc!=-1) {
-		    char buffer[12];
-		    if ( sf->glyphs[i]->unicodeenc<0x10000 )
-			sprintf( buffer,"uni%04X", sf->glyphs[i]->unicodeenc);
-		    else
-			sprintf( buffer,"u%04X", sf->glyphs[i]->unicodeenc);
-		    sf->glyphs[i]->name = copy(buffer);
-		} else {
-		    sf->glyphs[i]->name = sc->name;
-		    sc->name = NULL;
-		}
-	    break;
-	    }
-	}
+        int i;
+        if (unienc != -1) {
+            for (i = 0; i < sf->glyphcnt; ++i)
+                if (sf->glyphs[i] != NULL &&
+                    sf->glyphs[i]->orig_pos != sc->orig_pos &&
+                    sf->glyphs[i]->unicodeenc == unienc) {
+                    /* Duplicate encoding is never allowed */
+                    ff_post_notice(_("Duplicate encodings"),
+                                   _("There is already a glyph with Unicode "
+                                     "encoding 0x%1$04x named %2$.40s. The "
+                                     "current name and encoding will be kept."),
+                                   unienc, sf->glyphs[i]->name);
+                    return false;
+                }
+            /* Proceed to copy encoding and name. */
+        } else {
+	    /* For unencoded glyphs, check name duplication and propose to swap. */
+            int isnotdef = strcmp(name, ".notdef") == 0;
+            SplineChar* swap_sc = NULL;
+            for (i = 0; i < sf->glyphcnt && swap_sc == NULL; ++i)
+                if (!isnotdef && strcmp(name, sf->glyphs[i]->name) == 0) {
+                    if (!MultipleNames(name))
+                        return false;
+                    else
+                        swap_sc = sf->glyphs[i];
+                }
+            if (swap_sc) {
+                free(swap_sc->name);
+                swap_sc->namechanged = true;
+                if (strncmp(sc->name, "uni", 3) == 0 &&
+                    swap_sc->unicodeenc != -1) {
+                    if (swap_sc->unicodeenc < 0x10000)
+                        swap_sc->name =
+                            smprintf("uni%04X", swap_sc->unicodeenc);
+                    else
+                        swap_sc->name = smprintf("u%04X", swap_sc->unicodeenc);
+                } else {
+                    swap_sc->name = sc->name;
+                    sc->name = NULL;
+                }
+            }
+        }
 	if ( sc->unicodeenc!=unienc ) {
 	    struct splinecharlist *scl;
 	    int layer;
@@ -1151,7 +1254,7 @@ void RevertedGlyphReferenceFixup(SplineChar *sc, SplineFont *sf) {
     /* Fixup kerning pairs as well */
     for ( isv=0; isv<2; ++isv ) {
 	for ( kprev = NULL, kp=isv?sc->vkerns : sc->kerns; kp!=NULL; kp=knext ) {
-	    int index = (intpt) (kp->sc);
+	    int index = (intptr_t) (kp->sc);
 	    knext = kp->next;
 	    kp->kcid = false;
 	    ksf = sf;
@@ -1197,7 +1300,7 @@ static int CheckBluePair(char *blues, char *others, int bluefuzz,
 	    while ( *others==' ' ) ++others;
 	    if ( *others==']' || *others=='}' )
 	break;
-	    temp = g_ascii_strtod(others,&end);
+	    temp = ff_strtod(others,&end);
 	    if ( temp!=rint(temp))
 		err |= pds_notintegral;
 	    else if ( end==others ) {
@@ -1221,7 +1324,7 @@ static int CheckBluePair(char *blues, char *others, int bluefuzz,
 	while ( *blues==' ' ) ++blues;
 	if ( *blues==']' || *blues=='}' )
     break;
-	temp = g_ascii_strtod(blues,&end);
+	temp = ff_strtod(blues,&end);
 	if ( temp!=rint(temp))
 	    err |= pds_notintegral;
 	else if ( end==blues ) {
@@ -1269,7 +1372,7 @@ return( true );
 return( false );
     ++str_val;
 
-    val = g_ascii_strtod(str_val,&end);
+    val = ff_strtod(str_val,&end);
     while ( *end==' ' ) ++end;
     if ( *end!=']' && *end!='}' )
 return( false );
@@ -1291,7 +1394,7 @@ static int CheckStemSnap(struct psdict *dict,char *snapkey, char *stdkey ) {
     if ( (str_val = PSDictHasEntry(dict,stdkey))!=NULL ) {
 	while ( *str_val==' ' ) ++str_val;
 	if ( *str_val=='[' && *str_val!='{' ) ++str_val;
-	std_val = g_ascii_strtod(str_val,&end);
+	std_val = ff_strtod(str_val,&end);
     }
 
     if ( (str_val = PSDictHasEntry(dict,snapkey))==NULL )
@@ -1306,7 +1409,7 @@ return( false );
 	while ( *str_val==' ' ) ++str_val;
 	if ( *str_val==']' && *str_val!='}' )
     break;
-	temp = g_ascii_strtod(str_val,&end);
+	temp = ff_strtod(str_val,&end);
 	if ( end==str_val )
 return( false );
 	str_val = end;
@@ -1331,44 +1434,44 @@ int ValidatePrivate(SplineFont *sf) {
     bigreal bluescale = .039625;
     int magicpointsize;
 
-    if ( sf->private==NULL )
+    if ( sf->private_dict==NULL )
 return( pds_missingblue );
 
-    if ( (bf = PSDictHasEntry(sf->private,"BlueFuzz"))!=NULL ) {
+    if ( (bf = PSDictHasEntry(sf->private_dict,"BlueFuzz"))!=NULL ) {
 	fuzz = strtol(bf,&end,10);
 	if ( *end!='\0' || fuzz<0 )
 	    errs |= pds_badbluefuzz;
     }
 
-    if ( (test=PSDictHasEntry(sf->private,"BlueScale"))!=NULL ) {
-	bluescale = g_ascii_strtod(test,&end);
+    if ( (test=PSDictHasEntry(sf->private_dict,"BlueScale"))!=NULL ) {
+	bluescale = ff_strtod(test,&end);
 	if ( *end!='\0' || end==test || bluescale<0 )
 	    errs |= pds_badbluescale;
     }
     magicpointsize = rint( bluescale*240 + 0.49 );
 
-    if ( (blues = PSDictHasEntry(sf->private,"BlueValues"))==NULL )
+    if ( (blues = PSDictHasEntry(sf->private_dict,"BlueValues"))==NULL )
 	errs |= pds_missingblue;
     else
-	errs |= CheckBluePair(blues,PSDictHasEntry(sf->private,"OtherBlues"),fuzz,magicpointsize);
+	errs |= CheckBluePair(blues,PSDictHasEntry(sf->private_dict,"OtherBlues"),fuzz,magicpointsize);
 
-    if ( (blues = PSDictHasEntry(sf->private,"FamilyBlues"))!=NULL )
-	errs |= CheckBluePair(blues,PSDictHasEntry(sf->private,"FamilyOtherBlues"),
+    if ( (blues = PSDictHasEntry(sf->private_dict,"FamilyBlues"))!=NULL )
+	errs |= CheckBluePair(blues,PSDictHasEntry(sf->private_dict,"FamilyOtherBlues"),
 		fuzz,magicpointsize)<<pds_shift;
 
 
-    if ( (test=PSDictHasEntry(sf->private,"BlueShift"))!=NULL ) {
+    if ( (test=PSDictHasEntry(sf->private_dict,"BlueShift"))!=NULL ) {
 	int val = strtol(test,&end,10);
 	if ( *end!='\0' || end==test || val<0 )
 	    errs |= pds_badblueshift;
     }
 
-    if ( !CheckStdW(sf->private,"StdHW"))
+    if ( !CheckStdW(sf->private_dict,"StdHW"))
 	errs |= pds_badstdhw;
-    if ( !CheckStdW(sf->private,"StdVW"))
+    if ( !CheckStdW(sf->private_dict,"StdVW"))
 	errs |= pds_badstdvw;
 
-    switch ( CheckStemSnap(sf->private,"StemSnapH", "StdHW")) {
+    switch ( CheckStemSnap(sf->private_dict,"StemSnapH", "StdHW")) {
       case false:
 	errs |= pds_badstemsnaph;
       break;
@@ -1376,7 +1479,7 @@ return( pds_missingblue );
 	errs |= pds_stemsnapnostdh;
       break;
     }
-    switch ( CheckStemSnap(sf->private,"StemSnapV", "StdVW")) {
+    switch ( CheckStemSnap(sf->private_dict,"StemSnapV", "StdVW")) {
       case false:
 	errs |= pds_badstemsnapv;
       break;
@@ -1700,7 +1803,7 @@ int SCValidate(SplineChar *sc, int layer, int force) {
 		first = s;
 	    if ( s->acceptableextrema )
 	continue;		/* If marked as good, don't check it */
-	    /* rough appoximation to spline's length */
+	    /* rough approximation to spline's length */
 	    x = (s->to->me.x-s->from->me.x);
 	    y = (s->to->me.y-s->from->me.y);
 	    len2 = x*x + y*y;
@@ -1717,13 +1820,13 @@ int SCValidate(SplineChar *sc, int layer, int force) {
 	/* If we have a maxp table then do some truetype checks */
 	/* these are only errors for fontlint, we'll fix them up when we */
 	/*  generate the font -- but fontlint needs to know this stuff */
-	int pt_max = memushort(tab->data,tab->len,3*sizeof(uint16));
-	int path_max = memushort(tab->data,tab->len,4*sizeof(uint16));
-	int composit_pt_max = memushort(tab->data,tab->len,5*sizeof(uint16));
-	int composit_path_max = memushort(tab->data,tab->len,6*sizeof(uint16));
-	int instr_len_max = memushort(tab->data,tab->len,13*sizeof(uint16));
-	int num_comp_max = memushort(tab->data,tab->len,14*sizeof(uint16));
-	int comp_depth_max  = memushort(tab->data,tab->len,15*sizeof(uint16));
+	int pt_max = memushort(tab->data,tab->len,3*sizeof(uint16_t));
+	int path_max = memushort(tab->data,tab->len,4*sizeof(uint16_t));
+	int composit_pt_max = memushort(tab->data,tab->len,5*sizeof(uint16_t));
+	int composit_path_max = memushort(tab->data,tab->len,6*sizeof(uint16_t));
+	int instr_len_max = memushort(tab->data,tab->len,13*sizeof(uint16_t));
+	int num_comp_max = memushort(tab->data,tab->len,14*sizeof(uint16_t));
+	int comp_depth_max  = memushort(tab->data,tab->len,15*sizeof(uint16_t));
 	int rd, rdtest;
 
 	/* Already figured out two of these */
@@ -1859,7 +1962,7 @@ void SCTickValidationState(SplineChar *sc,int layer) {
     }
 }
 
-int VSMaskFromFormat(SplineFont *sf, int layer, enum fontformat format) {
+enum validation_state VSMaskFromFormat(SplineFont *sf, int layer, enum fontformat format) {
     if ( format==ff_cid || format==ff_cffcid || format==ff_otfcid || format==ff_otfciddfont )
 return( vs_maskcid );
     else if ( format<=ff_cff )
@@ -1870,8 +1973,10 @@ return( vs_maskttf );
 return( vs_maskps );
     else if ( format==ff_svg )
 return( vs_maskttf );
-    else if ( format==ff_woff2 )
+    else if ( format==ff_woff_ttf || format==ff_woff2_ttf )
 return( vs_maskttf );
+    else if ( format==ff_woff_otf || format==ff_woff2_otf )
+return( vs_maskps );
     else
 return( sf->subfontcnt!=0 || sf->cidmaster!=NULL ? vs_maskcid :
 	sf->layers[layer].order2 ? vs_maskttf : vs_maskps );
@@ -2463,7 +2568,7 @@ void _CVMenuMakeLine(CharViewBase *cv,int do_arc,int ellipse_to_back) {
 }
 
 void SCClearInstrsOrMark(SplineChar *sc, int layer, int complain) {
-    uint8 *instrs = sc->ttf_instrs==NULL && sc->parent->mm!=NULL && sc->parent->mm->apple ?
+    uint8_t *instrs = sc->ttf_instrs==NULL && sc->parent->mm!=NULL && sc->parent->mm->apple ?
 		sc->parent->mm->normal->glyphs[sc->orig_pos]->ttf_instrs : sc->ttf_instrs;
     struct splinecharlist *dep;
     SplineSet *ss;
@@ -2578,7 +2683,7 @@ static void SCHintsChng(SplineChar *sc) {
 }
 
 void instrcheck(SplineChar *sc,int layer) {
-    uint8 *instrs = sc->ttf_instrs==NULL && sc->parent->mm!=NULL && sc->parent->mm->apple ?
+    uint8_t *instrs = sc->ttf_instrs==NULL && sc->parent->mm!=NULL && sc->parent->mm->apple ?
 		sc->parent->mm->normal->glyphs[sc->orig_pos]->ttf_instrs : sc->ttf_instrs;
 
     if ( !sc->layers[layer].order2 || sc->layers[layer].background )
@@ -2668,7 +2773,6 @@ static void SCB_MoreLayers(SplineChar *sc,Layer *old) {
 static struct sc_interface noui_sc = {
     SCUpdateNothing,
     SCUpdateNothing,
-    SCUpdateNothing,
     SCHintsChng,
     SCChngNoUpdate,
     _SCChngNoUpdate,
@@ -2729,4 +2833,51 @@ void SCRemoveVKern(SplineChar* sc) {
 	if( sc->parent->fv->cidmaster!=NULL )
 	    sc->parent->fv->cidmaster->changed = true;
     }
+}
+
+const char* SCNameCheck(const unichar_t *name, bool *p_questionable) {
+    bool bad = false, questionable = false;
+    extern int allow_utf8_glyphnames;
+
+    if (p_questionable) *p_questionable = questionable;
+
+    if ( uc_strcmp(name,".notdef")==0 || uc_strcmp(name,".null")==0 )		/* These names are special cases and don't follow conventions */
+        return NULL;
+    if ( u_strlen(name)>31 ) {
+        return _("Glyph names are limited to 31 characters");
+    } else if ( *name=='\0' ) {
+        return _("Bad Name");
+    } else if ( isdigit(*name) || *name=='.' ) {
+        return _("A glyph name may not start with a digit nor a full stop (period)");
+    }
+
+    while ( *name ) {
+        if ( *name<=' ' || (!allow_utf8_glyphnames && *name>=0x7f) ||
+                *name=='(' || *name=='[' || *name=='{' || *name=='<' ||
+                *name==')' || *name==']' || *name=='}' || *name=='>' ||
+                *name=='%' || *name=='/' )
+            bad=true;
+        else if ( !isalnum(*name) && *name!='.' && *name!='_' )
+            questionable = true;
+        ++name;
+    }
+    if ( bad ) {
+        return _("A glyph name must be ASCII, without spaces and may not contain the characters \"([{<>}])/%%\", and should contain only alphanumerics, periods and underscores");
+    } else if ( questionable ) {
+        if (p_questionable == NULL) {
+            /* The caller doesn't care, just accept the name. */
+            return NULL;
+	} else {
+            *p_questionable = questionable;
+            return _("A glyph name should contain only alphanumerics, periods and underscores\nDo you want to use this name in spite of that?");
+        }
+    }
+    return NULL;
+}
+
+const char* SCGetName(const SplineChar* sc) { return sc->name; }
+
+void SCGetEncoding(const SplineChar* sc, int* p_unicodeenc, int* p_ttf_glyph) {
+    if (p_unicodeenc) *p_unicodeenc = sc->unicodeenc;
+    if (p_ttf_glyph) *p_ttf_glyph = sc->ttf_glyph;
 }

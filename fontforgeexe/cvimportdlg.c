@@ -108,7 +108,7 @@ static int BVImportImage(BitmapView *bv,char *path) {
     GImage *image;
     struct _GImage *base;
     int tot;
-    uint8 *pt, *end;
+    uint8_t *pt, *end;
     BDFChar *bc = bv->bc;
     int i, j;
 
@@ -127,7 +127,7 @@ return(false);
 	bc->bitmap = base->data;
 	bc->bytes_per_line = base->bytes_per_line;
 
-	/* Sigh. Bitmaps use a different defn of set than images do. make it consistant */
+	/* Sigh. Bitmaps use a different defn of set than images do. make it consistent */
 	tot = bc->bytes_per_line*(bc->ymax-bc->ymin+1);
 	for ( pt = bc->bitmap, end = pt+tot; pt<end; *pt++ ^= 0xff );
 
@@ -267,11 +267,11 @@ void _ImportParamsDlg(ImportParams *ip) {
     GRect pos;
     GWindow gw;
     GWindowAttrs wattrs;
-    GGadgetCreateData gcd[12], boxes[4], *hvarray[12][4], *barray[10];
-    GTextInfo label[12];
+    GGadgetCreateData gcd[13], boxes[4], *hvarray[13][4], *barray[10];
+    GTextInfo label[13];
     char accbuf[20], jlbuf[20];
     int done = false, err = false;
-    int k, he_k, cd_k, si_k, sc_k, cl_k, al_k;
+    int k, he_k, cd_k, si_k, sc_k, cl_k, di_k, al_k;
 
     if ( no_windowing_ui )
 	return;
@@ -373,13 +373,26 @@ void _ImportParamsDlg(ImportParams *ip) {
     hvarray[5][2] = GCD_ColSpan;
     hvarray[5][3] = NULL;
 
+    di_k = k;
+    label[k].text = (unichar_t *) _("Infer glyph width (Misc)");
+    label[k].text_is_1byte = true;
+    gcd[k].gd.label = &label[k];
+    gcd[k].gd.pos.x = gcd[k-1].gd.pos.x; gcd[k].gd.pos.y = gcd[k-1].gd.pos.y+15;
+    gcd[k].gd.flags = gg_enabled | gg_visible|
+	    (ip->dimensions?gg_cb_on:0);
+    gcd[k++].creator = GCheckBoxCreate;
+    hvarray[6][0] = &gcd[k-1];
+    hvarray[6][1] = GCD_ColSpan;
+    hvarray[6][2] = GCD_ColSpan;
+    hvarray[6][3] = NULL;
+
     label[k].text = (unichar_t *) _("Default Join Limit (PS/EPS/SVG):");
     label[k].text_is_1byte = true;
     label[k].text_in_resource = true;
     gcd[k].gd.label = &label[k];
     gcd[k].gd.flags = gg_visible | gg_enabled;
     gcd[k++].creator = GLabelCreate;
-    hvarray[6][0] = &gcd[k-1];
+    hvarray[7][0] = &gcd[k-1];
 
     sprintf( jlbuf, "%g", (double) (ip->default_joinlimit) );
     label[k].text = (unichar_t *) jlbuf;
@@ -392,9 +405,9 @@ void _ImportParamsDlg(ImportParams *ip) {
       "of 1/2 stroke-width. Set to -1 to use the format-\n"
       "specific limits of 10.0 for PostScript and 4.0 for SVG.");
     gcd[k++].creator = GTextFieldCreate;
-    hvarray[6][1] = &gcd[k-1];
-    hvarray[6][2] = GCD_Glue;
-    hvarray[6][3] = NULL;
+    hvarray[7][1] = &gcd[k-1];
+    hvarray[7][2] = GCD_Glue;
+    hvarray[7][3] = NULL;
 
     label[k].text = (unichar_t *) _("Accuracy _Target:");
     label[k].text_is_1byte = true;
@@ -402,7 +415,7 @@ void _ImportParamsDlg(ImportParams *ip) {
     gcd[k].gd.label = &label[k];
     gcd[k].gd.flags = gg_visible | gg_enabled;
     gcd[k++].creator = GLabelCreate;
-    hvarray[7][0] = &gcd[k-1];
+    hvarray[8][0] = &gcd[k-1];
 
     sprintf( accbuf, "%g", (double) (ip->accuracy_target) );
     label[k].text = (unichar_t *) accbuf;
@@ -414,9 +427,9 @@ void _ImportParamsDlg(ImportParams *ip) {
       "The Expand Stroke algorithm will attempt to be (at\n"
       "least) this accurate, but there may be exceptions.");
     gcd[k++].creator = GTextFieldCreate;
-    hvarray[7][1] = &gcd[k-1];
-    hvarray[7][2] = GCD_Glue;
-    hvarray[7][3] = NULL;
+    hvarray[8][1] = &gcd[k-1];
+    hvarray[8][2] = GCD_Glue;
+    hvarray[8][3] = NULL;
 
     al_k = k;
     label[k].text = (unichar_t *) _("_Always raise this dialog when importing");
@@ -425,10 +438,10 @@ void _ImportParamsDlg(ImportParams *ip) {
     gcd[k].gd.label = &label[k];
     gcd[k].gd.flags = gg_enabled | gg_visible | (ip->show_always?gg_cb_on:0);
     gcd[k++].creator = GCheckBoxCreate;
-    hvarray[8][0] = &gcd[k-1];
-    hvarray[8][1] = GCD_ColSpan;
-    hvarray[8][2] = GCD_ColSpan;
-    hvarray[8][3] = NULL;
+    hvarray[9][0] = &gcd[k-1];
+    hvarray[9][1] = GCD_ColSpan;
+    hvarray[9][2] = GCD_ColSpan;
+    hvarray[9][3] = NULL;
 
     gcd[k].gd.flags = gg_visible | gg_enabled | gg_but_default;
     label[k].text = (unichar_t *) _("_OK");
@@ -445,15 +458,15 @@ void _ImportParamsDlg(ImportParams *ip) {
     boxes[2].gd.flags = gg_enabled | gg_visible;
     boxes[2].gd.u.boxelements = barray;
     boxes[2].creator = GHBoxCreate;
-    hvarray[9][0] = GCD_Glue;
-    hvarray[9][1] = GCD_ColSpan;
-    hvarray[9][2] = GCD_ColSpan;
-    hvarray[9][3] = NULL;
-    hvarray[10][0] = &boxes[2];
+    hvarray[10][0] = GCD_Glue;
     hvarray[10][1] = GCD_ColSpan;
     hvarray[10][2] = GCD_ColSpan;
     hvarray[10][3] = NULL;
-    hvarray[11][0] = NULL;
+    hvarray[11][0] = &boxes[2];
+    hvarray[11][1] = GCD_ColSpan;
+    hvarray[11][2] = GCD_ColSpan;
+    hvarray[11][3] = NULL;
+    hvarray[12][0] = NULL;
 
     boxes[0].gd.pos.x = boxes[0].gd.pos.y = 2;
     boxes[0].gd.flags = gg_enabled | gg_visible;
@@ -475,6 +488,7 @@ void _ImportParamsDlg(ImportParams *ip) {
     ip->simplify = GGadgetIsChecked(gcd[si_k].ret);
     ip->clip = GGadgetIsChecked(gcd[cl_k].ret);
     ip->scale = GGadgetIsChecked(gcd[sc_k].ret);
+    ip->dimensions = GGadgetIsChecked(gcd[di_k].ret);
     ip->default_joinlimit = GetReal8(gw,CID_JoinLimitVal,_("Default Join Limit (PS/EPS/SVG):"),&err);
     if ( err ) {
 	ip->default_joinlimit = JLIMIT_INHERITED;
@@ -547,13 +561,13 @@ static int GFD_ImportOk(GGadget *g, GEvent *e) {
 	unichar_t *ret = GGadgetGetTitle(d->gfc);
 	char *temp = u2def_copy(ret);
 	int lpos = GGadgetGetFirstListSelectedItem(d->format);
-	int format = (intpt) (GGadgetGetListItemSelected(d->format)->userdata);
+	int format = (intptr_t) (GGadgetGetListItemSelected(d->format)->userdata);
 	GGadget *tf;
 
 	ImportParams *ip = ImportParamsState();
 
 	GFileChooserGetChildren(d->gfc,NULL,NULL,&tf);
-	if ( *_GGadgetGetTitle(tf)=='\0' )
+	if ( *_GGadgetGetTitle(tf)=='\0' || !temp)
 return( true );
 	GDrawSetCursor(GGadgetGetWindow(g),ct_watch);
 	if ( d->fv!=NULL ) {
@@ -565,17 +579,18 @@ return( true );
 	}
 	free(ret);
 	if ( d->fv!=NULL ) {
+	    char** path_list = GFileChooserGetMultipleFiles(temp);
 	    int toback = GGadgetIsChecked(d->background);
-	    if ( toback && strchr(temp,';')!=NULL && format<3 )
+	    if ( toback && path_list[1]!=NULL && format<3 )
 		ff_post_error(_("Only One Font"),_("Only one font may be imported into the background"));
 	    else if ( format==fv_bdf )
-		d->done = FVImportBDF((FontViewBase *) d->fv,temp,false, toback);
+		d->done = FVImportBDFs((FontViewBase *) d->fv,path_list,false, toback);
 	    else if ( format==fv_ttf )
 		d->done = FVImportMult((FontViewBase *) d->fv,temp,toback,bf_ttf);
 	    else if ( format==fv_pk )		/* pk */
-		d->done = FVImportBDF((FontViewBase *) d->fv,temp,true, toback);
+		d->done = FVImportBDFs((FontViewBase *) d->fv,path_list,true, toback);
 	    else if ( format==fv_pcf )		/* pcf */
-		d->done = FVImportBDF((FontViewBase *) d->fv,temp,2, toback);
+		d->done = FVImportBDFs((FontViewBase *) d->fv,path_list,2, toback);
 	    else if ( format==fv_mac )
 		d->done = FVImportMult((FontViewBase *) d->fv,temp,toback,bf_nfntmacbin);
 	    else if ( format==fv_win )
@@ -584,34 +599,38 @@ return( true );
 		d->done = FVImportMult((FontViewBase *) d->fv,temp,toback,bf_palm);
 	    else if ( format==fv_image ) {
 		ShowImportOptions(ip, d->opts_shown, sp_scale);
-		d->done = FVImportImages((FontViewBase *) d->fv,temp,format,toback,true,ip);
+		d->done = FVImportImages((FontViewBase *) d->fv,path_list,format,toback,true,ip);
 	    } else if ( format==fv_imgtemplate ) {
 		ShowImportOptions(ip, d->opts_shown, sp_scale);
 		d->done = FVImportImageTemplate((FontViewBase *) d->fv,temp,format,toback,true,ip);
 	    } else if ( format==fv_eps ) {
 		ShowImportOptions(ip, d->opts_shown, sp_eps);
-		d->done = FVImportImages((FontViewBase *) d->fv,temp,format,toback,true,ip);
+		d->done = FVImportImages((FontViewBase *) d->fv,path_list,format,toback,true,ip);
 	    } else if ( format==fv_epstemplate ) {
 		ShowImportOptions(ip, d->opts_shown, sp_eps);
 		d->done = FVImportImageTemplate((FontViewBase *) d->fv,temp,format,toback,true,ip);
 	    } else if ( format==fv_pdf ) {
 		ShowImportOptions(ip, d->opts_shown, sp_eps);
-		d->done = FVImportImages((FontViewBase *) d->fv,temp,format,toback,true,ip);
+		d->done = FVImportImages((FontViewBase *) d->fv,path_list,format,toback,true,ip);
 	    } else if ( format==fv_pdftemplate ) {
 		ShowImportOptions(ip, d->opts_shown, sp_eps);
 		d->done = FVImportImageTemplate((FontViewBase *) d->fv,temp,format,toback,true,ip);
 	    } else if ( format==fv_svg ) {
 		ShowImportOptions(ip, d->opts_shown, sp_svg);
-		d->done = FVImportImages((FontViewBase *) d->fv,temp,format,toback,true,ip);
+		d->done = FVImportImages((FontViewBase *) d->fv,path_list,format,toback,true,ip);
 	    } else if ( format==fv_svgtemplate ) {
 		ShowImportOptions(ip, d->opts_shown, sp_svg);
 		d->done = FVImportImageTemplate((FontViewBase *) d->fv,temp,format,toback,true,ip);
 	    } else if ( format==fv_glif )
-		d->done = FVImportImages((FontViewBase *) d->fv,temp,format,toback,true,ip);
+		d->done = FVImportImages((FontViewBase *) d->fv,path_list,format,toback,true,ip);
 	    else if ( format==fv_gliftemplate )
 		d->done = FVImportImageTemplate((FontViewBase *) d->fv,temp,format,toback,true,ip);
 	    else if ( format>=fv_pythonbase )
-		d->done = FVImportImages((FontViewBase *) d->fv,temp,format,toback,true,ip);
+		d->done = FVImportImages((FontViewBase *) d->fv,path_list,format,toback,true,ip);
+
+	    for (char** p_path = path_list; *p_path != NULL; ++p_path)
+		free(*p_path);
+	    free(path_list);
 	} else if ( d->bv!=NULL )
 	    d->done = BVImportImage(d->bv,temp);
 	else {
@@ -659,7 +678,7 @@ return( true );
 static int GFD_Format(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_listselected ) {
 	struct gfc_data *d = GDrawGetUserData(GGadgetGetWindow(g));
-	int format = (intpt) (GGadgetGetListItemSelected(d->format)->userdata);
+	int format = (intptr_t) (GGadgetGetListItemSelected(d->format)->userdata);
 	if ( format<fv_pythonbase )
 	    GFileChooserSetFilterText(d->gfc,wildfmt[format]);
 #ifndef _NO_PYTHON
@@ -710,6 +729,7 @@ static int GFD_Options(GGadget *g, GEvent *e) {
 	_ImportParamsDlg(ImportParamsState());
 	d->opts_shown = true;
     }
+    return true;
 }
 
 static int e_h(GWindow gw, GEvent *event) {
@@ -743,7 +763,7 @@ static void _Import(CharView *cv,BitmapView *bv,FontView *fv) {
     int i, format, lpos;
     int bs = GIntGetResource(_NUM_Buttonsize), bsbigger, totwid, scalewid;
     static int done= false;
-    GTextInfo *cur_formats, *base;
+    GTextInfo *cur_formats;
 
     if ( !done ) {
 	for ( i=0; formats[i].text!=NULL; ++i )
@@ -754,13 +774,13 @@ static void _Import(CharView *cv,BitmapView *bv,FontView *fv) {
 	flast_format = (int) fv_bdf;
 	done = true;
     }
-    base = cur_formats = fv==NULL?formats:fvformats;
 #ifndef _NO_PYTHON
+    GTextInfo *base = cur_formats = fv==NULL?formats:fvformats;
     if ( py_ie!=NULL ) {
 	int cnt, extras;
 	for ( cnt=0; base[cnt].text!=NULL; ++cnt );
 	for ( i=extras=0; py_ie[i].name!=NULL; ++i )
-	    if ( py_ie[i].import!=NULL )
+	    if ( py_ie[i].py_import!=NULL )
 		++extras;
 	if ( extras!=0 ) {
 	    cur_formats = calloc(extras+cnt+1,sizeof(GTextInfo));
@@ -769,10 +789,10 @@ static void _Import(CharView *cv,BitmapView *bv,FontView *fv) {
 		cur_formats[cnt].text = (unichar_t *) copy( (char *) base[cnt].text );
 	    }
 	    for ( i=extras=0; py_ie[i].name!=NULL; ++i ) {
-		if ( py_ie[i].import!=NULL ) {
+		if ( py_ie[i].py_import!=NULL ) {
 		    cur_formats[cnt+extras].text = (unichar_t *) copy(py_ie[i].name);
 		    cur_formats[cnt+extras].text_is_1byte = true;
-		    cur_formats[cnt+extras].userdata = (void *) (intpt) (fv_pythonbase+i);
+		    cur_formats[cnt+extras].userdata = (void *) (intptr_t) (fv_pythonbase+i);
 		    ++extras;
 		}
 	    }
@@ -781,8 +801,8 @@ static void _Import(CharView *cv,BitmapView *bv,FontView *fv) {
 #endif
     if ( !hasspiro()) {
 	for ( i=0; cur_formats[i].text!=NULL; ++i )
-	    if ( ((intpt) cur_formats[i].userdata)==fv_plate ||
-		    ((intpt) cur_formats[i].userdata)==fv_platetemplate )
+	    if ( ((intptr_t) cur_formats[i].userdata)==fv_plate ||
+		    ((intptr_t) cur_formats[i].userdata)==fv_platetemplate )
 		cur_formats[i].disabled = true;
     }
 

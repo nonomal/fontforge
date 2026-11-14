@@ -41,7 +41,10 @@
 #include "utanvec.h"
 
 #include <assert.h>
+#ifndef _MSC_VER
 #include <complex.h>
+#endif
+#include <float.h>
 #include <math.h>
 
 #define CIRCOFF 0.551915
@@ -634,7 +637,7 @@ static void BuildNibCorners(NibCorner **ncp, SplineSet *nib, int *maxp,
 	    // Flatten potential LineSameSide permissiveness
 	    nc[i].utv[NC_OUT_IDX] = nc[i].utv[NC_IN_IDX];
 	if (    UTanVecGreater(nc[i].utv[NC_IN_IDX], max_utanangle)
-	     || BPNear(nc[i].utv[NC_IN_IDX], max_utanangle) ) {
+	     || UTNear(nc[i].utv[NC_IN_IDX], max_utanangle) ) {
 	    max_utan_index = i;
 	    max_utanangle = nc[i].utv[NC_IN_IDX];
 	}
@@ -712,15 +715,15 @@ static NibOffset *_CalcNibOffset(NibCorner *nc, int n, BasePoint ut,
     // and therefore the only cases where the array values differ
     if (   nc[nci].linear
 	// "Capsule" case
-        && BPNear(ut, nc[ncni].utv[NC_IN_IDX])
-        && BPNear(ut, nc[nci].utv[NC_IN_IDX]) ) {
+        && UTNear(ut, nc[ncni].utv[NC_IN_IDX])
+        && UTNear(ut, nc[nci].utv[NC_IN_IDX]) ) {
 	no->nt = 0.0;
 	no->off[NIBOFF_CCW_IDX] = nc[nci].on_nib->me;
 	no->off[NIBOFF_CW_IDX] = nc[ncni].on_nib->me;
 	no->nci[NIBOFF_CW_IDX] = ncni;
 	no->at_line = true;
 	no->curve = false;
-    } else if ( nc[ncpi].linear && BPNear(ut, nc[ncpi].utv[NC_OUT_IDX]) ) {
+    } else if ( nc[ncpi].linear && UTNear(ut, nc[ncpi].utv[NC_OUT_IDX]) ) {
 	// Other lines
 	no->nt = 0.0;
 	no->off[NIBOFF_CCW_IDX] = nc[ncpi].on_nib->me;
@@ -732,7 +735,7 @@ static NibOffset *_CalcNibOffset(NibCorner *nc, int n, BasePoint ut,
     // draws the offset curve
     } else if (   UTanVecsSequent(nc[nci].utv[NC_IN_IDX], ut,
                                   nc[nci].utv[NC_OUT_IDX], false)
-               || BPNear(ut, nc[nci].utv[NC_OUT_IDX] ) ) {
+               || UTNear(ut, nc[nci].utv[NC_OUT_IDX] ) ) {
 	no->nt = 0.0;
 	no->off[0] = no->off[1] = nc[nci].on_nib->me;
 	no->curve = false;
@@ -774,11 +777,11 @@ static BasePoint SplineStrokeNextAngle(StrokeContext *c, BasePoint ut,
     ncni = NC_NEXTI(c, nci);
     ncpi = NC_PREVI(c, nci);
 
-    if ( BPNear(ut, c->nibcorners[nci].utv[NC_IN_IDX]) ) {
+    if ( UTNear(ut, c->nibcorners[nci].utv[NC_IN_IDX]) ) {
 	if ( is_ccw ) {
-	    if ( BPNear(c->nibcorners[nci].utv[NC_IN_IDX],
+	    if ( UTNear(c->nibcorners[nci].utv[NC_IN_IDX],
 	                c->nibcorners[ncpi].utv[NC_OUT_IDX]) ) {
-		if ( BPNear(c->nibcorners[nci].utv[NC_IN_IDX],
+		if ( UTNear(c->nibcorners[nci].utv[NC_IN_IDX],
 		            c->nibcorners[ncpi].utv[NC_IN_IDX]) ) {
 		    assert(c->nibcorners[ncpi].linear);
 		    *curved = true;
@@ -796,9 +799,9 @@ static BasePoint SplineStrokeNextAngle(StrokeContext *c, BasePoint ut,
 		nci = ncpi;
 	    }
 	} else { // CW
-	    if ( BPNear(c->nibcorners[nci].utv[NC_IN_IDX],
+	    if ( UTNear(c->nibcorners[nci].utv[NC_IN_IDX],
 	                c->nibcorners[nci].utv[NC_OUT_IDX]) ) {
-		if ( BPNear(c->nibcorners[nci].utv[NC_IN_IDX],
+		if ( UTNear(c->nibcorners[nci].utv[NC_IN_IDX],
 		            c->nibcorners[ncni].utv[NC_IN_IDX]) ) {
 		    assert(c->nibcorners[nci].linear);
 		    inout = NC_OUT_IDX;
@@ -813,14 +816,14 @@ static BasePoint SplineStrokeNextAngle(StrokeContext *c, BasePoint ut,
 		*curved = false;
 	    }
 	}
-    } else if ( BPNear(ut, c->nibcorners[nci].utv[NC_OUT_IDX]) ) {
-	assert( ! BPNear(c->nibcorners[nci].utv[NC_IN_IDX],
+    } else if ( UTNear(ut, c->nibcorners[nci].utv[NC_OUT_IDX]) ) {
+	assert( ! UTNear(c->nibcorners[nci].utv[NC_IN_IDX],
 	                 c->nibcorners[nci].utv[NC_OUT_IDX]) );
 	if ( is_ccw ) {
 	    inout = NC_IN_IDX;
 	    *curved = false;
 	} else { // CW
-	    if ( BPNear(c->nibcorners[nci].utv[NC_OUT_IDX],
+	    if ( UTNear(c->nibcorners[nci].utv[NC_OUT_IDX],
 	                c->nibcorners[ncni].utv[NC_IN_IDX]) ) {
 		assert(c->nibcorners[nci].linear);
 		inout = NC_OUT_IDX;
@@ -857,7 +860,7 @@ static BasePoint SplineStrokeNextAngle(StrokeContext *c, BasePoint ut,
 /******************************************************************************/
 
 /* This is a convenience function that also concisely demonstrates
- * the calculation of an offseted point.
+ * the calculation of an offsetted point.
  */
 BasePoint SplineOffsetAt(StrokeContext *c, Spline *s, bigreal t, int is_right) {
     int is_ccw;
@@ -1109,7 +1112,7 @@ static int SplineStrokeAppendFixup(SplinePoint *tailp, BasePoint sxy,
 
     // assert( mg < 1 );
     if ( mg > FIXUP_MARGIN*fudge ) {
-	LogError(_("Warning: Coordinate diff %lf greater than margin %lf\n"),
+	LogError(_("Warning: Coordinate diff %lf greater than margin %lf"),
 	         mg, FIXUP_MARGIN*fudge);
     }
 
@@ -1679,6 +1682,17 @@ static void MiterJoin(JoinParams *jpp);
  * the implementation below use complex arithmetic to calculate the center,
  * foci, and axes. 
  */
+#ifdef _MSC_VER
+/* MSVC doesn't support C99 complex numbers, fall back to miter join */
+static void RoundJoin(JoinParams *jpp, int rv) {
+    if ( rv ) {
+	DoubleBackJC(jpp->c, jpp->cur, jpp->sxy, jpp->oxy, jpp->ut_fm,
+	             jpp->is_right, 0);
+	return;
+    }
+    MiterJoin(jpp);
+}
+#else
 static void RoundJoin(JoinParams *jpp, int rv) {
     BasePoint p0, p1, p2, p1p, p12a, angle, h0, h2;
     bigreal p12d, x1, y1, w, major, minor;
@@ -1728,6 +1742,7 @@ static void RoundJoin(JoinParams *jpp, int rv) {
 
     SSAppendArc(jpp->cur, major, minor, angle, h0, h2, jpp->is_right, true);
 }
+#endif
 
 static void MiterJoin(JoinParams *jpp) {
     BasePoint ixy, refp, cow, coi, clip1, clip2, ut;
@@ -2110,7 +2125,7 @@ static int _HandleJoin(JoinParams *jpp) {
 	    MiterJoin(jpp);
     } else {
 	if ( c->join!=lj_nib && c->join!=lj_inherited )
-	    LogError( _("Warning: Unrecognized or unsupported join type, defaulting to 'nib'.\n") );
+	    LogError( _("Warning: Unrecognized or unsupported join type, defaulting to 'nib'.") );
 	NibJoin(jpp);
     }
     return is_flat;
@@ -2147,7 +2162,7 @@ static void HandleCap(StrokeContext *c, SplineSet *cur, BasePoint sxy,
 	DoubleBackJC(c, cur, sxy, oxy, BPRevIf(!is_right, ut), !is_right, 1);
     } else {
 	if ( c->cap!=lc_nib && c->cap!=lc_inherited )
-	    LogError( _("Warning: Unrecognized or unsupported cap type, defaulting to 'nib'.\n") );
+	    LogError( _("Warning: Unrecognized or unsupported cap type, defaulting to 'nib'.") );
 
 	CalcNibOffset(c, ut, false, &no_fm, -1);
 	corner_fm = SplineStrokeFindCorner(sxy, cur->last->me, &no_fm);
@@ -2262,7 +2277,7 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
     if (    (left!=NULL && left->first==NULL)
          || (right!=NULL && right->first==NULL) ) {
 	// The path (presumably) had only zero-length splines
-	LogError( _("Warning: No stroke output for contour\n") );
+	LogError( _("Warning: No stroke output for contour") );
 	assert(    (left==NULL || left->first==NULL)
 	        && (right==NULL || right->first==NULL) );
 	chunkfree(left, sizeof(SplineSet));
@@ -2277,12 +2292,12 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 	right = NULL;
 	SplineSetJoin(left, true, FIXUP_MARGIN*c->log_maxdim, &closed, false);
 	if ( !closed )
-	     LogError( _("Warning: Contour end did not close\n") );
+	     LogError( _("Warning: Contour end did not close") );
 	else {
 	    HandleCap(c, left, ss->first->me, ut_ini, left->first->me, false);
 	    SplineSetJoin(left, true, FIXUP_MARGIN*c->log_maxdim, &closed, true);
 	    if ( !closed )
-		LogError( _("Warning: Contour start did not close\n") );
+		LogError( _("Warning: Contour start did not close") );
 	    else {
 		if ( c->rmov==srmov_contour ) {
 		    left = SplineSetRemoveOverlap(NULL,left,over_remove);
@@ -2316,7 +2331,7 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
             left = SplineSetJoin(left, true, FIXUP_MARGIN*c->log_maxdim,
 	                         &closed, true);
 	    if ( !closed )
-		LogError( _("Warning: Left contour did not close\n") );
+		LogError( _("Warning: Left contour did not close") );
 
 	    cur = left;
 	}
@@ -2327,7 +2342,7 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
             right = SplineSetJoin(right, true, FIXUP_MARGIN*c->log_maxdim,
 	                          &closed, true);
 	    if ( !closed )
-		LogError( _("Warning: Right contour did not close\n") );
+		LogError( _("Warning: Right contour did not close") );
 	    else {
 		SplineSetReverse(right);
 	    }

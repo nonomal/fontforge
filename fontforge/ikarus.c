@@ -302,7 +302,7 @@ return;
     urwtable[677] = 0x2044;
     urwtable[678] = '%';
     urwtable[679] = 0x2030;
-	/* 680 and 681 are some sort of varient on % and per mill */
+	/* 680 and 681 are some sort of variant on % and per mill */
     urwtable[700] = '\\';
     urwtable[701] = 0xa8;
     urwtable[702] = 0x2d9;
@@ -318,7 +318,7 @@ return;
     urwtable[712] = 0x2db;
     urwtable[713] = 0xaf;
     urwtable[714] = 0xaf;
-	/* 751-764 seem to be varients on 701-714 */
+	/* 751-764 seem to be variants on 701-714 */
     urwtable[765] = 0x323;
     urwtable[766] = 0x320;
     urwtable[768] = 0x326;
@@ -414,7 +414,7 @@ return;
 }
 
 static void IkarusAddContour(SplineChar *sc,int npts,BasePoint *bps,
-	uint8 *ptype, int nesting) {
+	uint8_t *ptype, int nesting) {
     SplinePointList *spl;
     SplinePoint *last, *next;
     int i, cw;
@@ -448,13 +448,13 @@ static void IkarusAddContour(SplineChar *sc,int npts,BasePoint *bps,
 static void IkarusReadChar(SplineChar *sc,FILE *file) {
     int n, i, j, number, following, units, ncontours, ptmax;
     DBounds bb;
-    int32 base;
+    int32_t base;
     struct contour {
-	int32 offset;
+	int32_t offset;
 	int dir, nest, col, npts;
     } *contours;
     BasePoint *bps;
-    uint8 *ptype;
+    uint8_t *ptype;
     int x,y;
 
     /* record len of char = */ getushort(file);
@@ -465,7 +465,7 @@ static void IkarusReadChar(SplineChar *sc,FILE *file) {
     IkarusNameFromURWNumber(sc,number);
     following = getushort(file);
     if ( following!=0 )
-	LogError( _("This character (gid=%d) has a following part (%d). I'm not sure what that means, please send me (gww@silcom.com) a copy of this font so I can test with it.\n"),
+	LogError( _("This character (gid=%d) has a following part (%d). I'm not sure what that means, please send me (gww@silcom.com) a copy of this font so I can test with it."),
 		sc->orig_pos, following );
     for ( i=3; i<n ; ++i )
 	getushort(file);	/* Just in case the name section is bigger now */
@@ -504,7 +504,7 @@ static void IkarusReadChar(SplineChar *sc,FILE *file) {
 	    ptmax = contours[i].npts;
     }
     bps = malloc(ptmax*sizeof(BasePoint));
-    ptype = malloc(ptmax*sizeof(uint8));
+    ptype = malloc(ptmax*sizeof(uint8_t));
 
     base = ftell(file);
     /* 2 words here giving length (in records/words) of image data */
@@ -601,10 +601,10 @@ SplineFont *SFReadIkarus(char *fontname) {
     FILE *file = fopen(fontname,"rb");
     int ch1, ch2, rpos, wpos, i;
     int hlen, ilen, jlen, llen, mlen;
-    int numchars, maxnum, opt_pt_size;
+    int numchars, maxnum;
     double italic_angle;
     char fnam[13], fullname[81];
-    int32 *offsets, *numbers;
+    int32_t *offsets, *numbers;
 
     if ( file==NULL )
 return( NULL );
@@ -637,7 +637,7 @@ return( NULL );
 return( NULL );
     }
     if ( ilen!=55 )
-	LogError( _("Unexpected size for name section of URW font (expected 55, got %d)\n"), ilen );
+	LogError( _("Unexpected size for name section of URW font (expected 55, got %d)"), ilen );
 
     fseek(file,2*ilen+2,SEEK_SET);
     jlen = getushort(file);
@@ -646,7 +646,7 @@ return( NULL );
 return( NULL );
     }
     if ( jlen!=12 )
-	LogError( _("Unexpected size for font info section of URW font (expected 12, got %d)\n"), jlen );
+	LogError( _("Unexpected size for font info section of URW font (expected 12, got %d)"), jlen );
     if ( getushort(file)!=1 ) {		/* 1=> typeface */
 	fclose(file);
 return( NULL );
@@ -659,7 +659,7 @@ return( NULL );
     /* line thickness = */ getushort(file);
     /* stroke thickness = */ getushort(file);
     italic_angle = getushort(file)/10.0 * FF_PI/180.0;
-    opt_pt_size = getushort(file);
+    /*opt_pt_size =*/ getushort(file);
     /* average char width = */ getushort(file);
 
     fseek(file,2*ilen+2*jlen+2,SEEK_SET);
@@ -679,8 +679,8 @@ return( NULL );
     /* last record */ getushort(file);
     /* last word of last record */ getushort(file);
 
-    offsets = malloc(numchars*sizeof(int32));
-    numbers = malloc(numchars*sizeof(int32));
+    offsets = malloc(numchars*sizeof(int32_t));
+    numbers = malloc(numchars*sizeof(int32_t));
     maxnum = 0;
     for ( i=0; i<numchars; ++i ) {
 	numbers[i] = getushort(file);

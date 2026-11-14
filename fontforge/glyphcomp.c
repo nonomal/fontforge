@@ -518,7 +518,7 @@ return( ret );
 /* ************************************************************************** */
 
 enum Compare_Ret BitmapCompare(BDFChar *bc1, BDFChar *bc2, int err, int bb_err) {
-    uint8 *pt1, *pt2;
+    uint8_t *pt1, *pt2;
     int i,j, d, xlen;
     int mask;
     int xmin, xmax, ymin, ymax, c1, c2;
@@ -685,7 +685,7 @@ return( -1 );
     bc.ymin = cur->u.bmpstate.ymin;
     bc.ymax = cur->u.bmpstate.ymax;
     bc.bytes_per_line = cur->u.bmpstate.bytes_per_line;
-    bc.bitmap = (uint8 *) cur->u.bmpstate.bitmap;
+    bc.bitmap = (uint8_t *) cur->u.bmpstate.bitmap;
     bc.byte_data = cur->u.bmpstate.depth!=1;
     bc.width = cur->u.bmpstate.width;
     err = pixel_off_frac * (1<<BDFDepth(bdf));
@@ -1064,7 +1064,6 @@ static void SCAddBackgrounds(SplineChar *sc1,SplineChar *sc2) {
     SplineSet *last;
     RefChar *ref;
 
-    SCOutOfDateBackground(sc1);
     SplinePointListsFree(sc1->layers[ly_back].splines);
     sc1->layers[ly_back].splines = SplinePointListCopy(sc2->layers[ly_fore].splines);
     if ( sc1->layers[ly_back].splines!=NULL )
@@ -1545,7 +1544,7 @@ return( true );
 	    /*  script (for shaping engines which can't handle the script in */
 	    /*  question, or if glyphs are used in a context in which no */
 	    /*  script can be determined, or glyphs from font A are used */
-	    /*  surounded by those of font B, and the font B glyphs establish */
+	    /*  surrounded by those of font B, and the font B glyphs establish */
 	    /*  a script font A does not support) so we do not view the presence*/
 	    /*  of the default script as a reliable indicator -- only if it */
 	    /*  is the sole script */
@@ -1672,7 +1671,7 @@ static int comparekc(struct font_diff *fd,KernClass *kc1, KernClass *kc2) {
 
     if ( kc1->first_cnt!=kc2->first_cnt || kc1->second_cnt!=kc2->second_cnt )
 return( false );
-    if ( memcmp(kc1->offsets,kc2->offsets,kc1->first_cnt*kc2->second_cnt*sizeof(int16))!=0 )
+    if ( memcmp(kc1->offsets,kc2->offsets,kc1->first_cnt*kc2->second_cnt*sizeof(int16_t))!=0 )
 return( false );
 
     if ( kc1->firsts[0]==NULL && kc2->firsts[0]==NULL )
@@ -1738,25 +1737,25 @@ return( false );
 		    strcmp(fpst1->rules[i].u.glyph.fore,fpst2->rules[i].u.glyph.fore)!=0 )
 return( false );
 	} else if ( fpst1->format == pst_class ) {
-	    if ( fpst1->rules[i].u.class.ncnt!=fpst2->rules[i].u.class.ncnt ||
-		    fpst1->rules[i].u.class.bcnt!=fpst2->rules[i].u.class.bcnt ||
-		    fpst1->rules[i].u.class.fcnt!=fpst2->rules[i].u.class.fcnt )
+	    if ( fpst1->rules[i].u.fpc_class.ncnt!=fpst2->rules[i].u.fpc_class.ncnt ||
+		    fpst1->rules[i].u.fpc_class.bcnt!=fpst2->rules[i].u.fpc_class.bcnt ||
+		    fpst1->rules[i].u.fpc_class.fcnt!=fpst2->rules[i].u.fpc_class.fcnt )
 return( false );
-	    if ( memcmp(fpst1->rules[i].u.class.nclasses,fpst2->rules[i].u.class.nclasses,
-		    fpst1->rules[i].u.class.ncnt*sizeof(uint16))!=0 )
+	    if ( memcmp(fpst1->rules[i].u.fpc_class.nclasses,fpst2->rules[i].u.fpc_class.nclasses,
+		    fpst1->rules[i].u.fpc_class.ncnt*sizeof(uint16_t))!=0 )
 return( false );
-	    if ( fpst1->rules[i].u.class.bcnt!=0 &&
-		    memcmp(fpst1->rules[i].u.class.bclasses,fpst2->rules[i].u.class.bclasses,
-			fpst1->rules[i].u.class.bcnt*sizeof(uint16))!=0 )
+	    if ( fpst1->rules[i].u.fpc_class.bcnt!=0 &&
+		    memcmp(fpst1->rules[i].u.fpc_class.bclasses,fpst2->rules[i].u.fpc_class.bclasses,
+			fpst1->rules[i].u.fpc_class.bcnt*sizeof(uint16_t))!=0 )
 return( false );
-	    if ( fpst1->rules[i].u.class.fcnt!=0 &&
-		    memcmp(fpst1->rules[i].u.class.fclasses,fpst2->rules[i].u.class.fclasses,
-			fpst1->rules[i].u.class.fcnt*sizeof(uint16))!=0 )
+	    if ( fpst1->rules[i].u.fpc_class.fcnt!=0 &&
+		    memcmp(fpst1->rules[i].u.fpc_class.fclasses,fpst2->rules[i].u.fpc_class.fclasses,
+			fpst1->rules[i].u.fpc_class.fcnt*sizeof(uint16_t))!=0 )
 return( false );
 	} else if ( fpst1->format == pst_coverage || fpst1->format == pst_reversecoverage ) {
-	    if ( fpst1->rules[i].u.coverage.ncnt!=fpst2->rules[i].u.class.ncnt ||
-		    fpst1->rules[i].u.coverage.bcnt!=fpst2->rules[i].u.class.bcnt ||
-		    fpst1->rules[i].u.coverage.fcnt!=fpst2->rules[i].u.class.fcnt )
+	    if ( fpst1->rules[i].u.coverage.ncnt!=fpst2->rules[i].u.fpc_class.ncnt ||
+		    fpst1->rules[i].u.coverage.bcnt!=fpst2->rules[i].u.fpc_class.bcnt ||
+		    fpst1->rules[i].u.coverage.fcnt!=fpst2->rules[i].u.fpc_class.fcnt )
 return( false );
 	    for ( j=0; j<fpst1->rules[i].u.coverage.ncnt; ++j )
 		if ( classcmp(fpst1->rules[i].u.coverage.ncovers[j],fpst2->rules[i].u.coverage.ncovers[j])!=0 )

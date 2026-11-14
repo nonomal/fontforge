@@ -31,21 +31,23 @@
 #include "start.h"
 
 #include "encoding.h"
-#include "ffglib.h"
+#include "ffglib_compat.h"
 #include "fontforgevw.h"
 #include "gfile.h"
 #include "namelist.h"
 #include "psfont.h"
 
 #include <locale.h>
+#ifndef _MSC_VER
 #include <sys/time.h>
+#endif
 #include <time.h>
-#include <unistd.h>
+#include "ffunistd.h"
 #ifdef __Mac
 # include <stdlib.h>		/* getenv,setenv */
 #endif
 
-int32 unicode_from_adobestd[256];
+int32_t unicode_from_adobestd[256];
 struct lconv localeinfo;
 const char *coord_sep = ",";
 int quiet = 0;
@@ -65,11 +67,14 @@ static void initadobeenc(void) {
 }
 
 static void initrand(void) {
+#ifdef _MSC_VER
+    ff_random_set_seed((unsigned int)time(NULL));
+#else
     struct timeval tv;
 
     gettimeofday(&tv,NULL);
-    srand(tv.tv_usec);
-    g_random_set_seed(tv.tv_usec);
+    ff_random_set_seed(tv.tv_usec);
+#endif
 }
 
 void InitSimpleStuff(void) {
@@ -92,7 +97,7 @@ void doinitFontForgeMain(void) {
 
     if ( inited )
 return;
-    FindProgDir(NULL);
+    FindProgRoot(NULL);
     InitSimpleStuff();
     if ( default_encoding==NULL )
 	default_encoding=FindOrMakeEncoding("ISO8859-1");

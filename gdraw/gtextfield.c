@@ -30,7 +30,6 @@
 #include "gdraw.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "gwidget.h"
 #include "ustring.h"
 #include "utype.h"
@@ -43,8 +42,7 @@ static GBox glistfield_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox glistfieldmenu_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gnumericfield_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gnumericfieldspinner_box = GBOX_EMPTY; /* Don't initialize here */
-FontInstance *_gtextfield_font = NULL;
-static int gtextfield_inited = false;
+GResFont _gtextfield_font = GRESFONT_INIT("400 10pt " MONO_UI_FAMILIES);
 
 static GResInfo listfield_ri, listfieldmenu_ri, numericfield_ri, numericfieldspinner_ri;
 static GTextInfo text_lab[] = {
@@ -64,7 +62,7 @@ static GGadgetCreateData text_gcd[] = {
 static GGadgetCreateData *tarray[] = { GCD_Glue, &text_gcd[0], GCD_Glue, &text_gcd[1], GCD_Glue, NULL, NULL };
 static GGadgetCreateData textbox =
     { GHVGroupCreate, { { 2, 2, 0, 0 }, NULL, 0, 0, 0, 0, 0, NULL, { (GTextInfo *) tarray }, gg_visible|gg_enabled, NULL, NULL }, NULL, NULL };
-static GResInfo gtextfield_ri = {
+GResInfo gtextfield_ri = {
     &listfield_ri, &ggadget_ri,NULL, NULL,
     &_GGadget_gtextfield_box,
     &_gtextfield_font,
@@ -75,8 +73,9 @@ static GResInfo gtextfield_ri = {
     "GTextField",
     "Gdraw",
     false,
-    omf_font|omf_padding,
-    NULL,
+    false,
+    omf_padding,
+    { 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -90,7 +89,7 @@ static GGadgetCreateData *tlarray[] = { GCD_Glue, &textlist_gcd[0], GCD_Glue, &t
 static GGadgetCreateData textlistbox =
     { GHVGroupCreate, { { 2, 2, 0, 0 }, NULL, 0, 0, 0, 0, 0, NULL, { (GTextInfo *) tlarray }, gg_visible|gg_enabled, NULL, NULL }, NULL, NULL };
 static GResInfo listfield_ri = {
-    &listfieldmenu_ri, &gtextfield_ri,&listfieldmenu_ri, &listmark_ri,
+    &listfieldmenu_ri,&gtextfield_ri,&listfieldmenu_ri, &listmark_ri,
     &glistfield_box,
     NULL,
     &textlistbox,
@@ -100,8 +99,9 @@ static GResInfo listfield_ri = {
     "GComboBox",
     "Gdraw",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -118,8 +118,9 @@ static GResInfo listfieldmenu_ri = {
     "GComboBoxMenu",
     "Gdraw",
     false,
+    false,
     omf_padding,
-    NULL,
+    { 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -143,15 +144,17 @@ static GResInfo numericfield_ri = {
     "GNumericField",
     "Gdraw",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
     NULL
 };
+extern GResInfo glist_ri;
 static GResInfo numericfieldspinner_ri = {
-    NULL, &numericfield_ri,NULL, NULL,
+    &glist_ri, &numericfield_ri,NULL, NULL,
     &gnumericfieldspinner_box,
     NULL,
     &numbox,
@@ -161,8 +164,9 @@ static GResInfo numericfieldspinner_ri = {
     "GNumericFieldSpinner",
     "Gdraw",
     false,
+    false,
     omf_border_type|omf_border_width|omf_padding,
-    NULL,
+    { bt_none, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -257,7 +261,7 @@ static void GTextFieldPangoRefigureLines(GTextField *gt, int start_of_change) {
 
     free(gt->utf8_text);
     if ( gt->lines8==NULL ) {
-	gt->lines8 = malloc(gt->lmax*sizeof(int32));
+	gt->lines8 = malloc(gt->lmax*sizeof(int32_t));
 	gt->lines8[0] = 0;
 	gt->lines8[1] = -1;
     }
@@ -283,15 +287,15 @@ return;
 	i=0;
 	while ( ( ept = strchr(pt,'\n'))!=NULL ) {
 	    if ( i>=gt->lmax ) {
-		gt->lines8 = realloc(gt->lines8,(gt->lmax+=10)*sizeof(int32));
-		gt->lines = realloc(gt->lines,gt->lmax*sizeof(int32));
+		gt->lines8 = realloc(gt->lines8,(gt->lmax+=10)*sizeof(int32_t));
+		gt->lines = realloc(gt->lines,gt->lmax*sizeof(int32_t));
 	    }
 	    gt->lines8[i++] = pt-utf8_text;
 	    pt = ept+1;
 	}
 	if ( i>=gt->lmax ) {
-	    gt->lines8 = realloc(gt->lines8,(gt->lmax+=10)*sizeof(int32));
-	    gt->lines = realloc(gt->lines,gt->lmax*sizeof(int32));
+	    gt->lines8 = realloc(gt->lines8,(gt->lmax+=10)*sizeof(int32_t));
+	    gt->lines = realloc(gt->lines,gt->lmax*sizeof(int32_t));
 	}
 	gt->lines8[i++] = pt-utf8_text;
 
@@ -307,8 +311,8 @@ return;
 	GDrawLayoutSetWidth(gt->g.base,gt->g.inner.width);
 	lcnt = GDrawLayoutLineCount(gt->g.base);
 	if ( lcnt+2>=gt->lmax ) {
-	    gt->lines8 = realloc(gt->lines8,(gt->lmax=lcnt+10)*sizeof(int32));
-	    gt->lines = realloc(gt->lines,gt->lmax*sizeof(int32));
+	    gt->lines8 = realloc(gt->lines8,(gt->lmax=lcnt+10)*sizeof(int32_t));
+	    gt->lines = realloc(gt->lines,gt->lmax*sizeof(int32_t));
 	}
 	pt = utf8_text; uc=0;
 	for ( i=0; i<lcnt; ++i ) {
@@ -341,7 +345,7 @@ return;
 	}
     }
     if ( i>=gt->lmax )
-	gt->lines = realloc(gt->lines,(gt->lmax+=10)*sizeof(int32));
+	gt->lines = realloc(gt->lines,(gt->lmax+=10)*sizeof(int32_t));
     gt->lines8[i] = -1;
     gt->lines[i++] = -1;
 
@@ -357,7 +361,7 @@ return;
 static void GTextFieldRefigureLines(GTextField *gt, int start_of_change) {
     GDrawSetFont(gt->g.base,gt->font);
     if ( gt->lines==NULL ) {
-	gt->lines = malloc(10*sizeof(int32));
+	gt->lines = malloc(10*sizeof(int32_t));
 	gt->lines[0] = 0;
 	gt->lines[1] = -1;
 	gt->lmax = 10;
@@ -405,10 +409,8 @@ return( i );
 }
 
 static unichar_t *GTextFieldGetPtFromPos(GTextField *gt,int i,int xpos) {
-    int ll;
     unichar_t *end;
 
-    ll = gt->lines[i+1]==-1?-1:gt->lines[i+1]-gt->lines[i]-1;
     int index8, uc;
     if ( gt->lines8[i+1]==-1 )
 	GDrawLayoutInit(gt->g.base,gt->utf8_text + gt->lines8[i],-1,NULL);
@@ -480,7 +482,7 @@ static int GTextField_Show(GTextField *gt, int pos) {
 return( refresh );
 }
 
-static void *genunicodedata(void *_gt,int32 *len) {
+static void *genunicodedata(void *_gt,int32_t *len) {
     GTextField *gt = _gt;
     unichar_t *temp;
     *len = gt->sel_end-gt->sel_start + 1;
@@ -491,7 +493,7 @@ static void *genunicodedata(void *_gt,int32 *len) {
 return( temp );
 }
 
-static void *genutf8data(void *_gt,int32 *len) {
+static void *genutf8data(void *_gt,int32_t *len) {
     GTextField *gt = _gt;
     unichar_t *temp =u_copyn(gt->text+gt->sel_start,gt->sel_end-gt->sel_start);
     char *ret = u2utf8_copy(temp);
@@ -500,7 +502,7 @@ static void *genutf8data(void *_gt,int32 *len) {
 return( ret );
 }
 
-static void *ddgenunicodedata(void *_gt,int32 *len) {
+static void *ddgenunicodedata(void *_gt,int32_t *len) {
     void *temp = genunicodedata(_gt,len);
     GTextField *gt = _gt;
     _GTextFieldReplace(gt,nullstr);
@@ -508,7 +510,7 @@ static void *ddgenunicodedata(void *_gt,int32 *len) {
 return( temp );
 }
 
-static void *genlocaldata(void *_gt,int32 *len) {
+static void *genlocaldata(void *_gt,int32_t *len) {
     GTextField *gt = _gt;
     unichar_t *temp =u_copyn(gt->text+gt->sel_start,gt->sel_end-gt->sel_start);
     char *ret = u2def_copy(temp);
@@ -517,7 +519,7 @@ static void *genlocaldata(void *_gt,int32 *len) {
 return( ret );
 }
 
-static void *ddgenlocaldata(void *_gt,int32 *len) {
+static void *ddgenlocaldata(void *_gt,int32_t *len) {
     void *temp = genlocaldata(_gt,len);
     GTextField *gt = _gt;
     _GTextFieldReplace(gt,nullstr);
@@ -563,7 +565,7 @@ static void GTextFieldGrabSelection(GTextField *gt, enum selnames sel ) {
 	unichar_t *temp;
 	char *ctemp, *ctemp2;
 	int i;
-	uint16 *u2temp;
+	uint16_t *u2temp;
 
 	GDrawGrabSelection(gt->g.base,sel);
 	temp = malloc((gt->sel_end-gt->sel_start + 2)*sizeof(unichar_t));
@@ -574,7 +576,7 @@ static void GTextFieldGrabSelection(GTextField *gt, enum selnames sel ) {
 	GDrawAddSelectionType(gt->g.base,sel,"text/plain;charset=ISO-10646-UCS-4",temp,u_strlen(temp),
 		sizeof(unichar_t),
 		NULL,NULL);
-	u2temp = malloc((gt->sel_end-gt->sel_start + 2)*sizeof(uint16));
+	u2temp = malloc((gt->sel_end-gt->sel_start + 2)*sizeof(uint16_t));
 	for ( i=0; temp[i]!=0; ++i )
 	    u2temp[i] = temp[i];
 	u2temp[i] = 0;
@@ -631,7 +633,7 @@ static int GTextFieldSelForeword(unichar_t *text,int end) {
 return( end );
 }
 
-static void GTextFieldSelectWord(GTextField *gt,int mid, int16 *start, int16 *end) {
+static void GTextFieldSelectWord(GTextField *gt,int mid, int32_t *start, int32_t *end) {
     unichar_t *text;
     unichar_t ch = gt->text[mid];
 
@@ -662,7 +664,7 @@ static void GTextFieldSelectWord(GTextField *gt,int mid, int16 *start, int16 *en
 }
 
 static void GTextFieldSelectWords(GTextField *gt,int last) {
-    int16 ss, se;
+    int32_t ss, se;
     GTextFieldSelectWord(gt,gt->sel_base,&gt->sel_start,&gt->sel_end);
     if ( last!=gt->sel_base ) {
 	GTextFieldSelectWord(gt,last,&ss,&se);
@@ -675,7 +677,7 @@ static void GTextFieldPaste(GTextField *gt,enum selnames sel) {
     if ( GDrawSelectionHasType(gt->g.base,sel,"UTF8_STRING") ||
 	    GDrawSelectionHasType(gt->g.base,sel,"text/plain;charset=UTF-8")) {
 	unichar_t *temp; char *ctemp;
-	int32 len;
+	int32_t len;
 	ctemp = GDrawRequestSelection(gt->g.base,sel,"UTF8_STRING",&len);
 	if ( ctemp==NULL || len==0 )
 	    ctemp = GDrawRequestSelection(gt->g.base,sel,"text/plain;charset=UTF-8",&len);
@@ -688,7 +690,7 @@ static void GTextFieldPaste(GTextField *gt,enum selnames sel) {
 /*  so avoid them, by looking for utf8 first */
     } else if ( GDrawSelectionHasType(gt->g.base,sel,"text/plain;charset=ISO-10646-UCS-4")) {
 	unichar_t *temp;
-	int32 len;
+	int32_t len;
 	temp = GDrawRequestSelection(gt->g.base,sel,"text/plain;charset=ISO-10646-UCS-4",&len);
 	/* Bug! I don't handle byte reversed selections. But I don't think there should be any anyway... */
 	if ( temp!=NULL )
@@ -697,8 +699,8 @@ static void GTextFieldPaste(GTextField *gt,enum selnames sel) {
     } else if ( GDrawSelectionHasType(gt->g.base,sel,"Unicode") ||
 	    GDrawSelectionHasType(gt->g.base,sel,"text/plain;charset=ISO-10646-UCS-2")) {
 	unichar_t *temp;
-	uint16 *temp2;
-	int32 len;
+	uint16_t *temp2;
+	int32_t len;
 	temp2 = GDrawRequestSelection(gt->g.base,sel,"text/plain;charset=ISO-10646-UCS-2",&len);
 	if ( temp2==NULL || len==0 )
 	    temp2 = GDrawRequestSelection(gt->g.base,sel,"Unicode",&len);
@@ -714,7 +716,7 @@ static void GTextFieldPaste(GTextField *gt,enum selnames sel) {
 	free(temp2);
     } else if ( GDrawSelectionHasType(gt->g.base,sel,"STRING")) {
 	unichar_t *temp; char *ctemp;
-	int32 len;
+	int32_t len;
 	ctemp = GDrawRequestSelection(gt->g.base,sel,"STRING",&len);
 	if ( ctemp==NULL || len==0 )
 	    ctemp = GDrawRequestSelection(gt->g.base,sel,"text/plain;charset=UTF-8",&len);
@@ -754,7 +756,7 @@ return( true );
       case ec_undo:
 	if ( gt->oldtext!=NULL ) {
 	    unichar_t *temp = gt->text;
-	    int16 s;
+	    int16_t s;
 	    gt->text = gt->oldtext; gt->oldtext = temp;
 	    s = gt->sel_start; gt->sel_start = gt->sel_oldstart; gt->sel_oldstart = s;
 	    s = gt->sel_end; gt->sel_end = gt->sel_oldend; gt->sel_oldend = s;
@@ -886,10 +888,6 @@ return( NULL );
 return( space );
 }
 
-static unichar_t txt[] = { '*','.','{','t','x','t',',','p','y','}',  '\0' };
-static unichar_t errort[] = { 'C','o','u','l','d',' ','n','o','t',' ','o','p','e','n',  '\0' };
-static unichar_t error[] = { 'C','o','u','l','d',' ','n','o','t',' ','o','p','e','n',' ','%','.','1','0','0','h','s',  '\0' };
-
 bool GTextFieldIsEmpty(GGadget *g) {
     GTextField *gt = (GTextField *) g;
     return gt->text == NULL || *gt->text == '\0';
@@ -900,14 +898,9 @@ static void GTextFieldImport(GTextField *gt) {
     char *cret;
     unichar_t *str;
 
-    if ( _ggadget_use_gettext ) {
-	char *temp = GWidgetOpenFile8(_("Open"),NULL,"*.{txt,py}",NULL,NULL);
-	ret = utf82u_copy(temp);
-	free(temp);
-    } else {
-	ret = GWidgetOpenFile(GStringGetResource(_STR_Open,NULL),NULL,
-		txt,NULL,NULL);
-    }
+    char *temp = GWidgetOpenFile8(_("Open"),NULL,"*.{txt,py}",NULL,NULL);
+    ret = utf82u_copy(temp);
+    free(temp);
 
     if ( ret==NULL )
 return;
@@ -915,10 +908,7 @@ return;
     free(ret);
     str = _GGadgetFileToUString(cret,65536);
     if ( str==NULL ) {
-	if ( _ggadget_use_gettext )
-	    GWidgetError8(_("Could not open file"), _("Could not open %.100s"),cret);
-	else
-	    GWidgetError(errort,error,cret);
+	GWidgetError8(_("Could not open file"), _("Could not open %.100s"),cret);
 	free(cret);
 return;
     }
@@ -933,13 +923,9 @@ static void GTextFieldSave(GTextField *gt,int utf8) {
     FILE *file;
     unichar_t *pt;
 
-    if ( _ggadget_use_gettext ) {
-	char *temp = GWidgetOpenFile8(_("Save"),NULL,"*.{txt,py}",NULL,NULL);
-	ret = utf82u_copy(temp);
-	free(temp);
-    } else
-	ret = GWidgetSaveAsFile(GStringGetResource(_STR_Save,NULL),NULL,
-		txt,NULL,NULL);
+    char *temp = GWidgetOpenFile8(_("Save"),NULL,"*.{txt,py}",NULL,NULL);
+    ret = utf82u_copy(temp);
+    free(temp);
 
     if ( ret==NULL )
 return;
@@ -947,10 +933,7 @@ return;
     free(ret);
     file = fopen(cret,"w");
     if ( file==NULL ) {
-	if ( _ggadget_use_gettext )
-	    GWidgetError8(_("Could not open file"), _("Could not open %.100s"),cret);
-	else
-	    GWidgetError(errort,error,cret);
+	GWidgetError8(_("Could not open file"), _("Could not open %.100s"),cret);
 	free(cret);
 return;
     }
@@ -1097,7 +1080,7 @@ return;
     _ggadget_redraw(&gt->g);
     GTextFieldChanged(gt,-1);
 }
-    
+
 static int GTextFieldDoChange(GTextField *gt, GEvent *event) {
     int ss = gt->sel_start, se = gt->sel_end;
     int pos, l, xpos, sel;
@@ -1404,7 +1387,6 @@ return;
 }
 
 static void gt_draw_cursor(GWindow pixmap, GTextField *gt) {
-    GRect old;
     int x, y, l;
 
     if (gt->has_dd_cursor) {
@@ -1487,7 +1469,7 @@ static int gtextfield_expose(GWindow pixmap, GGadget *g, GEvent *event) {
     GListField *ge = (GListField *) g;
     GRect old1, old2, old3, *r = &g->r;
     Color fg;
-    int ll,i, last;
+    int i, last;
     GRect unpadded_inner;
     int pad;
 
@@ -1523,7 +1505,6 @@ return( false );
     fg = g->state==gs_disabled?g->box->disabled_foreground:
 		    g->box->main_foreground==COLOR_DEFAULT?GDrawGetDefaultForeground(GDrawGetDisplayOfWindow(pixmap)):
 		    g->box->main_foreground;
-    ll = 0;
     if ( (last = gt->g.inner.height/gt->fh)==0 ) last = 1;
     if ( gt->sel_start != gt->sel_end ) {
 	/* I used to have support for drawing on a bw display where the */
@@ -1688,7 +1669,7 @@ static int GTextFieldDoDrop(GTextField *gt,GEvent *event,int endpos) {
     _ggadget_redraw(&gt->g);
 return( false );
 }
-    
+
 static int gtextfield_mouse(GGadget *g, GEvent *event) {
     GTextField *gt = (GTextField *) g;
     GListField *ge = (GListField *) g;
@@ -1956,8 +1937,8 @@ return( true );
 		++gt->loff_top;
 		l = gt->loff_top + g->inner.width/gt->fh;
 	    } else if ( l<gt->loff_top )
-		l = gt->loff_top; 
-	    else if ( l>=gt->loff_top + g->inner.height/gt->fh ) 
+		l = gt->loff_top;
+	    else if ( l>=gt->loff_top + g->inner.height/gt->fh )
 		l = gt->loff_top + g->inner.height/gt->fh-1;
 	    if ( l>=gt->lcnt ) l = gt->lcnt-1;
 
@@ -2015,7 +1996,7 @@ static int gtextfield_sel(GGadget *g, GEvent *event) {
 	gt_set_dd_cursor(gt, end - gt->text);
     } else if ( event->type == et_dragout ) {
 	/* this event exists simply to clear the dd cursor line. We've done */
-	/*  that already */ 
+	/*  that already */
     } else if ( event->type == et_drop ) {
 	gt->sel_start = gt->sel_end = gt->sel_base = end-gt->text;
 	GTextFieldPaste(gt,sn_drag_and_drop);
@@ -2127,7 +2108,7 @@ void GTextFieldReplace(GGadget *g,const unichar_t *txt) {
     _ggadget_redraw(g);
 }
 
-static void GListFSelectOne(GGadget *g, int32 pos) {
+static void GListFSelectOne(GGadget *g, int32_t pos) {
     GListField *gl = (GListField *) g;
     int i;
 
@@ -2141,7 +2122,7 @@ static void GListFSelectOne(GGadget *g, int32 pos) {
     }
 }
 
-static int32 GListFIsSelected(GGadget *g, int32 pos) {
+static int32_t GListFIsSelected(GGadget *g, int32_t pos) {
     GListField *gl = (GListField *) g;
 
     if ( pos>=gl->ltot )
@@ -2154,7 +2135,7 @@ return( gl->ti[pos]->selected );
 return( false );
 }
 
-static int32 GListFGetFirst(GGadget *g) {
+static int32_t GListFGetFirst(GGadget *g) {
     int i;
     GListField *gl = (GListField *) g;
 
@@ -2165,13 +2146,13 @@ return( i );
 return( -1 );
 }
 
-static GTextInfo **GListFGet(GGadget *g,int32 *len) {
+static GTextInfo **GListFGet(GGadget *g,int32_t *len) {
     GListField *gl = (GListField *) g;
     if ( len!=NULL ) *len = gl->ltot;
 return( gl->ti );
 }
 
-static GTextInfo *GListFGetItem(GGadget *g,int32 pos) {
+static GTextInfo *GListFGetItem(GGadget *g,int32_t pos) {
     GListField *gl = (GListField *) g;
     if ( pos<0 || pos>=gl->ltot )
 return( NULL );
@@ -2179,7 +2160,7 @@ return( NULL );
 return(gl->ti[pos]);
 }
 
-static void GListFSet(GGadget *g,GTextInfo **ti,int32 docopy) {
+static void GListFSet(GGadget *g,GTextInfo **ti,int32_t docopy) {
     GListField *gl = (GListField *) g;
 
     GTextInfoArrayFree(gl->ti);
@@ -2202,9 +2183,9 @@ static void gtextfield_redraw(GGadget *g) {
     _ggadget_redraw(g);
 }
 
-static void gtextfield_move(GGadget *g, int32 x, int32 y ) {
+static void gtextfield_move(GGadget *g, int32_t x, int32_t y ) {
     GTextField *gt = (GTextField *) g;
-    int fxo=0, fyo=0, bxo, byo;
+    int fxo=0, fyo=0, bxo=0, byo=0;
 
     if ( gt->listfield || gt->numericfield ) {
 	fxo = ((GListField *) gt)->fieldrect.x - g->r.x;
@@ -2225,10 +2206,10 @@ static void gtextfield_move(GGadget *g, int32 x, int32 y ) {
     }
 }
 
-static void gtextfield_resize(GGadget *g, int32 width, int32 height ) {
+static void gtextfield_resize(GGadget *g, int32_t width, int32_t height ) {
     GTextField *gt = (GTextField *) g;
     int gtwidth=width, gtheight=height, oldheight=0;
-    int fxo=0, fwo=0, fyo=0, bxo, byo;
+    int fxo=0, fwo=0, fyo=0, bxo=0, byo=0;
     int l;
 
     if ( gt->listfield || gt->numericfield ) {
@@ -2566,31 +2547,15 @@ struct gfuncs glistfield_funcs = {
     NULL
 };
 
-static void GTextFieldInit() {
-    FontRequest rq;
-
-    memset(&rq,0,sizeof(rq));
-    GGadgetInit();
-    GDrawDecomposeFont(_ggadget_default_font,&rq);
-    rq.family_name = NULL;
-    rq.utf8_family_name = MONO_UI_FAMILIES;
-    _gtextfield_font = GDrawInstanciateFont(NULL,&rq);
-    _GGadgetCopyDefaultBox(&_GGadget_gtextfield_box);
-    _GGadget_gtextfield_box.padding = 3;
-    /*_GGadget_gtextfield_box.flags = box_active_border_inner;*/
-    _gtextfield_font = _GGadgetInitDefaultBox("GTextField.",&_GGadget_gtextfield_box,_gtextfield_font);
-    glistfield_box = _GGadget_gtextfield_box;
-    _GGadgetInitDefaultBox("GComboBox.",&glistfield_box,_gtextfield_font);
-    glistfieldmenu_box = glistfield_box;
-    glistfieldmenu_box.padding = 1;
-    _GGadgetInitDefaultBox("GComboBoxMenu.",&glistfieldmenu_box,_gtextfield_font);
-    gnumericfield_box = _GGadget_gtextfield_box;
-    _GGadgetInitDefaultBox("GNumericField.",&gnumericfield_box,_gtextfield_font);
-    gnumericfieldspinner_box = gnumericfield_box;
-    gnumericfieldspinner_box.border_type = bt_none;
-    gnumericfieldspinner_box.border_width = 0;
-    gnumericfieldspinner_box.padding = 0;
-    _GGadgetInitDefaultBox("GNumericFieldSpinner.",&gnumericfieldspinner_box,_gtextfield_font);
+void GTextFieldInit() {
+    static int gtextfield_inited = false;
+    if ( gtextfield_inited )
+	return;
+    GResEditDoInit(&gtextfield_ri);
+    GResEditDoInit(&listfield_ri);
+    GResEditDoInit(&listfieldmenu_ri);
+    GResEditDoInit(&numericfield_ri);
+    GResEditDoInit(&numericfieldspinner_ri);
     gtextfield_inited = true;
 }
 
@@ -2633,8 +2598,7 @@ static void GTextFieldAddHSb(GTextField *gt) {
 }
 
 static void GTextFieldFit(GTextField *gt) {
-    GTextBounds bounds;
-    int as=0, ds, ld, width=0;
+    int as=0, ds, ld;
     GRect inner, outer;
     int bp = GBoxBorderWidth(gt->g.base,gt->g.box);
 
@@ -2643,7 +2607,6 @@ static void GTextFieldFit(GTextField *gt) {
 	FontRequest rq;
 	int tries;
 	for ( tries = 0; tries<2; ++tries ) {
-	    width = GDrawGetTextBounds(gt->g.base,gt->text, -1, &bounds);
 	    GDrawWindowFontMetrics(gt->g.base,gt->font,&as, &ds, &ld);
 	    if ( gt->g.r.height==0 || as+ds-3+2*bp<=gt->g.r.height || tries==1 )
 	break;
@@ -2716,24 +2679,21 @@ static void GTextFieldFit(GTextField *gt) {
 
 static GTextField *_GTextFieldCreate(GTextField *gt, struct gwindow *base, GGadgetData *gd,void *data, GBox *def) {
 
-    if ( !gtextfield_inited )
-	GTextFieldInit();
+    GTextFieldInit();
     gt->g.funcs = &gtextfield_funcs;
     _GGadget_Create(&gt->g,base,gd,data,def);
 
     gt->g.takes_input = true; gt->g.takes_keyboard = true; gt->g.focusable = true;
-    if ( gd->label!=NULL ) {
+    if ( gd->label!=NULL && gd->label->text!=NULL ) {
 	if ( gd->label->text_is_1byte )
 	    gt->text = /* def2u_*/ utf82u_copy((char *) gd->label->text);
-	else if ( gd->label->text_in_resource )
-	    gt->text = u_copy((unichar_t *) GStringGetResource((intpt) gd->label->text,&gt->g.mnemonic));
 	else
 	    gt->text = u_copy(gd->label->text);
 	gt->sel_start = gt->sel_end = gt->sel_base = u_strlen(gt->text);
     }
     if ( gt->text==NULL )
 	gt->text = calloc(1,sizeof(unichar_t));
-    gt->font = _gtextfield_font;
+    gt->font = _gtextfield_font.fi;
     if ( gd->label!=NULL && gd->label->font!=NULL )
 	gt->font = gd->label->font;
     if ( (gd->flags & gg_textarea_wrap) && gt->multi_line )
@@ -2820,7 +2780,7 @@ return( &ge->gt.g );
 static unichar_t **GListField_NameCompletion(GGadget *t,int from_tab) {
     const unichar_t *spt; unichar_t **ret;
     GTextInfo **ti;
-    int32 len;
+    int32_t len;
     int i, cnt, doit, match_len;
 
     spt = _GGadgetGetTitle(t);
@@ -3157,11 +3117,4 @@ void GCompletionFieldSetCompletion(GGadget *g,GTextCompletionHandler completion)
 
 void GCompletionFieldSetCompletionMode(GGadget *g,int enabled) {
     ((GTextField *) g)->was_completing = enabled;
-}
-
-GResInfo *_GTextFieldRIHead(void) {
-
-    if ( !gtextfield_inited )
-	GTextFieldInit();
-return( &gtextfield_ri );
 }

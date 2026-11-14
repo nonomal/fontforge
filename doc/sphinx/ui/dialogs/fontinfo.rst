@@ -298,7 +298,7 @@ the top of the list are executed first, things at the bottom last.
 .. note::
 
    Although the OpenType spec claims that the execution of features (actually
-   lookups) will be ordered by their appearence in the lookup table, MicroSoft
+   lookups) will be ordered by their appearance in the lookup table, MicroSoft
    claims that they will apply features in the order that they think best. So
    the order specified in the font may be ignored.
 
@@ -400,7 +400,7 @@ PANOSE
 This sub-dialog allows you to describe your font in 10 different dimensions. The
 exact meanings of many of these entries vary from script to script, and even the
 Latin ones are not clear to me, I have merely typed them in as specified in the
-`true type docs <http://fonts.apple.com/TTRefMan/RM06/Chap6OS2.html>`__. Better
+`true type docs <http://fonts.apple.com/TrueType-Reference-Manual/RM06/Chap6OS2.html>`__. Better
 information is available from `HP <http://panose.com/>`__,
 `MS <https://msdn.microsoft.com/en-us/library/windows/desktop/dd162774(v=vs.85).aspx>`__,
 `RS <https://www.w3.org/Printing/stevahn.html>`__,
@@ -556,7 +556,7 @@ The various strings and a brief description of their meanings are:
    A string describing the license terms under which the font is marketed.
 
    If you want to use the
-   `SIL Open Font License <http://scripts.sil.org/OFL/>`__, there is a button at
+   `SIL Open Font License <https://openfontlicense.org>`__, there is a button at
    the bottom of the dialog which will add that directly (so you don't need to
    type it in).
 
@@ -584,7 +584,7 @@ The various strings and a brief description of their meanings are:
    Whatever.
 
 These are described in the
-`original true type docs <http://fonts.apple.com/TTRefMan/RM06/Chap6name.html>`__,
+`original true type docs <http://fonts.apple.com/TrueType-Reference-Manual/RM06/Chap6name.html>`__,
 but they apply to
 `open type <http://partners.adobe.com/asn/tech/type/opentype/recom.jsp>`__ as
 well.
@@ -655,7 +655,7 @@ In the table above:
 * All pixel sizes between 9 and 16 (inclusive) will be grid-fit but not
   anti-aliased.
 * All pixel sizes above 16 will be both grid-fit and anti-aliased, and will have
-  Cleartype Symetric Smoothing done.
+  Cleartype Symmetric Smoothing done.
 
 
 .. _fontinfo.TeX:
@@ -697,7 +697,7 @@ Size
 This allows you to set the design size of a font, the design range, and provide
 a style name for this class of font.
 
-In tradtional typography every point size of a given font would be slightly
+In traditional typography every point size of a given font would be slightly
 different -- generally small point sizes would have proportionally more
 white-space around the glyph and wider stems inside the glyph. This made small
 point sizes more readable than they would otherwise be. Conversely large
@@ -768,7 +768,7 @@ FONTLOG
 This has the same interface as the Comment above. The FONTLOG is an idea stolen
 from the Open Font License. It is description of the font and a log of changes
 made to it over time and includes some more information about the font as well
-(see the `OFL FAQ) <http://scripts.sil.org/OFL-FAQ_web>`__. This pane allows you
+(see the `OFL FAQ) <https://openfontlicense.org/ofl-faq/>`__. This pane allows you
 to store this information within the font itself where it won't get lost.
 
 
@@ -957,7 +957,7 @@ Dates
 Displays what fontforge thinks is the create date and modification date of the
 font data. FontForge started retaining those dates in August of 2006, any prior
 dates are conjectural and based on a best guess -- usually from the modification
-time of the sfd file. When loading a font from somthing other than an sfd file,
+time of the sfd file. When loading a font from something other than an sfd file,
 FontForge will again make the best guess it can.
 
 

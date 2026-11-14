@@ -33,8 +33,16 @@
 /* The tagged version of FontForge. Additional versioning information in fontforge-version-extras.h */
 #define FONTFORGE_VERSION "@PROJECT_VERSION@"
 
+/* CalVer format for Python module (e.g., 2025.10.9 from 20251009) */
+#define FONTFORGE_PYTHON_VERSION "@FONTFORGE_PYTHON_VERSION@"
+
 /* The install prefix configured at configure/compile time, used as a last resort */
 #define FONTFORGE_INSTALL_PREFIX "@CMAKE_INSTALL_PREFIX@"
+
+#define SERIF_UI_FAMILIES "@FONTFORGE_SERIF_FAMILIES@"
+#define SANS_UI_FAMILIES  "@FONTFORGE_UI_FAMILIES@"
+#define LABEL_UI_FAMILIES "@FONTFORGE_LABEL_FAMILIES@"
+#define MONO_UI_FAMILIES  "@FONTFORGE_MONO_FAMILIES@"
 
 /* Platform checks */
 
@@ -45,8 +53,6 @@
 
 #cmakedefine _CursorsMustBe16x16 1
 
-#cmakedefine _Keyboard @_Keyboard@
-
 #cmakedefine __Mac 1
 
 
@@ -54,10 +60,10 @@
 
 #cmakedefine __CygWin 1
 
+
 #cmakedefine _BrokenBitmapImages 1
 
 #cmakedefine _ModKeysAutoRepeat 1
-
 
 /* Header checks */
 
@@ -67,6 +73,9 @@
 
 #cmakedefine HAVE_IEEEFP_H 1
 
+/* Function checks */
+
+#cmakedefine HAVE_REALPATH 1
 
 /* FontForge configurable options */
 
@@ -83,14 +92,6 @@
 
 /* FontForge feature detection */
 
-#cmakedefine _NO_XKB 1
-
-#cmakedefine _NO_XINPUT 1
-
-#cmakedefine X_DISPLAY_MISSING 1
-
-#cmakedefine FONTFORGE_CAN_USE_GDK 1
-
 #cmakedefine FONTFORGE_CAN_USE_WOFF2 1
 
 #cmakedefine _NO_FFSCRIPT 1
@@ -100,6 +101,8 @@
 #cmakedefine _NO_LIBPNG 1
 
 #cmakedefine _NO_LIBSPIRO 1
+
+#cmakedefine _NO_LIBUNIBREAK 1
 
 #cmakedefine _NO_LIBTIFF 1
 

@@ -3,6 +3,10 @@
 
 #include "splinefont.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern const char *EncodingName(Encoding *map);
 extern int AfmSplineFont(FILE *afm, SplineFont *sf, int formattype, EncMap *map, int docc, SplineFont *fullsf, int layer);
 extern int AmfmSplineFont(FILE *amfm, MMSet *mm, int formattype, EncMap *map, int layer);
@@ -12,7 +16,7 @@ extern int doesGlyphExpandHorizontally(SplineChar *UNUSED(sc));
 extern int LayerWorthOutputting(SplineFont *sf, int layer);
 extern int LoadKerningDataFromAfm(SplineFont *sf, char *filename);
 extern int LoadKerningDataFromAmfm(SplineFont *sf, char *filename);
-extern int LoadKerningDataFromMetricsFile(SplineFont *sf, char *filename, EncMap *map);
+extern int LoadKerningDataFromMetricsFile(SplineFont *sf, char *filename, EncMap *map, bool ignore_invalid_replacement);
 extern int LoadKerningDataFromOfm(SplineFont *sf, char *filename, EncMap *map);
 extern int LoadKerningDataFromPfm(SplineFont *sf, char *filename, EncMap *map);
 extern int LoadKerningDataFromTfm(SplineFont *sf, char *filename, EncMap *map);
@@ -31,5 +35,9 @@ extern void SFLigatureCleanup(SplineFont *sf);
 extern void SFLigaturePrepare(SplineFont *sf);
 extern void SubsNew(SplineChar *to, enum possub_type type, int tag, char *components, SplineChar *default_script);
 extern void TeXDefaultParams(SplineFont *sf);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* FONTFORGE_SPLINESAVEAFM_H */

@@ -83,15 +83,6 @@ extern void GWidgetFlowGadgets(GWindow gw);
 extern void GWidgetToDesiredSize(GWindow gw);
 
 	/* Built in dialogs */
-unichar_t *GWidgetOpenFile(const unichar_t *title, const unichar_t *defaultfile,
-	const unichar_t *initial_filter, unichar_t **mimetypes,GFileChooserFilterType filter);
-unichar_t *GWidgetSaveAsFile(const unichar_t *title, const unichar_t *defaultfile,
-	const unichar_t *initial_filter, unichar_t **mimetypes,GFileChooserFilterType filter );
-unichar_t *GWidgetSaveAsFileWithGadget(const unichar_t *title, const unichar_t *defaultfile,
-				       const unichar_t *initial_filter, unichar_t **mimetypes,
-				       GFileChooserFilterType filter,
-				       GFileChooserInputFilenameFuncType filenamefunc,
-				       GGadgetCreateData *optional_gcd);
 char *GWidgetOpenFile8(const char *title, const char *defaultfile,
 	const char *initial_filter, char **mimetypes,GFileChooserFilterType filter);
 char *GWidgetOpenFileWPath8(const char *title, const char *defaultfile,
@@ -103,10 +94,6 @@ char *GWidgetSaveAsFileWithGadget8(const char *title, const char *defaultfile,
 				   GGadgetCreateData *optional_gcd);
 char *GWidgetSaveAsFile8(const char *title, const char *defaultfile,
 	const char *initial_filter, char **mimetypes,GFileChooserFilterType filter );
-int GWidgetAsk(const unichar_t *title, const unichar_t **answers, const unichar_t *mn,
-	int def, int cancel,const unichar_t *question,...);
-void GWidgetError(const unichar_t *title,const unichar_t *statement,...);
-unichar_t *GWidgetAskStringR(int title, const unichar_t *def,int question,...);
 int GWidgetAsk8(const char *title, const char **answers,
 	int def, int cancel,const char *question,...);
 int GWidgetAskCentered8(const char *title,
@@ -128,8 +115,8 @@ int GWidgetChoicesB8(char *title, const char **choices, int cnt, int def,
 int GWidgetChoicesBM8(const char *title, const char **choices, char *sel,
 	int cnt, char *buts[2], const char *question,...);
 
-extern struct hslrgb GWidgetColor(const char *title,struct hslrgb *defcol,struct hslrgb fontcols[6]);
-extern struct hslrgba GWidgetColorA(const char *title,struct hslrgba *defcol,struct hslrgba fontcols[6]);
+extern struct hslrgb GWidgetColor(const char *title,struct hslrgb *defcol,struct hslrgb *fontcols);
+extern struct hslrgba GWidgetColorA(const char *title,struct hslrgba *defcol,struct hslrgba *fontcols);
 
 #define gwwv_choose_multiple	GWidgetChoicesBM8
 #define gwwv_choose_with_buttons	GWidgetChoicesB8

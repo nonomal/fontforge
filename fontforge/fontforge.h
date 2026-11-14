@@ -38,11 +38,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 static const unsigned unicode4_size = 17*65536;
     /* Unicode goes up to 0x10ffff */
 
 
-extern int32 unicode_from_adobestd[256];
+extern int32_t unicode_from_adobestd[256];
 
 extern int default_fv_font_size;
 extern int default_fv_antialias;
@@ -51,9 +55,9 @@ extern Encoding *default_encoding, custom;
 extern int adjustwidth;
 extern int adjustlbearing;
 extern int autohint_before_generate;
-extern int seperate_hint_controls;
+extern int separate_hint_controls;
 extern int no_windowing_ui;
-extern uint32 default_background;
+extern uint32_t default_background;
 extern int use_utf8_in_script;
 
 extern int new_em_size;
@@ -76,5 +80,9 @@ extern int quiet;
 extern MacFeat *default_mac_feature_map;
 
 extern int fontforge_main(int, char **);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* FONTFORGE_PFAEDIT_H */

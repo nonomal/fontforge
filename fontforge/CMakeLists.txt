@@ -29,6 +29,7 @@ set(FONTFORGE_NOINST_HEADERS
   macbinary.h
   macenc.h
   mathconstants.h
+  multidialog.h
   namelist.h
   othersubrs.h
   palmfonts.h
@@ -56,6 +57,7 @@ set(FONTFORGE_NOINST_HEADERS
   splineutil.h
   splineutil2.h
   start.h
+  std_maps.hpp
   svg.h
   tottf.h
   tottfaat.h
@@ -84,6 +86,7 @@ set(FONTFORGE_INST_HEADERS
   fontforge.h
   fontforgevw.h
   fvmetrics.h
+  getline.h
   glif_name_hash.h
   glyphcomp.h
   groups.h
@@ -116,6 +119,7 @@ add_library(fontforge
   ${FONTFORGE_NOINST_HEADERS}
   ${FONTFORGE_INST_HEADERS}
   activeinui.c
+  ffglib_compat.cpp
   asmfpst.c
   autohint.c
   autosave.c
@@ -127,7 +131,7 @@ add_library(fontforge
   bitmapcontrol.c
   bvedit.c
   clipnoui.c
-  crctab.c
+  crctab.cpp
   cvexport.c
   cvimages.c
   cvundoes.c
@@ -136,15 +140,17 @@ add_library(fontforge
   effects.c
   encoding.c
   featurefile.c
+  ffprocess.c
   flaglist.c
   fontviewbase.c
   freetype.c
   ftdelta.c
-  fvcomposite.c
+  fvcomposite.cpp
   fvfonts.c
   fvimportbdf.c
   fvmetrics.c
-  glif_name_hash.c
+  getline.c
+  glif_name_hash.cpp
   glyphcomp.c
   groups.c
   ikarus.c
@@ -155,6 +161,7 @@ add_library(fontforge
   mathconstants.c
   mem.c
   mm.c
+  multimastersubrs.c
   namelist.c
   nonlineartrans.c
   noprefs.c
@@ -169,18 +176,18 @@ add_library(fontforge
   parsettfatt.c
   parsettfbmf.c
   parsettfvar.c
-  plugin.c
-  print.c
+  plugin.cpp
+  print.cpp
   psread.c
   pua.c
-  python.c
+  python.cpp
   savefont.c
-  scripting.c
+  scripting.cpp
   scstyles.c
   search.c
-  sfd.c
+  sfd.cpp
   sfd1.c
-  sflayout.c
+  sflayout.cpp
   spiro.c
   splinechar.c
   splinefill.c
@@ -196,6 +203,7 @@ add_library(fontforge
   splineutil2.c
   start.c
   stemdb.c
+  std_maps.cpp
   svg.c
   tottf.c
   tottfaat.c
@@ -211,6 +219,8 @@ add_library(fontforge
   zapfnomen.c
 )
 
+add_subdirectory(shapers)
+
 if(ENABLE_WOFF2_RESULT)
   target_sources(fontforge PRIVATE woff2.cc)
 endif()
@@ -221,6 +231,11 @@ set_property(SOURCE splineoverlap.c APPEND PROPERTY COMPILE_OPTIONS ${FONTFORGE_
 set_property(TARGET fontforge PROPERTY VERSION 4)
 if(BUILD_SHARED_LIBS)
   if(WIN32 OR CYGWIN)
+    # Both fontforge.exe and *.pyd Python modules look for libfontforge.dll in
+    # their directory, so we need to produce a second copy.
+    add_custom_command(TARGET fontforge POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:fontforge> ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
+    )
     target_link_options(fontforge PRIVATE -Wl,--export-all-symbols) # FIXME
   endif()
 endif()
@@ -228,17 +243,21 @@ endif()
 # This is pretty bad...
 target_include_directories(fontforge PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+# Export all symbols from the DLL on Windows (mimics MinGW's --export-all-symbols)
+set_target_properties(fontforge PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
 target_link_libraries(fontforge
   PUBLIC
     fontforge_common_headers
+    shapers
     Freetype::Freetype
     LibXml2::LibXml2
-    GLIB::GLIB
-    Intl::Intl
+    $<$<BOOL:${Intl_FOUND}>:Intl::Intl>
   PRIVATE
     MathLib::MathLib
     Iconv::Iconv
     ZLIB::ZLIB
+    mINI
 )
 
 if(APPLE)
@@ -258,10 +277,28 @@ if(ENABLE_LIBREADLINE_RESULT)
   target_link_libraries(fontforge PUBLIC Readline::Readline)
 endif()
 if(ENABLE_PYTHON_SCRIPTING_RESULT)
-  target_link_libraries(fontforge PRIVATE Python3::Python)
+  if(APPLE)
+    # On macOS, don't link libfontforge directly to Python library.
+    # The Python symbols should be resolved at runtime from the interpreter
+    # that loads the extension module. Use -undefined dynamic_lookup to allow
+    # undefined symbols that will be resolved when the extension is loaded.
+    target_include_directories(fontforge PRIVATE ${Python3_INCLUDE_DIRS})
+    target_link_options(fontforge PRIVATE -undefined dynamic_lookup)
+  else()
+    if(TARGET Python3::Python)
+      target_link_libraries(fontforge PRIVATE Python3::Python)
+    elseif(TARGET Python3::Module)
+      target_link_libraries(fontforge PRIVATE Python3::Module)
+    else()
+      message(FATAL_ERROR "Python3 imported target not found")
+    endif()
+  endif()
 endif()
 if(ENABLE_WOFF2_RESULT)
   target_link_libraries(fontforge PRIVATE WOFF2::WOFF2)
+endif()
+if(ENABLE_LIBUNIBREAK_RESULT)
+  target_link_libraries(fontforge PRIVATE Libunibreak::Libunibreak)
 endif()
 
 if(${CMAKE_VERSION} VERSION_LESS "3.12.0")
@@ -272,7 +309,13 @@ endif()
 
 # No dev package -> no need to install if static
 if(BUILD_SHARED_LIBS)
-  if(WIN32 OR CYGWIN)
+  if(BUILDING_WHEEL)
+    # Wheel: install alongside Python modules for bundling
+    install(TARGETS fontforge
+      RUNTIME DESTINATION "."
+      LIBRARY DESTINATION "."
+    )
+  elseif(WIN32 OR CYGWIN)
     install(TARGETS fontforge RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
   else()
     install(TARGETS fontforge RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

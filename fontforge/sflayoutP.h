@@ -28,6 +28,10 @@
 #ifndef FONTFORGE_SFLAYOUTP_H
 #define FONTFORGE_SFLAYOUTP_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 enum sftf_fonttype { sftf_pfb, sftf_ttf, sftf_otf, sftf_nohints, sftf_bitmap, sftf_pfaedit };
 
 typedef struct fontdata {
@@ -39,7 +43,7 @@ typedef struct fontdata {
     BDFFont *bdf;
     struct fontdata *next;
     struct fontdata *depends_on;	/* We use much of the ftc allocated for depends_on */
-					/* Can't free depends_on until after we get freeed */
+					/* Can't free depends_on until after we get freed */
     struct _GImage base;
     GImage gi;
     GClut clut;
@@ -47,17 +51,17 @@ typedef struct fontdata {
 } FontData;
 
 struct lineheights {
-    int32 y;
-    int16 as, fh;
-    uint16 p, linelen;
-    uint32 start_pos;
+    int32_t y;
+    int16_t as, fh;
+    uint16_t p, linelen;
+    uint32_t start_pos;
 };
 
 struct fontlist {
     int start, end;		/* starting and ending characters [start,end) */
 				/*  always break at newline & will omit it between fontlists */
-    uint32 *feats;		/* Ends with a 0 entry */
-    uint32 script, lang;
+    uint32_t *feats;		/* Ends with a 0 entry */
+    uint32_t script, lang;
     FontData *fd;
     SplineChar **sctext;
     int scmax;
@@ -68,8 +72,8 @@ struct fontlist {
 struct sfmaps {
     SplineFont *sf;
     EncMap *map;
-    int16 sfbit_id;
-    int16 notdef_gid;
+    int16_t sfbit_id;
+    int16_t notdef_gid;
     SplineChar *fake_notdef;
     struct sfmaps *next;
 };
@@ -81,9 +85,9 @@ struct paras {
 
 typedef struct layoutinfo {
     unichar_t *text, *oldtext;	/* Input glyphs (in unicode) */
-    int16 lcnt, lmax;
+    int16_t lcnt, lmax;
     struct opentype_str ***lines;	/* pointers into the paras array */
-    int16 xmax;
+    int16_t xmax;
     struct lineheights *lineheights;
     struct fontlist *fontlist, *oldfontlist;
     struct sfmaps *sfmaps;
@@ -102,7 +106,7 @@ extern int LI_FDDrawChar(void *data,
 	void (*drawImage)(void *,GImage *,GRect *,int x, int y),
 	void (*drawRect)(void *,GRect *,Color col),
 	struct opentype_str *osc,int x,int y,Color col);
-extern uint32 *LI_TagsCopy(uint32 *tags);
+extern uint32_t *LI_TagsCopy(uint32_t *tags);
 extern struct fontlist *LI_fontlistcopy(struct fontlist *fl );
 extern void LI_fontlistmergecheck(LayoutInfo *li);
 extern void LayoutInfoRefigureLines(LayoutInfo *li, int start_of_change,
@@ -115,12 +119,16 @@ extern struct sfmaps *SFMapOfSF(LayoutInfo *li,SplineFont *sf);
 extern FontData *LI_FindFontData(LayoutInfo *li, SplineFont *sf,
 	int layer, enum sftf_fonttype fonttype, int size, int antialias);
 extern FontData *LI_RegenFontData(LayoutInfo *li, FontData *ret);
-extern void LayoutInfoInitLangSys(LayoutInfo *li, int end, uint32 script, uint32 lang);
+extern void LayoutInfoInitLangSys(LayoutInfo *li, int end, uint32_t script, uint32_t lang);
 extern LayoutInfo *LIConvertToPrint(LayoutInfo *li, int width, int height, int dpi);
 extern SplineSet *LIConvertToSplines(LayoutInfo *li,double dpi,int order2);
 extern void LayoutInfoSetTitle(LayoutInfo *li,const unichar_t *tit,int width);
 extern struct fontlist *LI_BreakFontList(LayoutInfo *li,int start,int end);
 extern int LI_SetFontData(LayoutInfo *li, int start, int end, SplineFont *sf,
 	int layer, enum sftf_fonttype fonttype, int size, int antialias,int width);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* FONTFORGE_SFLAYOUTP_H */

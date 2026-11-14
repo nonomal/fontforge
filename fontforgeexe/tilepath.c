@@ -31,6 +31,7 @@
 #include "fontforgeui.h"
 #include "fvfonts.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "splinefit.h"
 #include "splinefont.h"
 #include "splineutil.h"
@@ -59,6 +60,8 @@
 /* Complications: */
 /*  There may not be an integral number of tiles, so we must be prepared to truncate some splines */
 
+GResFont tilepath_font = GRESFONT_INIT("400 12pt " SANS_UI_FAMILIES);
+GResFont tilepath_boldfont = GRESFONT_INIT("700 12pt " SANS_UI_FAMILIES);
 typedef struct tiledata {
     SplineSet *basetile;	/* Moved so that ymin==0, and x is adjusted */
 				/*  about the x-axis as implied by tilepos */
@@ -70,7 +73,7 @@ typedef struct tiledata {
 			        /*  higher than the last */
     SplineSet *result;		/* Final result after transformation */
     DBounds bb, fbb, lbb, ibb;	/* Of the basetile, first & last tiles */
-    uint8 include_white, finclude_white, linclude_white, iinclude_white;
+    uint8_t include_white, finclude_white, linclude_white, iinclude_white;
     bigreal xscale[3];
 
     SplineSet *path;
@@ -776,6 +779,7 @@ static void TPDDraw(TilePathDlg *tpd, GWindow pixmap, GEvent *event) {
     GRect r,pos;
     int i;
 
+    Color fg = GDrawGetDefaultForeground(NULL);
     GDrawSetLineWidth(pixmap,0);
     for ( i=0; i<4; ++i ) {
 	CharView *cv = (&tpd->cv_first)+i;
@@ -783,10 +787,10 @@ static void TPDDraw(TilePathDlg *tpd, GWindow pixmap, GEvent *event) {
 	GGadgetGetSize(GWidgetGetControl(tpd->gw,CID_FirstTile+i),&pos);
 	r.x = pos.x; r.y = pos.y-1;
 	r.width = pos.width+1; r.height = pos.height+1;
-	GDrawDrawRect(pixmap,&r,0);
+	GDrawDrawRect(pixmap,&r,fg);
 
 	GDrawSetFont(pixmap,cv->inactive ? tpd->plain : tpd->bold);
-	GDrawDrawText8(pixmap,r.x,pos.y-2-tpd->fh+tpd->as,_(tilenames[i]),-1,0);
+	GDrawDrawText8(pixmap,r.x,pos.y-2-tpd->fh+tpd->as,_(tilenames[i]),-1,fg);
     }
 }
 
@@ -1051,10 +1055,8 @@ static int TileAsk(struct tiledata *td,SplineFont *sf) {
     GGadgetCreateData gcd[24], boxes[5], *harray[8], *varray[5],
 	*rhvarray[4][5], *chvarray[4][5];
     GTextInfo label[24];
-    FontRequest rq;
     int as, ds, ld;
     int i,k;
-    static GFont *font = NULL, *bold=NULL;
 
     TPDInit( &tpd,sf );
     tpd.td = td;
@@ -1072,21 +1074,8 @@ static int TileAsk(struct tiledata *td,SplineFont *sf) {
     pos.height = 300;
     tpd.gw = gw = GDrawCreateTopWindow(NULL,&pos,tpd_e_h,&tpd.cv_first,&wattrs);
 
-    if ( font==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = 12;
-	rq.weight = 400;
-	font = GDrawInstanciateFont(NULL,&rq);
-	font = GResourceFindFont("TilePath.Font",font);
-
-	GDrawDecomposeFont(font, &rq);
-	rq.weight = 700;
-	bold = GDrawInstanciateFont(NULL,&rq);
-	bold = GResourceFindFont("TilePath.BoldFont",bold);
-    }
-    tpd.plain = font;
-    tpd.bold = bold;
+    tpd.plain = tilepath_font.fi;
+    tpd.bold = tilepath_boldfont.fi;
     GDrawWindowFontMetrics(tpd.gw,tpd.plain,&as,&ds,&ld);
     tpd.fh = as+ds; tpd.as = as;
 
@@ -1276,10 +1265,6 @@ static int TileAsk(struct tiledata *td,SplineFont *sf) {
 
     for ( i=0; i<4; ++i ) {
 	CharView *cv = &tpd.cv_first + i;
-	if ( cv->backimgs!=NULL ) {
-	    GDrawDestroyWindow(cv->backimgs);
-	    cv->backimgs = NULL;
-	}
 	CVPalettesHideIfMine(cv);
     }
     GDrawDestroyWindow(tpd.gw);
@@ -1464,7 +1449,7 @@ static void PTDDraw(TilePathDlg *tpd, GWindow pixmap, GEvent *event) {
     GGadgetGetSize(GWidgetGetControl(tpd->gw,CID_Tile),&pos);
     r.x = pos.x; r.y = pos.y-1;
     r.width = pos.width+1; r.height = pos.height+1;
-    GDrawDrawRect(pixmap,&r,0);
+    GDrawDrawRect(pixmap,&r,GDrawGetDefaultForeground(NULL));
 }
 
 static void PTDMakeActive(TilePathDlg *ptd,CharView *cv) {
@@ -1927,10 +1912,6 @@ static int TilePatternAsk(struct tiledata *td,SplineFont *sf) {
 
     {
 	CharView *cv = &ptd.cv_first;
-	if ( cv->backimgs!=NULL ) {
-	    GDrawDestroyWindow(cv->backimgs);
-	    cv->backimgs = NULL;
-	}
 	CVPalettesHideIfMine(cv);
     }
     GDrawDestroyWindow(ptd.gw);

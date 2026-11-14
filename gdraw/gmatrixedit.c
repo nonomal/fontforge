@@ -32,7 +32,6 @@
 #include "gdrawP.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "gwidget.h"
 #include "ustring.h"
 
@@ -40,12 +39,12 @@
 
 static GBox gmatrixedit_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gmatrixedit_button_box = GBOX_EMPTY; /* Don't initialize here */
-static FontInstance *gmatrixedit_font = NULL, *gmatrixedit_titfont = NULL;
+static GResFont gmatrixedit_font = GRESFONT_INIT("400 12pt " MONO_UI_FAMILIES);
+static GResFont gmatrixedit_titfont = GRESFONT_INIT("400 8pt " SANS_UI_FAMILIES);
 static Color gmatrixedit_title_bg = 0x808080, gmatrixedit_title_fg = 0x000000, gmatrixedit_title_divider = 0xffffff;
 static Color gmatrixedit_rules = 0x000000;
 static Color gmatrixedit_frozencol = 0xff0000,
 	gmatrixedit_activecol = 0x0000ff, gmatrixedit_activebg=0xffffc0;
-static int gmatrixedit_inited = false;
 
 static struct resed gmatrixedit_re[] = {
     {N_("Title Background"), "TitleBG", rt_color, &gmatrixedit_title_bg, N_("Background color of column headers at the top of a matrix edit"), NULL, { 0 }, 0, 0 },
@@ -58,27 +57,30 @@ static struct resed gmatrixedit_re[] = {
     {N_("Title Font"), "TitleFont", rt_font, &gmatrixedit_titfont, N_("Font used to draw titles of a matrix edit"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
-static GResInfo gmatrixedit_ri = {
-    NULL, &ggadget_ri, NULL,NULL,
+static GResInfo gmatrixedit2_ri;
+GResInfo gmatrixedit_ri = {
+    &gmatrixedit2_ri, &ggadget_ri, &gmatrixedit2_ri,NULL,
     &gmatrixedit_box,
     &gmatrixedit_font,
     NULL,
-    gmatrixedit_re,
+    NULL,
     N_("Matrix Edit"),
     N_("Matrix Edit (sort of like a spreadsheet)"),
     "GMatrixEdit",
     "Gdraw",
     false,
+    false,
     omf_border_type|omf_border_width|omf_border_shape|omf_padding|
 	omf_main_background|omf_disabled_background,
-    NULL,
+    { bt_none, bs_rect, 0, 0, 0, 0, 0, 0, 0, 0, COLOR_TRANSPARENT, 0, COLOR_TRANSPARENT, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
     NULL
 };
+static GResInfo gmatrixedit_button_ri;
 static GResInfo gmatrixedit2_ri = {
-    NULL, &ggadget_ri, &gmatrixedit_ri,NULL,
+    &gmatrixedit_button_ri, &ggadget_ri, &gmatrixedit_ri,NULL,
     NULL,
     NULL,
     NULL,
@@ -88,49 +90,48 @@ static GResInfo gmatrixedit2_ri = {
     "GMatrixEdit",
     "Gdraw",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
     NULL
 };
 
+static int GMatrixEditButtonRIInit(GResInfo *ri) {
+    if ( ri->is_initialized )
+	return false;
+    GResEditDoInit(&gmatrixedit_ri);
+    ri->overrides.main_background = gmatrixedit_ri.boxdata->main_background;
+    ri->overrides.disabled_background = gmatrixedit_ri.boxdata->disabled_background;
+    return _GResEditInitialize(ri);
+}
+extern GResInfo gdrawable_ri;
+static GResInfo gmatrixedit_button_ri = {
+    &gdrawable_ri, &ggadget_ri, NULL,NULL,
+    &gmatrixedit_button_box,
+    NULL,
+    NULL,
+    NULL,
+    N_("Matrix Edit Button"),
+    N_("Button in Matrix Edit"),
+    "GMatrixEditButton",
+    "Gdraw",
+    false,
+    false,
+    omf_border_width|omf_main_background|omf_disabled_background|box_foreground_border_inner,
+    { 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    GBOX_EMPTY,
+    NULL,
+    GMatrixEditButtonRIInit,
+    NULL
+};
+
 static void _GMatrixEdit_Init(void) {
-    FontRequest rq;
-
-    if ( gmatrixedit_inited )
-return;
-    _GGadgetCopyDefaultBox(&gmatrixedit_box);
-    gmatrixedit_box.border_type = bt_none;
-    gmatrixedit_box.border_width = 0;
-    gmatrixedit_box.border_shape = bs_rect;
-    gmatrixedit_box.padding = 0;
-    /*gmatrixedit_box.flags = 0;*/
-    gmatrixedit_box.main_background = COLOR_TRANSPARENT;
-    gmatrixedit_box.disabled_background = COLOR_TRANSPARENT;
-    GDrawDecomposeFont(_ggadget_default_font,&rq);
-    gmatrixedit_font = GDrawInstanciateFont(NULL,&rq);
-    gmatrixedit_font = _GGadgetInitDefaultBox("GMatrixEdit.",&gmatrixedit_box,gmatrixedit_font);
-    GDrawDecomposeFont(gmatrixedit_font,&rq);
-    rq.point_size = (rq.point_size>=12) ? rq.point_size-2 : rq.point_size>=10 ? rq.point_size-1 : rq.point_size;
-    rq.weight = 700;
-    gmatrixedit_titfont = GResourceFindFont("GMatrixEdit.TitleFont",GDrawInstanciateFont(NULL,&rq));
-    gmatrixedit_title_bg = GResourceFindColor("GMatrixEdit.TitleBG",gmatrixedit_title_bg);
-    gmatrixedit_title_fg = GResourceFindColor("GMatrixEdit.TitleFG",gmatrixedit_title_fg);
-    gmatrixedit_title_divider = GResourceFindColor("GMatrixEdit.TitleDivider",gmatrixedit_title_divider);
-    gmatrixedit_rules = GResourceFindColor("GMatrixEdit.RuleCol",gmatrixedit_rules);
-    gmatrixedit_frozencol = GResourceFindColor("GMatrixEdit.FrozenCol",gmatrixedit_frozencol);
-    gmatrixedit_activecol = GResourceFindColor("GMatrixEdit.ActiveCol",gmatrixedit_activecol);
-    gmatrixedit_activebg = GResourceFindColor("GMatrixEdit.ActiveBG",gmatrixedit_activebg);
-    gmatrixedit_inited = true;
-
-    _GGadgetCopyDefaultBox(&gmatrixedit_button_box);
-    gmatrixedit_button_box.border_width = 1;
-    gmatrixedit_button_box.flags |= box_foreground_border_inner;
-    gmatrixedit_button_box.main_background = gmatrixedit_box.main_background;
-    gmatrixedit_button_box.disabled_background = gmatrixedit_box.disabled_background;
-    _GGadgetInitDefaultBox("GMatrixEditButton.",&gmatrixedit_button_box,NULL);
+    GResEditDoInit(&gmatrixedit_ri);
+    GResEditDoInit(&gmatrixedit2_ri);
+    GResEditDoInit(&gmatrixedit_button_ri);
 }
 
 static void MatrixDataFree(GMatrixEdit *gme) {
@@ -200,7 +201,7 @@ static void GME_FixScrollBars(GMatrixEdit *gme) {
     GScrollBarSetBounds(gme->hsb,0,width,gme->hsb->r.width);
 }
 
-static void GMatrixEdit_Move(GGadget *g, int32 x, int32 y) {
+static void GMatrixEdit_Move(GGadget *g, int32_t x, int32_t y) {
     GMatrixEdit *gme = (GMatrixEdit *) g;
     int i;
 
@@ -231,11 +232,11 @@ static void GMatrixEdit_Move(GGadget *g, int32 x, int32 y) {
     _ggadget_move(g,x,y);
 }
 
-static GMenuItem *FindMi(GMenuItem *mi, intpt val ) {
+static GMenuItem *FindMi(GMenuItem *mi, intptr_t val ) {
     int i;
 
     for ( i=0; mi[i].ti.text!=NULL || mi[i].ti.line; ++i ) {
-	if ( mi[i].ti.userdata == (void *) (intpt) val && mi[i].ti.text!=NULL )
+	if ( mi[i].ti.userdata == (void *) (intptr_t) val && mi[i].ti.text!=NULL )
 return( &mi[i] );
     }
 return( NULL );
@@ -330,7 +331,6 @@ return( 0 );
 return( width );
 }
 
-static void GME_RedrawTitles(GMatrixEdit *gme);
 static int GME_AdjustCol(GMatrixEdit *gme,int col) {
     int new_width, x,c, changed;
     int orig_width, min_width;
@@ -375,7 +375,7 @@ static int GME_AdjustCol(GMatrixEdit *gme,int col) {
     if ( changed ) {
 	GME_FixScrollBars(gme);
 	GDrawRequestExpose(gme->nested,NULL,false);
-	GME_RedrawTitles(gme);
+	_ggadget_redraw((GGadget*)gme);
     }
 return( changed );
 }
@@ -454,7 +454,7 @@ static void GMatrixEdit_GetDesiredSize(GGadget *g,GRect *outer,GRect *inner) {
 }
 
 static void GME_PositionEdit(GMatrixEdit *gme);
-static void GMatrixEdit_Resize(GGadget *g, int32 width, int32 height ) {
+static void GMatrixEdit_Resize(GGadget *g, int32_t width, int32_t height ) {
     GMatrixEdit *gme = (GMatrixEdit *) g;
     int bp = GBoxBorderWidth(g->base,g->box);
     int subheight, subwidth;
@@ -567,7 +567,7 @@ return( true );
 	gme->col_data[c].width = nw;
 	if ( event->type==et_mouseup )
 	    GME_FixScrollBars(gme);
-	GME_RedrawTitles(gme);
+	_ggadget_redraw((GGadget*)gme);
 	GME_PositionEdit(gme);
 	GDrawRequestExpose(gme->nested,NULL,false);
 	if ( event->type==et_mouseup ) {
@@ -645,10 +645,6 @@ static int GMatrixEdit_Expose(GWindow pixmap, GGadget *g, GEvent *event) {
 return( true );
 }
 
-static void GME_RedrawTitles(GMatrixEdit *gme) {
-    GMatrixEdit_Expose(gme->g.base,&gme->g,NULL);
-}
-
 static void GMatrixEdit_SetVisible(GGadget *g, int visible ) {
     GMatrixEdit *gme = (GMatrixEdit *) g;
     int i;
@@ -718,7 +714,7 @@ return( copy(str));
 
 static int GME_RecalcFH(GMatrixEdit *gme) {
     int r,c, as, ds;
-    int32 end = -1;
+    int32_t end = -1;
     char *str, *ept;
     GTextBounds bounds;
     GMenuItem *mi;
@@ -774,13 +770,13 @@ static FontInstance *GMatrixEdit_GetFont(GGadget *g) {
 return( gme->font );
 }
 
-static int32 GMatrixEdit_IsSelected(GGadget *g, int32 pos) {
+static int32_t GMatrixEdit_IsSelected(GGadget *g, int32_t pos) {
     GMatrixEdit *gme = (GMatrixEdit *) g;
 
 return( pos==gme->active_row );
 }
 
-static int32 GMatrixEdit_GetFirst(GGadget *g) {
+static int32_t GMatrixEdit_GetFirst(GGadget *g) {
     GMatrixEdit *gme = (GMatrixEdit *) g;
 
 return( gme->active_row );
@@ -885,7 +881,7 @@ static void GME_StrSmallEdit(GMatrixEdit *gme,char *str, GEvent *event) {
 static int GME_SetValue(GMatrixEdit *gme,GGadget *g ) {
     int c = gme->active_col;
     int r = gme->active_row;
-    intpt lval;
+    intptr_t lval;
     double dval;
     char *end="";
     char *str = GGadgetGetTitle8(g), *pt;
@@ -898,9 +894,9 @@ static int GME_SetValue(GMatrixEdit *gme,GGadget *g ) {
 	    int i;
 	    for ( i=0; (test=gme->col_data[c].enum_vals[i].ti.text)!=NULL || gme->col_data[c].enum_vals[i].ti.line ; ++i ) {
 		if ( u_strcmp(ustr,test)==0 ) {
-		    if ( (intpt) gme->col_data[c].enum_vals[i].ti.userdata != GME_NoChange )
+		    if ( (intptr_t) gme->col_data[c].enum_vals[i].ti.userdata != GME_NoChange )
 			gme->data[r*gme->cols+c].u.md_ival =
-				(intpt) gme->col_data[c].enum_vals[i].ti.userdata;
+				(intptr_t) gme->col_data[c].enum_vals[i].ti.userdata;
 		    free(str);
   goto good;
 		}
@@ -1100,7 +1096,7 @@ return;
 	gme->data[gme->active_row*gme->cols+i] = gme->data[(gme->active_row-1)*gme->cols+i];
 	gme->data[(gme->active_row-1)*gme->cols+i] = md;
     }
-    --gme->active_row;;
+    --gme->active_row;
     GGadgetGetSize(gme->tf,&r);
     GGadgetMove(gme->tf,r.x,r.y-(gme->fh+1));
     GME_EnableDelete(gme);
@@ -1128,7 +1124,7 @@ return;
 	gme->data[gme->active_row*gme->cols+i] = gme->data[(gme->active_row+1)*gme->cols+i];
 	gme->data[(gme->active_row+1)*gme->cols+i] = md;
     }
-    ++gme->active_row;;
+    ++gme->active_row;
     GGadgetGetSize(gme->tf,&r);
     GGadgetMove(gme->tf,r.x,r.y-(gme->fh+1));
     GME_EnableDelete(gme);
@@ -1213,11 +1209,8 @@ static void GME_StrBigEdit(GMatrixEdit *gme,char *str) {
     mgcd[1].gd.pos.x = 30-3; mgcd[1].gd.pos.y = GDrawPixelsToPoints(NULL,pos.height)-35-3;
     mgcd[1].gd.pos.width = -1; mgcd[1].gd.pos.height = 0;
     mgcd[1].gd.flags = gg_visible | gg_enabled | gg_but_default;
-    if ( _ggadget_use_gettext ) {
-	mlabel[1].text = (unichar_t *) _("_OK");
-	mlabel[1].text_is_1byte = true;
-    } else
-	mlabel[1].text = (unichar_t *) _STR_OK;
+    mlabel[1].text = (unichar_t *) _("_OK");
+    mlabel[1].text_is_1byte = true;
     mlabel[1].text_in_resource = true;
     mgcd[1].gd.label = &mlabel[1];
     mgcd[1].gd.cid = CID_OK;
@@ -1226,11 +1219,8 @@ static void GME_StrBigEdit(GMatrixEdit *gme,char *str) {
     mgcd[2].gd.pos.x = -30; mgcd[2].gd.pos.y = mgcd[1].gd.pos.y+3;
     mgcd[2].gd.pos.width = -1; mgcd[2].gd.pos.height = 0;
     mgcd[2].gd.flags = gg_visible | gg_enabled | gg_but_cancel;
-    if ( _ggadget_use_gettext ) {
-	mlabel[2].text = (unichar_t *) _("_Cancel");
-	mlabel[2].text_is_1byte = true;
-    } else
-	mlabel[2].text = (unichar_t *) _STR_Cancel;
+    mlabel[2].text = (unichar_t *) _("_Cancel");
+    mlabel[2].text_is_1byte = true;
     mlabel[2].text_in_resource = true;
     mgcd[2].gd.label = &mlabel[2];
     mgcd[2].gd.cid = CID_Cancel;
@@ -1268,10 +1258,10 @@ static void GME_StrBigEdit(GMatrixEdit *gme,char *str) {
 static void GME_EnumDispatch(GWindow gw, GMenuItem *mi, GEvent *e) {
     GMatrixEdit *gme = GDrawGetUserData(gw);
 
-    if ( (intpt) mi->ti.userdata == GME_NoChange )
+    if ( (intptr_t) mi->ti.userdata == GME_NoChange )
 return;
 
-    gme->data[gme->active_row*gme->cols+gme->active_col].u.md_ival = (intpt) mi->ti.userdata;
+    gme->data[gme->active_row*gme->cols+gme->active_col].u.md_ival = (intptr_t) mi->ti.userdata;
 
     if ( gme->finishedit != NULL )
 	(gme->finishedit)(&gme->g,gme->active_row,gme->active_col,gme->wasnew);
@@ -1295,7 +1285,7 @@ static void GME_Choices(GMatrixEdit *gme,GEvent *event,int r,int c) {
     int i;
 
     for ( i=0; mi[i].ti.text!=NULL || mi[i].ti.line || mi[i].ti.image!=NULL; ++i )
-	mi[i].ti.selected = mi[i].ti.checked = !gme->wasnew && (mi[i].ti.userdata == (void *) (intpt) val);
+	mi[i].ti.selected = mi[i].ti.checked = !gme->wasnew && (mi[i].ti.userdata == (void *) (intptr_t) val);
     if ( gme->col_data[c].enable_enum!=NULL )
 	(gme->col_data[c].enable_enum)(&gme->g,mi,r,c);
     _GMenuCreatePopupMenu(gme->nested,event, mi, GME_FinishChoice);
@@ -1305,7 +1295,7 @@ static void GME_EnumStringDispatch(GWindow gw, GMenuItem *mi, GEvent *e) {
     GMatrixEdit *gme = GDrawGetUserData(gw);
     int r = gme->active_row, c = gme->active_col;
 
-    if ( (intpt) mi->ti.userdata == GME_NoChange )
+    if ( (intptr_t) mi->ti.userdata == GME_NoChange )
 return;
 
     free(gme->data[r*gme->cols+c].u.md_str);
@@ -1313,10 +1303,10 @@ return;
 	gme->data[r*gme->cols+c].u.md_str = copy( (char *) mi->ti.userdata );
     else if ( gme->col_data[c].me_type==me_stringchoicetag ) {
 	char buf[8];
-	buf[0] = ((intpt) mi->ti.userdata)>>24;
-	buf[1] = ((intpt) mi->ti.userdata)>>16;
-	buf[2] = ((intpt) mi->ti.userdata)>>8;
-	buf[3] = ((intpt) mi->ti.userdata)&0xff;
+	buf[0] = ((intptr_t) mi->ti.userdata)>>24;
+	buf[1] = ((intptr_t) mi->ti.userdata)>>16;
+	buf[2] = ((intptr_t) mi->ti.userdata)>>8;
+	buf[3] = ((intptr_t) mi->ti.userdata)&0xff;
 	buf[4] = '\0';
 	gme->data[r*gme->cols+c].u.md_str = copy( buf );
     } else
@@ -1336,10 +1326,10 @@ static void GME_StringChoices(GMatrixEdit *gme,GEvent *event,int r,int c) {
     if ( gme->col_data[c].me_type==me_stringchoicetag ) {
 	char buf[8];
 	for ( i=0; mi[i].ti.text!=NULL || mi[i].ti.line || mi[i].ti.image!=NULL; ++i ) {
-	    buf[0] = ((intpt) mi[i].ti.userdata)>>24;
-	    buf[1] = ((intpt) mi[i].ti.userdata)>>16;
-	    buf[2] = ((intpt) mi[i].ti.userdata)>>8;
-	    buf[3] = ((intpt) mi[i].ti.userdata)&0xff;
+	    buf[0] = ((intptr_t) mi[i].ti.userdata)>>24;
+	    buf[1] = ((intptr_t) mi[i].ti.userdata)>>16;
+	    buf[2] = ((intptr_t) mi[i].ti.userdata)>>8;
+	    buf[3] = ((intptr_t) mi[i].ti.userdata)&0xff;
 	    buf[4] = '\0';
 	    mi[i].ti.selected = mi[i].ti.checked = !gme->wasnew && val!=NULL &&
 		    strcmp(buf,val)==0;
@@ -1383,6 +1373,7 @@ static void GMatrixEdit_StartSubGadgets(GMatrixEdit *gme,int r, int c,GEvent *ev
 	      case me_enum:
 		d->u.md_ival = (int) (intptr_t) gme->col_data[i].enum_vals[0].ti.userdata;
 	      break;
+	      default: break;
 	    }
 	}
 	if ( gme->initrow!=NULL )
@@ -1513,10 +1504,10 @@ return;
 	    char *str = gme->data[r*gme->cols+c].u.md_str, buf[8];
 	    GMenuItem *enums = gme->col_data[c].enum_vals;
 	    for ( i=0; enums[i].ti.text!=NULL || enums[i].ti.line ; ++i ) {
-		buf[0] = ((intpt) enums[i].ti.userdata)>>24;
-		buf[1] = ((intpt) enums[i].ti.userdata)>>16;
-		buf[2] = ((intpt) enums[i].ti.userdata)>>8;
-		buf[3] = ((intpt) enums[i].ti.userdata)&0xff;
+		buf[0] = ((intptr_t) enums[i].ti.userdata)>>24;
+		buf[1] = ((intptr_t) enums[i].ti.userdata)>>16;
+		buf[2] = ((intptr_t) enums[i].ti.userdata)>>8;
+		buf[3] = ((intptr_t) enums[i].ti.userdata)&0xff;
 		buf[4] = '\0';
 		if ( enums[i].ti.userdata!=NULL && strcmp(buf,str)==0 ) {
 		    if ( enums[i].ti.text_is_1byte )
@@ -1626,14 +1617,8 @@ static void GMatrixEdit_SubExpose(GMatrixEdit *gme,GWindow pixmap,GEvent *event)
 		    if ( !gme->no_edit ) {
 			if ( gme->newtext!=NULL )
 			    buf = smprintf( "<%s>", gme->newtext );
-			else if ( _ggadget_use_gettext )
+			else
 			    buf = smprintf( "<%s>", S_("Row|New") );
-			else {
-			    gchar *tmp = g_ucs4_to_utf8( (const gunichar *) GStringGetResource( _STR_New, NULL ),
-				   -1, NULL, NULL, NULL );
-			    buf = smprintf( "<%s>", tmp );
-			    g_free( tmp ); tmp = NULL;
-			}
 			GDrawDrawText8( pixmap, gme->col_data[0].x - gme->off_left,y,
 				(char *) buf, -1, gmatrixedit_activecol );
 			free( buf ) ; buf = NULL ;
@@ -1791,6 +1776,7 @@ return( false );
 	if ( gme->reporttextchanged!=NULL )
 	    (gme->reporttextchanged)(&gme->g,gme->active_row,gme->active_col,gme->tf);
       break;
+      default: break;
     }
 return( true );
 }
@@ -1824,6 +1810,7 @@ static void GME_HScroll(GMatrixEdit *gme,struct sbevent *sb) {
       case et_sb_thumbrelease:
 	newpos = sb->pos;
       break;
+      case et_sb_halfup: case et_sb_halfdown: break;
     }
 
     if ( newpos + size.width > hend )
@@ -1860,7 +1847,7 @@ static void GME_HScroll(GMatrixEdit *gme,struct sbevent *sb) {
 	}
 	GDrawScroll( gme->nested,&clip,diff,0 );
 	GME_PositionEdit(gme);
-	GME_RedrawTitles(gme);
+	_ggadget_redraw((GGadget*)gme);
     }
 }
 
@@ -1895,6 +1882,7 @@ static void GME_VScroll(GMatrixEdit *gme,struct sbevent *sb) {
       case et_sb_thumbrelease:
 	newpos = sb->pos;
       break;
+      case et_sb_halfup: case et_sb_halfdown: break;
     }
     if ( newpos + page > gme->rows+1 )
 	newpos = gme->rows+1 - page;
@@ -1972,15 +1960,14 @@ GGadget *GMatrixEditCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     GTextInfo label;
     int as, ds, ld;
 
-    if ( !gmatrixedit_inited )
-	_GMatrixEdit_Init();
+    _GMatrixEdit_Init();
 
     gme->g.funcs = &gmatrixedit_funcs;
     _GGadget_Create(&gme->g,base,gd,data,&gmatrixedit_box);
     gme->g.takes_input = true; gme->g.takes_keyboard = false; gme->g.focusable = false;
 
-    gme->font = gmatrixedit_font;
-    gme->titfont = gmatrixedit_titfont;
+    gme->font = gmatrixedit_font.fi;
+    gme->titfont = gmatrixedit_titfont.fi;
     GDrawWindowFontMetrics(base,gme->font,&as, &ds, &ld);
     gme->font_as = gme->as = as;
     gme->font_fh = gme->fh = as+ds;
@@ -2473,18 +2460,4 @@ void GMatrixEditSetEditable(GGadget *g, int editable ) {
     GGadgetSetVisible(gme->del,editable);
     GMatrixEdit_Resize(&gme->g,gme->g.r.width,gme->g.r.height);
     GDrawRequestExpose(gme->nested,NULL,false);
-}
-
-GResInfo *_GMatrixEditRIHead(void) {
-    /* GRect size; */
-
-    _GMatrixEdit_Init();
-    /* GDrawGetSize(GDrawGetRoot(NULL),&size);*/
-    if ( true /* size.height<900*/ ) {
-	gmatrixedit_ri.next = &gmatrixedit2_ri;
-	gmatrixedit_ri.extras = NULL;
-	gmatrixedit_ri.seealso1 = &gmatrixedit2_ri;
-    }
-
-return( &gmatrixedit_ri );
 }

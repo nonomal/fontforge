@@ -29,17 +29,7 @@
 #define FONTFORGE_GDRAW_H
 
 #include "gimage.h"
-
-enum font_style { fs_none, fs_italic=1, fs_smallcaps=2, fs_condensed=4, fs_extended=8, fs_vertical=16 };
-enum font_type { ft_unknown, ft_serif, ft_sans, ft_mono, ft_cursive, ft_max };
-
-typedef struct {
-    const unichar_t *family_name;	/* may be more than one */
-    int16 point_size;			/* negative values are in pixels */
-    int16 weight;
-    enum font_style style;
-    char *utf8_family_name;
-} FontRequest;
+#include "gresource.h"
 
 typedef struct font_instance FontInstance, GFont;
 enum gic_style { gic_overspot=2, gic_root=1, gic_hidden=0, gic_orlesser=4, gic_type=3 };
@@ -51,24 +41,24 @@ typedef struct ggc {
     Color bg;
     GRect clip;
     unsigned int bitmap_col: 1;			/* window is mapped for bitmap */
-    int16 skip_len, dash_len;
-    int16 line_width;
-    int16 ts;
-    int32 ts_xoff, ts_yoff;
+    int16_t skip_len, dash_len;
+    int16_t line_width;
+    int16_t ts;
+    int32_t ts_xoff, ts_yoff;
     int dash_offset;
     GFont *fi;
 } GGC;
 
 typedef struct gtextbounds {
-    int16 lbearing;		/* of first character */
+    int16_t lbearing;		/* of first character */
 				/* origin to left edge of first char's raster */
-    int32 rbearing;		/* origin to right edge of last char's raster */
-    int16 as,ds;		/* maximum ascent and maximum descent */
+    int32_t rbearing;		/* origin to right edge of last char's raster */
+    int16_t as,ds;		/* maximum ascent and maximum descent */
     				/*  (both numbers will be positive for "g" */
 			        /* so total height = as+ds */
-    int16 fas, fds;		/* font ascent and descent */
+    int16_t fas, fds;		/* font ascent and descent */
 			        /* total width = rbearing-lbearing */
-    int32 width;	        /* above are for the bounding rect, not the text */
+    int32_t width;	        /* above are for the bounding rect, not the text */
 			        /*  "width" which may be totally different */
 } GTextBounds;
 
@@ -120,11 +110,11 @@ enum et_subtype { et_buttonpress, et_buttonactivate, et_radiochanged,
 enum sb { et_sb_top, et_sb_uppage, et_sb_up, et_sb_left=et_sb_up,
 	  et_sb_down, et_sb_right=et_sb_down, et_sb_downpage,
 	  et_sb_bottom,
-	  et_sb_thumb, et_sb_thumbrelease };
+	  et_sb_thumb, et_sb_thumbrelease, et_sb_halfup, et_sb_halfdown };
 
 struct sbevent {
     enum sb type;
-    int32 pos;
+    int32_t pos;
 };
 
 typedef struct gevent {
@@ -134,21 +124,21 @@ typedef struct gevent {
     union {
 	struct {
 	    char *device;		/* for wacom devices */
-	    uint32 time;
-	    uint16 state;
-	    int16 x,y;
-	    uint16 keysym;
-	    int16 autorepeat;
+	    uint32_t time;
+	    uint16_t state;
+	    int16_t x,y;
+	    uint16_t keysym;
+	    int16_t autorepeat;
 	    unichar_t chars[_GD_EVT_CHRLEN];
 	} chr;
 	struct {
 	    char *device;		/* for wacom devices */
-	    uint32 time;
-	    int16 state;
-	    int16 x,y;
-	    int16 button;
-	    int16 clicks;
-	    int32 pressure, xtilt, ytilt, separation;
+	    uint32_t time;
+	    int16_t state;
+	    int16_t x,y;
+	    int16_t button;
+	    int16_t clicks;
+	    int32_t pressure, xtilt, ytilt, separation;
 	} mouse;
 	struct {
 	    GRect rect;
@@ -158,15 +148,15 @@ typedef struct gevent {
 	} visibility;
 	struct {
 	    GRect size;
-	    int16 dx, dy, dwidth, dheight;
+	    int16_t dx, dy, dwidth, dheight;
 	    unsigned int moved: 1;
 	    unsigned int sized: 1;
 	} resize;
 	struct {
 	    char *device;		/* for wacom devices */
-	    uint32 time;
-	    int16 state;
-	    int16 x,y;
+	    uint32_t time;
+	    int16_t state;
+	    int16_t x,y;
 	    unsigned int entered: 1;
 	} crossing;
 	struct {
@@ -180,7 +170,7 @@ typedef struct gevent {
 	    enum selnames sel;
 	} selclear;
 	struct {
-	    int32 x,y;
+	    int32_t x,y;
 	} drag_drop;
 	struct {
 	    GTimer *timer;
@@ -199,7 +189,7 @@ typedef struct gevent {
 		} tf_changed;
 		struct {
 		    int clicks;
-		    int16 button, state;
+		    int16_t button, state;
 		} button;
 		struct {
 		    int from_mouse, changed_index;
@@ -229,10 +219,19 @@ enum window_attr_mask { wam_events=0x2, wam_bordwidth=0x4,
 			wam_utf8_wtitle=0x80000, wam_utf8_ititle=0x100000,
 			wam_nocairo=0x200000, wam_verytransient=0x400000, wam_palette=0x800000 };
 
+#ifdef __cplusplus
+extern "C++" {
+inline enum window_attr_mask operator|(enum window_attr_mask lhs, enum window_attr_mask rhs) {
+    return static_cast<enum window_attr_mask>(static_cast<int>(lhs) |
+                                              static_cast<int>(rhs));
+}
+}
+#endif
+
 typedef struct gwindow_attrs {
     enum window_attr_mask mask;
-    uint32 event_masks;			/* (1<<et_char) | (1<<et_mouseup) etc */
-    int16 border_width;
+    uint32_t event_masks;			/* (1<<et_char) | (1<<et_mouseup) etc */
+    int16_t border_width;
     Color border_color;			/* Color_UNKNOWN if unspecified */
     Color background_color;
     GCursor cursor;
@@ -263,17 +262,18 @@ typedef struct gdeveventmask {
 } GDevEventMask;
 
 enum gzoom_flags { gzf_pos=1, gzf_size=2 };
-    /* bit flags for the hasCairo query */
-enum gcairo_flags { gc_buildpath=1,	/* Has build path commands (postscript, cairo) */
-		    gc_alpha=2,		/* Supports alpha channels & translucent colors (cairo, pdf) */
-		    gc_xor=4,		/* Cairo can't do the traditional XOR drawing that X11 does */
-		    gc_all = gc_buildpath|gc_alpha
-		    };
 
 typedef int (*GDrawEH)(GWindow,GEvent *);
 
+extern Color _GDraw_res_fg, _GDraw_res_bg, _GDraw_res_warnfg;
+extern int _GDraw_res_res, _GDraw_res_multiclicktime, _GDraw_res_multiclickwiggle;
+extern int _GDraw_res_selnottime, _GDraw_res_twobuttonfixup, _GDraw_res_macosxcmd;
+extern int _GDraw_res_synchronize;
+
 extern unichar_t *GDrawKeysyms[];
 extern GDisplay *screen_display;
+
+extern void GDrawResourceFind(void);
 
 extern void GDrawDestroyDisplays(void);
 extern void GDrawCreateDisplays(char *displayname,char *programname);
@@ -284,10 +284,10 @@ extern int GDrawPixelsToPoints(GWindow gw,int pixels);
 extern void GDrawSetDefaultIcon(GWindow icon);
 extern GWindow GDrawCreateTopWindow(GDisplay *gdisp, GRect *pos, int (*eh)(GWindow,GEvent *), void *user_data, GWindowAttrs *wattrs);
 extern GWindow GDrawCreateSubWindow(GWindow w, GRect *pos, int (*eh)(GWindow,GEvent *), void *user_data, GWindowAttrs *wattrs);
-extern GWindow GDrawCreatePixmap(GDisplay *gdisp, GWindow similar, uint16 width, uint16 height);
-extern GWindow GDrawCreateBitmap(GDisplay *gdisp, uint16 width, uint16 height, uint8 *data);
+extern GWindow GDrawCreatePixmap(GDisplay *gdisp, GWindow similar, uint16_t width, uint16_t height);
+extern GWindow GDrawCreateBitmap(GDisplay *gdisp, uint16_t width, uint16_t height, uint8_t *data);
 extern GCursor GDrawCreateCursor(GWindow src,GWindow mask,Color fg,Color bg,
-	int16 x, int16 y );
+	int16_t x, int16_t y );
 extern void GDrawDestroyWindow(GWindow w);
 extern int  GDrawNativeWindowExists(GDisplay *gdisp, void *native);
 extern void GDrawSetZoom(GWindow w, GRect *zoomsize, enum gzoom_flags);
@@ -312,13 +312,14 @@ extern char* GDrawGetWindowTypeName(GWindow w);
 extern int  GDrawSetDither(GDisplay *gdisp, int dither);
 extern void GDrawSetVisible(GWindow w, int visible);
 extern int  GDrawIsVisible(GWindow w);
-extern void GDrawTrueMove(GWindow w, int32 x, int32 y);
-extern void GDrawMove(GWindow w, int32 x, int32 y);
-extern void GDrawResize(GWindow w, int32 width, int32 height);
-extern void GDrawMoveResize(GWindow w, int32 x, int32 y, int32 width, int32 height);
+extern void GDrawTrueMove(GWindow w, int32_t x, int32_t y);
+extern void GDrawMove(GWindow w, int32_t x, int32_t y);
+extern void GDrawResize(GWindow w, int32_t width, int32_t height);
+extern void GDrawMoveResize(GWindow w, int32_t x, int32_t y, int32_t width, int32_t height);
 extern GWindow GDrawGetRoot(GDisplay *);
 extern Color GDrawGetDefaultBackground(GDisplay *);
 extern Color GDrawGetDefaultForeground(GDisplay *);
+extern Color GDrawGetWarningForeground(GDisplay *);
 extern GRect *GDrawGetSize(GWindow w, GRect *ret);
 extern GDrawEH GDrawGetEH(GWindow w);
 extern void GDrawSetEH(GWindow w,GDrawEH e_h);
@@ -336,7 +337,7 @@ extern void GDrawSetUserData(GWindow gw, void *ud);
 extern void *GDrawGetUserData(GWindow gw);
 extern GDisplay *GDrawGetDisplayOfWindow(GWindow);
 extern void GDrawTranslateCoordinates(GWindow from,GWindow to, GPoint *pt);
-extern int32 GDrawEventInWindow(GWindow inme,GEvent *event);
+extern int32_t GDrawEventInWindow(GWindow inme,GEvent *event);
 extern void GDrawBeep(GDisplay *gdisp);
 extern void GDrawFlush(GDisplay *gdisp);
 
@@ -347,56 +348,58 @@ extern void GDrawPushClip(GWindow w, GRect *rct, GRect *old);
 extern void GDrawPopClip(GWindow w, GRect *old);
 extern void GDrawPushClipOnly(GWindow w);
 extern void GDrawClipPreserve(GWindow w);
-extern void GDrawSetDashedLine(GWindow w,int16 dash_len, int16 skip_len, int16 off);
-extern void GDrawSetStippled(GWindow w,int16 ts, int32 yoff,int32 xoff);
-extern void GDrawSetLineWidth(GWindow w,int16 width);
-extern int16 GDrawGetLineWidth( GWindow w );
+extern void GDrawSetDashedLine(GWindow w,int16_t dash_len, int16_t skip_len, int16_t off);
+extern void GDrawSetStippled(GWindow w,int16_t ts, int32_t yoff,int32_t xoff);
+extern void GDrawSetLineWidth(GWindow w,int16_t width);
+extern int16_t GDrawGetLineWidth( GWindow w );
 
 extern void GDrawSetBackground(GWindow w,Color col);
 
 extern GFont *GDrawSetFont(GWindow gw, GFont *fi);
+extern GFont *GDrawSetDefaultFont(GWindow gw);
 extern GFont *GDrawInstanciateFont(GWindow gw, FontRequest *rq);
 extern GFont *GDrawAttachFont(GWindow gw, FontRequest *rq);
 extern FontRequest *GDrawDecomposeFont(GFont *fi, FontRequest *rq);
 extern void GDrawWindowFontMetrics(GWindow gw,GFont *fi,int *as, int *ds, int *ld);
+extern void GDrawDefaultFontMetrics(GWindow gw,int *as, int *ds, int *ld);
 
-extern int32 GDrawGetTextBounds(GWindow gw,const unichar_t *text, int32 cnt, GTextBounds *size);
-extern int32 GDrawGetTextWidth(GWindow gw, const unichar_t *text, int32 cnt);
-extern int32 GDrawDrawText(GWindow gw, int32 x, int32 y, const unichar_t *txt, int32 cnt, Color col);
+extern int32_t GDrawGetTextBounds(GWindow gw,const unichar_t *text, int32_t cnt, GTextBounds *size);
+extern int32_t GDrawGetTextWidth(GWindow gw, const unichar_t *text, int32_t cnt);
+extern int32_t GDrawDrawText(GWindow gw, int32_t x, int32_t y, const unichar_t *txt, int32_t cnt, Color col);
 /* UTF8 routines */
-extern int32 GDrawGetText8Bounds(GWindow gw, const char *text, int32 cnt, GTextBounds *size);
-extern int32 GDrawGetText8Width(GWindow gw, const char *text, int32 cnt);
-extern int32 GDrawGetText8Height(GWindow gw, const char *text, int32 cnt);
-extern int32 GDrawDrawText8(GWindow gw, int32 x, int32 y, const char *txt, int32 cnt, Color col);
+extern int32_t GDrawGetText8Bounds(GWindow gw, const char *text, int32_t cnt, GTextBounds *size);
+extern int32_t GDrawGetText8Width(GWindow gw, const char *text, int32_t cnt);
+extern int32_t GDrawGetText8Height(GWindow gw, const char *text, int32_t cnt);
+extern int32_t GDrawDrawText8(GWindow gw, int32_t x, int32_t y, const char *txt, int32_t cnt, Color col);
 
 extern GIC *GDrawCreateInputContext(GWindow w,enum gic_style def_style);
 extern void GDrawSetGIC(GWindow w,GIC *gic,int x, int y);
 extern int GDrawKeyState(GWindow w, int keysym);
 
-extern void GDrawDrawLine(GWindow w, int32 x,int32 y, int32 xend,int32 yend, Color col);
-extern void GDrawDrawArrow(GWindow w, int32 x,int32 y, int32 xend,int32 yend, int arrows, Color col);
+extern void GDrawDrawLine(GWindow w, int32_t x,int32_t y, int32_t xend,int32_t yend, Color col);
+extern void GDrawDrawArrow(GWindow w, int32_t x,int32_t y, int32_t xend,int32_t yend, int arrows, Color col);
 extern void GDrawDrawRect(GWindow w, GRect *rect, Color col);
 extern void GDrawFillRect(GWindow w, GRect *rect, Color col);
 extern void GDrawFillRoundRect(GWindow w, GRect *rect, int radius, Color col);
 extern void GDrawDrawElipse(GWindow w, GRect *rect, Color col);
 extern void GDrawFillElipse(GWindow w, GRect *rect, Color col);
-extern void GDrawDrawArc(GWindow w, GRect *rect, int32 sangle, int32 tangle, Color col);
-extern void GDrawDrawPoly(GWindow w, GPoint *pts, int16 cnt, Color col);
-extern void GDrawFillPoly(GWindow w, GPoint *pts, int16 cnt, Color col);
-extern void GDrawScroll(GWindow w, GRect *rect, int32 hor, int32 vert);
-extern void GDrawDrawImage(GWindow w, GImage *img, GRect *src, int32 x, int32 y);
-extern void GDrawDrawGlyph(GWindow w, GImage *img, GRect *src, int32 x, int32 y);
-extern void GDrawDrawScaledImage(GWindow w, GImage *img, int32 x, int32 y);
-extern void GDrawDrawImageMagnified(GWindow w, GImage *img, GRect *src, int32 x, int32 y,
-	int32 width, int32 height);
-extern void GDrawDrawPixmap(GWindow w, GWindow pixmap, GRect *src, int32 x, int32 y);
+extern void GDrawDrawArc(GWindow w, GRect *rect, int32_t sangle, int32_t tangle, Color col);
+extern void GDrawDrawPoly(GWindow w, GPoint *pts, int16_t cnt, Color col);
+extern void GDrawFillPoly(GWindow w, GPoint *pts, int16_t cnt, Color col);
+extern void GDrawScroll(GWindow w, GRect *rect, int32_t hor, int32_t vert);
+extern void GDrawDrawImage(GWindow w, GImage *img, GRect *src, int32_t x, int32_t y);
+extern void GDrawDrawGlyph(GWindow w, GImage *img, GRect *src, int32_t x, int32_t y);
+extern void GDrawDrawScaledImage(GWindow w, GImage *img, int32_t x, int32_t y);
+extern void GDrawDrawImageMagnified(GWindow w, GImage *img, GRect *src, int32_t x, int32_t y,
+	int32_t width, int32_t height);
+extern void GDrawDrawPixmap(GWindow w, GWindow pixmap, GRect *src, int32_t x, int32_t y);
 
 extern void GDrawGrabSelection(GWindow w,enum selnames sel);
 extern void GDrawAddSelectionType(GWindow w,enum selnames sel,char *type,
-	void *data,int32 cnt,int32 unitsize,void *(*gendata)(void *,int32 *len),
+	void *data,int32_t cnt,int32_t unitsize,void *(*gendata)(void *,int32_t *len),
 	void (*freedata)(void *));
-extern void *GDrawRequestSelection(GWindow w,enum selnames sn, char *typename, int32 *len);
-extern int GDrawSelectionHasType(GWindow w,enum selnames sn, char *typename);
+extern void *GDrawRequestSelection(GWindow w,enum selnames sn, char *type_name, int32_t *len);
+extern int GDrawSelectionHasType(GWindow w,enum selnames sn, char *type_name);
 extern void GDrawBindSelection(GDisplay *disp,enum selnames sel, char *atomname);
 extern int GDrawSelectionOwned(GDisplay *disp,enum selnames sel);
 
@@ -413,13 +416,13 @@ extern void GDrawEventLoop(GDisplay *disp);
 extern void GDrawPostEvent(GEvent *e);
 extern void GDrawPostDragEvent(GWindow gw,GEvent *e,enum event_type);
 
-extern GTimer *GDrawRequestTimer(GWindow w,int32 time_from_now,int32 frequency,
+extern GTimer *GDrawRequestTimer(GWindow w,int32_t time_from_now,int32_t frequency,
 	void *userdata);
 extern void GDrawCancelTimer(GTimer *timer);
 
 extern int GDrawRequestDeviceEvents(GWindow w,int devcnt,struct gdeveventmask *de);
+extern int GDrawShortcutKeyMatches(const GEvent *e, unichar_t ch);
 
-extern enum gcairo_flags GDrawHasCairo(GWindow w);
 extern void GDrawPathStartNew(GWindow w);
 extern void GDrawPathStartSubNew(GWindow w);
 extern int GDrawFillRuleSetWinding(GWindow w);
@@ -433,10 +436,9 @@ extern void GDrawPathCurveTo(GWindow w,
 extern void GDrawPathStroke(GWindow w,Color col);
 extern void GDrawPathFill(GWindow w,Color col);
 extern void GDrawPathFillAndStroke(GWindow w,Color fillcol, Color strokecol);
-extern void GDrawEnableCairo(int on);
 
 extern void GDrawLayoutInit(GWindow w, char *text, int cnt, GFont *fi);
-extern void GDrawLayoutDraw(GWindow w, int32 x, int32 y, Color fg);
+extern void GDrawLayoutDraw(GWindow w, int32_t x, int32_t y, Color fg);
 extern void GDrawLayoutIndexToPos(GWindow w, int index, GRect *pos);
 extern int  GDrawLayoutXYToIndex(GWindow w, int x, int y);
 extern void GDrawLayoutExtents(GWindow w, GRect *size);

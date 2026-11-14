@@ -43,6 +43,8 @@
 #include "ustring.h"
 #include "utype.h"
 
+#include <stdbool.h>
+
 int coverageformatsallowed=3;
 int use_second_indic_scripts = true;
 
@@ -60,193 +62,299 @@ int use_second_indic_scripts = true;
 /* scripts (for opentype) that I understand */
     /* see also list in lookups.c mapping script tags to friendly names */
 
-static uint32 scripts[][61] = {
-/* Adlam */	{ CHR('a','d','l','m'), 0x1e900, 0x1e95f },
-/* Ahom */	{ CHR('a','h','o','m'), 0x11700, 0x1173f },
-/* Anatolian */	{ CHR('h','l','u','w'), 0x14400, 0x1467f },
-/* Arabic */	{ CHR('a','r','a','b'), 0x0600, 0x06ff, 0x0750, 0x077f, 0xfb50, 0xfdff, 0xfe70, 0xfefe },
-/* Aramaic */	{ CHR('s','a','m','r'), 0x0820, 0x083f },
-/* Armenian */	{ CHR('a','r','m','n'), 0x0530, 0x058f, 0xfb13, 0xfb17 },
-/* Avestan */	{ CHR('a','v','s','t'), 0x10b00, 0x10b3f },
-/* Balinese */	{ CHR('b','a','l','i'), 0x1b00, 0x1b7f },
-/* Bamum */	{ CHR('b','a','m','u'), 0xa6a0, 0xa6ff, 0x16800, 0x16a3f },
-/* Bassa Vah */	{ CHR('b','a','s','s'), 0x16ad0, 0x16aff }, 
-/* Batak */	{ CHR('b','a','t','k'), 0x1bc0, 0x1bff }, 
-/* Bengali */	{ CHR('b','e','n','g'), 0x0980, 0x09ff },
-/* Bhaiksuki */	{ CHR('b','h','k','s'), 0x11c00, 0x11c6f },
-/* Bopomofo */	{ CHR('b','o','p','o'), 0x3100, 0x312f, 0x02ea, 0x02eb, 0x31a0, 0x31bf },
-/* Brahmi */	{ CHR('b','r','a','h'), 0x11000, 0x1107f },
+static uint32_t scripts[][117] = {
+/* Adlam */	{ CHR('a','d','l','m'), 0x1e900, 0x1e94b, 0x1e950, 0x1e959, 0x1e95e, 0x1e95f },
+/* Ahom */	{ CHR('a','h','o','m'), 0x11700, 0x1171a, 0x1171d, 0x1172b, 0x11730, 0x11746 },
+/* Anatolian */	{ CHR('h','l','u','w'), 0x14400, 0x14646 },
+/* Arabic */	{ CHR('a','r','a','b'), 0x0600, 0x0604, 0x0606, 0x060b, 0x060d, 0x061a, 0x061c, 0x061e,
+	0x0620, 0x063f, 0x0641, 0x064a, 0x0656, 0x066f, 0x0671, 0x06dc, 0x06de, 0x06ff, 0x0750, 0x077f,
+	0x0870, 0x0891, 0x0897, 0x08e1, 0x08e3, 0x08ff, 0xfb50, 0xfd3d, 0xfd40, 0xfdcf, 0xfdf0, 0xfdff,
+	0xfe70, 0xfe74, 0xfe76, 0xfefc, 0x10e60, 0x10e7e, 0x10ec2, 0x10ec7, 0x10ed0, 0x10ed8, 0x10efa, 0x10eff,
+	0x1ee00, 0x1ee03, 0x1ee05, 0x1ee1f, 0x1ee21, 0x1ee22, 0x1ee24, 0x1ee24, 0x1ee27, 0x1ee27,
+	0x1ee29, 0x1ee32, 0x1ee34, 0x1ee37, 0x1ee39, 0x1ee39, 0x1ee3b, 0x1ee3b, 0x1ee42, 0x1ee42,
+	0x1ee47, 0x1ee47, 0x1ee49, 0x1ee49, 0x1ee4b, 0x1ee4b, 0x1ee4d, 0x1ee4f, 0x1ee51, 0x1ee52,
+	0x1ee54, 0x1ee54, 0x1ee57, 0x1ee57, 0x1ee59, 0x1ee59, 0x1ee5b, 0x1ee5b, 0x1ee5d, 0x1ee5d,
+	0x1ee5f, 0x1ee5f, 0x1ee61, 0x1ee62, 0x1ee64, 0x1ee64, 0x1ee67, 0x1ee6a, 0x1ee6c, 0x1ee72,
+	0x1ee74, 0x1ee77, 0x1ee79, 0x1ee7c, 0x1ee7e, 0x1ee7e, 0x1ee80, 0x1ee89, 0x1ee8b, 0x1ee9b,
+	0x1eea1, 0x1eea3, 0x1eea5, 0x1eea9, 0x1eeab, 0x1eebb, 0x1eef0, 0x1eef1 },
+/* Aramaic */	{ CHR('s','a','m','r'), 0x0800, 0x082d, 0x0830, 0x083e },
+/* Armenian */	{ CHR('a','r','m','n'), 0x0531, 0x0556, 0x0559, 0x058a, 0x058d, 0x058f, 0xfb13, 0xfb17 },
+/* Avestan */	{ CHR('a','v','s','t'), 0x10b00, 0x10b35, 0x10b39, 0x10b3f },
+/* Balinese */	{ CHR('b','a','l','i'), 0x1b00, 0x1b4c, 0x1b4e, 0x1b7f },
+/* Bamum */	{ CHR('b','a','m','u'), 0xa6a0, 0xa6f7, 0x16800, 0x16a38 },
+/* Bassa Vah */	{ CHR('b','a','s','s'), 0x16ad0, 0x16aed, 0x16af0, 0x16af5 },
+/* Batak */	{ CHR('b','a','t','k'), 0x1bc0, 0x1bf3, 0x1bfc, 0x1bff },
+/* Bengali */	{ CHR('b','e','n','g'), 0x0980, 0x0983, 0x0985, 0x098c, 0x098f, 0x0990, 0x0993, 0x09a8,
+	0x09aa, 0x09b0, 0x09b2, 0x09b2, 0x09b6, 0x09b9, 0x09bc, 0x09c4, 0x09c7, 0x09c8, 0x09cb, 0x09ce,
+	0x09d7, 0x09d7, 0x09dc, 0x09dd, 0x09df, 0x09e3, 0x09e6, 0x09fe },
+/* Beria Erfe */{ CHR('b','e','r','f'), 0x16ea0, 0x16eb8, 0x16ebb, 0x16ed3 },
+/* Bhaiksuki */	{ CHR('b','h','k','s'), 0x11c00, 0x11c08, 0x11c0a, 0x11c36, 0x11c38, 0x11c45,
+	0x11c50, 0x11c6c },
+/* Bopomofo */	{ CHR('b','o','p','o'), 0x02ea, 0x02eb, 0x3105, 0x312f, 0x31a0, 0x31bf },
+/* Brahmi */	{ CHR('b','r','a','h'), 0x11000, 0x1104d, 0x11052, 0x11075, 0x1107f, 0x1107f },
 /* Braille */	{ CHR('b','r','a','i'), 0x2800, 0x28ff },
-/* Buginese */	{ CHR('b','u','g','i'), 0x1a00, 0x1a1f },
-/* Buhid */	{ CHR('b','u','h','d'), 0x1740, 0x175f },
-/* Byzantine M*/{ CHR('b','y','z','m'), 0x1d000, 0x1d0ff },
-/* Canadian Syl*/{CHR('c','a','n','s'), 0x1400, 0x167f, 0x18b0, 0x18ff },
-/* Carian */	{ CHR('c','a','r','i'), 0x102a0, 0x102df },
+/* Buginese */	{ CHR('b','u','g','i'), 0x1a00, 0x1a1b, 0x1a1e, 0x1a1f },
+/* Buhid */	{ CHR('b','u','h','d'), 0x1740, 0x1753 },
+/* Byzantine M*/{ CHR('b','y','z','m'), 0x1d000, 0x1d0f5 },
+/* Canadian Syl*/{CHR('c','a','n','s'), 0x1400, 0x167f, 0x18b0, 0x18f5, 0x11ab0, 0x11abf },
+/* Carian */	{ CHR('c','a','r','i'), 0x102a0, 0x102d0 },
 /* Caucasian Albanian */
-		{ CHR('a','g','h','b'), 0x10530, 0x1056f },
-/* Chakma */	{ CHR('c','a','k','m'), 0x11100, 0x1114f },
-/* Cham */	{ CHR('c','h','a','m'), 0xaa00, 0xaa5f },
-/* Cherokee */	{ CHR('c','h','e','r'), 0x13a0, 0x13ff, 0xab70, 0xabbf },
-/* CJKIdeogra */{ CHR('h','a','n','i'), 0x3400, 0x4dbf, 0x2e80, 0x2fdf, 0x3005, 0x3005, 0x3007, 0x3007,
-	0x3021, 0x3029, 0x3038, 0x303B, 0x4e00, 0x9fff, 0xf900, 0xfaff, 0x020000, 0x02ffff },
-/* Coptic */	{ CHR('c','o','p','t'), 0x03e2, 0x03ef, 0x2c80, 0x2cff },
-/* Cypriot */	{ CHR('c','p','r','t'), 0x10800, 0x1083f },
-/* Cyrillic */	{ CHR('c','y','r','l'), 0x0400, 0x052f, 0x1c80, 0x1c8f, 0x1d2b, 0x1d2b, 0x1d78, 0x1d78,
-	0x2de0, 0x2dff, 0xa640, 0xa6ff },
+		{ CHR('a','g','h','b'), 0x10530, 0x10563, 0x1056f, 0x1056f },
+/* Chakma */	{ CHR('c','a','k','m'), 0x11100, 0x11134, 0x11136, 0x11147 },
+/* Cham */	{ CHR('c','h','a','m'), 0xaa00, 0xaa36, 0xaa40, 0xaa4d, 0xaa50, 0xaa59, 0xaa5c, 0xaa5f },
+/* Cherokee */	{ CHR('c','h','e','r'), 0x13a0, 0x13f5, 0x13f8, 0x13fd, 0xab70, 0xabbf },
+/* Chorasmian */{ CHR('c','h','r','s'), 0x10fb0, 0x10fcb },
+/* CJKIdeogra */{ CHR('h','a','n','i'), 0x2e80, 0x2e99, 0x2e9b, 0x2ef3, 0x2f00, 0x2fd5, 0x3005, 0x3005,
+	0x3007, 0x3007, 0x3021, 0x3029, 0x3038, 0x303b, 0x3400, 0x4dbf, 0x4e00, 0x9fff, 0xf900, 0xfa6d,
+	0xfa70, 0xfad9, 0x16fe2, 0x16fe3, 0x16ff0, 0x16ff6, 0x20000, 0x2a6df, 0x2a700, 0x2b81d,
+	0x2b820, 0x2cead, 0x2ceb0, 0x2ebe0, 0x2ebf0, 0x2ee5d, 0x2f800, 0x2fa1d, 0x30000, 0x3134a,
+	0x31350, 0x33479 },
+/* Coptic */	{ CHR('c','o','p','t'), 0x03e2, 0x03ef, 0x2c80, 0x2cf3, 0x2cf9, 0x2cff },
+/* Cypriot */	{ CHR('c','p','r','t'), 0x10800, 0x10805, 0x10808, 0x10808, 0x1080a, 0x10835,
+	0x10837, 0x10838, 0x1083c, 0x1083c, 0x1083f, 0x1083f },
+/* Cypro-Minoan */
+		{ CHR('c','p','m','n'), 0x12f90, 0x12ff2 },
+/* Cyrillic */	{ CHR('c','y','r','l'), 0x0400, 0x0484, 0x0487, 0x052f, 0x1c80, 0x1c8a, 0x1d2b, 0x1d2b,
+	0x1d78, 0x1d78, 0x2de0, 0x2dff, 0xa640, 0xa69f, 0xfe2e, 0xfe2f, 0x1e030, 0x1e06d,
+	0x1e08f, 0x1e08f },
+/* Dives Akuru */{CHR('d','i','a','k'), 0x11900, 0x11906, 0x11909, 0x11909, 0x1190c, 0x11913,
+	0x11915, 0x11916, 0x11918, 0x11935, 0x11937, 0x11938, 0x1193b, 0x11946, 0x11950, 0x11959 },
 /* Deseret */	{ CHR('d','s','r','t'), 0x10400, 0x1044f },
-/* Devanagari */{ CHR('d','e','v','a'), 0x0900, 0x097f, 0xa8e0, 0xa8ff },
-/* Dogra */	{ CHR('d','o','g','r'), 0x11800, 0x1184f },
-/* Duployan */	{ CHR('d','u','p','l'), 0x1bc00, 0x1bc9f },
-/* Egyptian */	{ CHR('e','g','y','p'), 0x13000, 0x1343f },
-/* Elbasan */	{ CHR('e','l','b','a'), 0x10500, 0x1052f },
-/* Ethiopic */	{ CHR('e','t','h','i'), 0x1200, 0x139f, 0x2d80, 0x2ddf, 0xab00, 0xab2f },
-/* Georgian */	{ CHR('g','e','o','r'), 0x10a0, 0x10ff, 0x1c90, 0x1cbf, 0x2d00, 0x2d2f },
-/* Glagolitic */{ CHR('g','l','a','g'), 0x2c00, 0x2c5f, 0x1e000, 0x1e02f },
+/* Devanagari */{ CHR('d','e','v','a'), 0x0900, 0x0950, 0x0955, 0x0963, 0x0966, 0x097f, 0xa8e0, 0xa8ff,
+	0x11b00, 0x11b09 },
+/* Dogra */	{ CHR('d','o','g','r'), 0x11800, 0x1183b },
+/* Duployan */	{ CHR('d','u','p','l'), 0x1bc00, 0x1bc6a, 0x1bc70, 0x1bc7c, 0x1bc80, 0x1bc88,
+	0x1bc90, 0x1bc99, 0x1bc9c, 0x1bc9f },
+/* Egyptian */	{ CHR('e','g','y','p'), 0x13000, 0x13455, 0x13460, 0x143fa },
+/* Elbasan */	{ CHR('e','l','b','a'), 0x10500, 0x10527 },
+/* Elymaic */	{ CHR('e','l','y','m'), 0x10fe0, 0x10ff6 },
+/* Ethiopic */	{ CHR('e','t','h','i'), 0x1200, 0x1248, 0x124a, 0x124d, 0x1250, 0x1256, 0x1258, 0x1258,
+	0x125a, 0x125d, 0x1260, 0x1288, 0x128a, 0x128d, 0x1290, 0x12b0, 0x12b2, 0x12b5, 0x12b8, 0x12be,
+	0x12c0, 0x12c0, 0x12c2, 0x12c5, 0x12c8, 0x12d6, 0x12d8, 0x1310, 0x1312, 0x1315, 0x1318, 0x135a,
+	0x135d, 0x137c, 0x1380, 0x1399, 0x2d80, 0x2d96, 0x2da0, 0x2da6, 0x2da8, 0x2dae, 0x2db0, 0x2db6,
+	0x2db8, 0x2dbe, 0x2dc0, 0x2dc6, 0x2dc8, 0x2dce, 0x2dd0, 0x2dd6, 0x2dd8, 0x2dde, 0xab01, 0xab06,
+	0xab09, 0xab0e, 0xab11, 0xab16, 0xab20, 0xab26, 0xab28, 0xab2e, 0x1e7e0, 0x1e7e6,
+	0x1e7e8, 0x1e7eb, 0x1e7ed, 0x1e7ee, 0x1e7f0, 0x1e7fe },
+/* Garay */	{ CHR('g','a','r','a'), 0x10d40, 0x10d65, 0x10d69, 0x10d85, 0x10d8e, 0x10d8f },
+/* Georgian */	{ CHR('g','e','o','r'), 0x10a0, 0x10c5, 0x10c7, 0x10c7, 0x10cd, 0x10cd, 0x10d0, 0x10fa,
+	0x10fc, 0x10ff, 0x1c90, 0x1cba, 0x1cbd, 0x1cbf, 0x2d00, 0x2d25, 0x2d27, 0x2d27, 0x2d2d, 0x2d2d },
+/* Glagolitic */{ CHR('g','l','a','g'), 0x2c00, 0x2c5f, 0x1e000, 0x1e006, 0x1e008, 0x1e018,
+	0x1e01b, 0x1e021, 0x1e023, 0x1e024, 0x1e026, 0x1e02a },
 /* Gothic */	{ CHR('g','o','t','h'), 0x10330, 0x1034a },
-/* Grantha */	{ CHR('g','r','a','n'), 0x11300, 0x1137f },
-/* Greek */	{ CHR('g','r','e','k'), 0x0370, 0x03e1, 0x03f0, 0x03ff, 0x1d26, 0x1d2a, 0x1d5d, 0x1d61,
-	0x1d66, 0x1d6a, 0x1dbf, 0x1dbf, 0x1f00, 0x1fff, 0x2126, 0x2126, 0xab65, 0xab65, 0x10140, 0x1018f,
-	0x101a0, 0x101a0, 0x1d200, 0x1d24f },
-/* Gujarati */	{ CHR('g','u','j','r'), 0x0a80, 0x0aff },
+/* Grantha */	{ CHR('g','r','a','n'), 0x11300, 0x11303, 0x11305, 0x1130c, 0x1130f, 0x11310,
+	0x11313, 0x11328, 0x1132a, 0x11330, 0x11332, 0x11333, 0x11335, 0x11339, 0x1133c, 0x11344,
+	0x11347, 0x11348, 0x1134b, 0x1134d, 0x11350, 0x11350, 0x11357, 0x11357, 0x1135d, 0x11363,
+	0x11366, 0x1136c, 0x11370, 0x11374 },
+/* Greek */	{ CHR('g','r','e','k'), 0x0370, 0x0373, 0x0375, 0x0377, 0x037a, 0x037d, 0x037f, 0x037f,
+	0x0384, 0x0384, 0x0386, 0x0386, 0x0388, 0x038a, 0x038c, 0x038c, 0x038e, 0x03a1, 0x03a3, 0x03e1,
+	0x03f0, 0x03ff, 0x1d26, 0x1d2a, 0x1d5d, 0x1d61, 0x1d66, 0x1d6a, 0x1dbf, 0x1dbf, 0x1f00, 0x1f15,
+	0x1f18, 0x1f1d, 0x1f20, 0x1f45, 0x1f48, 0x1f4d, 0x1f50, 0x1f57, 0x1f59, 0x1f59, 0x1f5b, 0x1f5b,
+	0x1f5d, 0x1f5d, 0x1f5f, 0x1f7d, 0x1f80, 0x1fb4, 0x1fb6, 0x1fc4, 0x1fc6, 0x1fd3, 0x1fd6, 0x1fdb,
+	0x1fdd, 0x1fef, 0x1ff2, 0x1ff4, 0x1ff6, 0x1ffe, 0x2126, 0x2126, 0xab65, 0xab65, 0x10140, 0x1018e,
+	0x101a0, 0x101a0, 0x1d200, 0x1d245 },
+/* Gujarati */	{ CHR('g','u','j','r'), 0x0a81, 0x0a83, 0x0a85, 0x0a8d, 0x0a8f, 0x0a91, 0x0a93, 0x0aa8,
+	0x0aaa, 0x0ab0, 0x0ab2, 0x0ab3, 0x0ab5, 0x0ab9, 0x0abc, 0x0ac5, 0x0ac7, 0x0ac9, 0x0acb, 0x0acd,
+	0x0ad0, 0x0ad0, 0x0ae0, 0x0ae3, 0x0ae6, 0x0af1, 0x0af9, 0x0aff },
 /* Gunjala Gondi */
-		{ CHR('g','o','n','g'), 0x11d60, 0x11daf },
-/* Gurmukhi */	{ CHR('g','u','r','u'), 0x0a00, 0x0a7f },
-/* Hangul */	{ CHR('h','a','n','g'), 0xac00, 0xd7af, 0x3130, 0x319f, 0xffa0, 0xffdf },
- /* I'm not sure what the difference is between the 'hang' tag and the 'jamo' */
- /*  tag. 'Jamo' is said to be the precomposed forms, but what's 'hang'? */
+		{ CHR('g','o','n','g'), 0x11d60, 0x11d65, 0x11d67, 0x11d68, 0x11d6a, 0x11d8e, 0x11d90, 0x11d91,
+	0x11d93, 0x11d98, 0x11da0, 0x11da9 },
+/* Gurmukhi */	{ CHR('g','u','r','u'), 0x0a01, 0x0a03, 0x0a05, 0x0a0a, 0x0a0f, 0x0a10, 0x0a13, 0x0a28,
+	0x0a2a, 0x0a30, 0x0a32, 0x0a33, 0x0a35, 0x0a36, 0x0a38, 0x0a39, 0x0a3c, 0x0a3c, 0x0a3e, 0x0a42,
+	0x0a47, 0x0a48, 0x0a4b, 0x0a4d, 0x0a51, 0x0a51, 0x0a59, 0x0a5c, 0x0a5e, 0x0a5e, 0x0a66, 0x0a76 },
+/* Gurung Khema*/{CHR('g','u','k','h'), 0x16100, 0x16139 },
+/* Hangul */	{ CHR('h','a','n','g'), 0x1100, 0x11ff, 0x302e, 0x302f, 0x3131, 0x318e, 0x3200, 0x321e,
+	0x3260, 0x327e, 0xa960, 0xa97c, 0xac00, 0xd7a3, 0xd7b0, 0xd7c6, 0xd7cb, 0xd7fb, 0xffa0, 0xffbe,
+	0xffc2, 0xffc7, 0xffca, 0xffcf, 0xffd2, 0xffd7, 0xffda, 0xffdc },
 /* Hanifi Rohingya */
-		{ CHR('r','o','h','g'), 0x10d00, 0x10d3f },
+		{ CHR('r','o','h','g'), 0x10d00, 0x10d27, 0x10d30, 0x10d39 },
 /* Hanunoo */	{ CHR('h','a','n','o'), 0x1720, 0x1734 },
-/* Hatran */	{ CHR('h','a','t','r'), 0x108e0, 0x108ff },
-/* Hebrew */	{ CHR('h','e','b','r'), 0x0590, 0x05ff, 0xfb1d, 0xfb4f },
+/* Hatran */	{ CHR('h','a','t','r'), 0x108e0, 0x108f2, 0x108f4, 0x108f5, 0x108fb, 0x108ff },
+/* Hebrew */	{ CHR('h','e','b','r'), 0x0591, 0x05c7, 0x05d0, 0x05ea, 0x05ef, 0x05f4, 0xfb1d, 0xfb36,
+	0xfb38, 0xfb3c, 0xfb3e, 0xfb3e, 0xfb40, 0xfb41, 0xfb43, 0xfb44, 0xfb46, 0xfb4f },
 /* Hiragana used to have its own tag 'hira', but has since been merged with katakana */
-/* Hangul Jamo*/{ CHR('j','a','m','o'), 0x1100, 0x11ff, 0x3130, 0x319f, 0xffa0, 0xffdf },
+/* Hangul Jamo has its own tag 'jamo', but it is redundant with 'hang' */
 /* Imperial Aramaic */
-		{ CHR('a','r','m','i'), 0x10840, 0x1085f },
+		{ CHR('a','r','m','i'), 0x10840, 0x10855, 0x10857, 0x1085f },
 /* Inscriptional Pahlavi */
-		{ CHR('p','h','l','i'), 0x10b60, 0x10b7f },
+		{ CHR('p','h','l','i'), 0x10b60, 0x10b72, 0x10b78, 0x10b7f },
 /* Inscriptional Parthian */
-		{ CHR('p','r','t','i'), 0x10b40, 0x10b5f },
-/* Javanese */	{ CHR('j','a','v','a'), 0xa980, 0xa9df },
-/* Katakana */	{ CHR('k','a','n','a'), 0x3040, 0x30ff, 0x31f0, 0x31ff, 0x32d0, 0x32fe, 0x3300, 0x3357,
-	0xff66, 0xff9f },
-/* Kaithi */	{ CHR('k','t','h','i'), 0x11080, 0x110cf },
-/* Kayah Li */	{ CHR('k','a','l','i'), 0xa900, 0xa92f },
-/* Kannada */	{ CHR('k','n','d','a'), 0x0c80, 0x0cff },
-/* Kharosthi */	{ CHR('k','h','a','r'), 0x10a00, 0x10a5f },
-/* Khmer */	{ CHR('k','h','m','r'), 0x1780, 0x17ff, 0x19e0, 0x19ff },
-/* Khojki */	{ CHR('k','h','o','j'), 0x11200, 0x1124f },
-/* Khudawadi */	{ CHR('s','i','n','d'), 0x112b0, 0x112ff },
-/* Lao */	{ CHR('l','a','o',' '), 0x0e80, 0x0eff },
+		{ CHR('p','r','t','i'), 0x10b40, 0x10b55, 0x10b58, 0x10b5f },
+/* Javanese */	{ CHR('j','a','v','a'), 0xa980, 0xa9cd, 0xa9d0, 0xa9d9, 0xa9de, 0xa9df },
+/* Katakana */	{ CHR('k','a','n','a'), 0x3041, 0x3096, 0x309d, 0x309f, 0x30a1, 0x30fa, 0x30fd, 0x30ff,
+	0x31f0, 0x31ff, 0x32d0, 0x32fe, 0x3300, 0x3357, 0xff66, 0xff6f, 0xff71, 0xff9d, 0x1aff0, 0x1aff3,
+	0x1aff5, 0x1affb, 0x1affd, 0x1affe, 0x1b000, 0x1b122, 0x1b132, 0x1b132, 0x1b150, 0x1b152,
+	0x1b155, 0x1b155, 0x1b164, 0x1b167, 0x1f200, 0x1f200 },
+/* Kaithi */	{ CHR('k','t','h','i'), 0x11080, 0x110c2, 0x110cd, 0x110cd },
+/* Kawi */	{ CHR('k','a','w','i'), 0x11f00, 0x11f10, 0x11f12, 0x11f3a, 0x11f3e, 0x11f5a },
+/* Kayah Li */	{ CHR('k','a','l','i'), 0xa900, 0xa92d, 0xa92f, 0xa92f },
+/* Kannada */	{ CHR('k','n','d','a'), 0x0c80, 0x0c8c, 0x0c8e, 0x0c90, 0x0c92, 0x0ca8, 0x0caa, 0x0cb3,
+	0x0cb5, 0x0cb9, 0x0cbc, 0x0cc4, 0x0cc6, 0x0cc8, 0x0cca, 0x0ccd, 0x0cd5, 0x0cd6, 0x0cdc, 0x0cde,
+	0x0ce0, 0x0ce3, 0x0ce6, 0x0cef, 0x0cf1, 0x0cf3 },
+/* Kharosthi */	{ CHR('k','h','a','r'), 0x10a00, 0x10a03, 0x10a05, 0x10a06, 0x10a0c, 0x10a13,
+	0x10a15, 0x10a17, 0x10a19, 0x10a35, 0x10a38, 0x10a3a, 0x10a3f, 0x10a48, 0x10a50, 0x10a58 },
+/* Khitan Small Script */
+		{ CHR('k','i','t','s'), 0x16fe4, 0x16fe4, 0x18b00, 0x18cd5, 0x18cff, 0x18cff },
+/* Khmer */	{ CHR('k','h','m','r'), 0x1780, 0x17dd, 0x17e0, 0x17e9, 0x17f0, 0x17f9, 0x19e0, 0x19ff },
+/* Khojki */	{ CHR('k','h','o','j'), 0x11200, 0x11211, 0x11213, 0x11241 },
+/* Khudawadi */	{ CHR('s','i','n','d'), 0x112b0, 0x112ea, 0x112f0, 0x112f9 },
+/* Kirat Rai */	{ CHR('k','r','a','i'), 0x16d40, 0x16d79 },
+/* Lao */	{ CHR('l','a','o',' '), 0x0e81, 0x0e82, 0x0e84, 0x0e84, 0x0e86, 0x0e8a, 0x0e8c, 0x0ea3,
+	0x0ea5, 0x0ea5, 0x0ea7, 0x0ebd, 0x0ec0, 0x0ec4, 0x0ec6, 0x0ec6, 0x0ec8, 0x0ece, 0x0ed0, 0x0ed9,
+	0x0edc, 0x0edf },
 /* Latin */	{ CHR('l','a','t','n'), 0x0041, 0x005a, 0x0061, 0x007a, 0x00aa, 0x00aa, 0x00ba, 0x00ba,
 	0x00c0, 0x00d6, 0x00d8, 0x00f6, 0x00f8, 0x02b8, 0x02e0, 0x02e4, 0x1d00, 0x1d25, 0x1d2c, 0x1d5c,
 	0x1d62, 0x1d65, 0x1d6b, 0x1d77, 0x1d79, 0x1dbe, 0x1e00, 0x1eff, 0x2071, 0x2071, 0x207f, 0x207f,
 	0x2090, 0x209c, 0x212a, 0x212b, 0x2132, 0x2132, 0x214e, 0x214e, 0x2160, 0x2188, 0x2c60, 0x2c7f,
-	0xa722, 0xa7ff, 0xab30, 0xab5a, 0xab5c, 0xab64, 0xab66, 0xab67, 0xfb00, 0xfb0f, 0xff21, 0xff3a,
-	0xff41, 0xff5a },
-/* Lepcha */	{ CHR('l','e','p','c'), 0x1c00, 0x1c4f },
-/* Limbu */	{ CHR('l','i','m','b'), 0x1900, 0x194f },
-/* Linear A */	{ CHR('l','i','n','a'), 0x10600, 0x1077f },
-/* Linear B */	{ CHR('l','i','n','b'), 0x10000, 0x100ff },
-/* Lisu */	{ CHR('l','i','s','u'), 0xa4d0, 0xa4ff },
-/* Lycian */	{ CHR('l','y','c','i'), 0x10280, 0x1029f },
-/* Lydian */	{ CHR('l','y','d','i'), 0x10920, 0x1093f },
-/* Mahajani */	{ CHR('m','a','h','j'), 0x11150, 0x1117f },
-/* Makasar */	{ CHR('m','a','k','a'), 0x11ee0, 0x11eff },
-/* Malayalam */	{ CHR('m','l','y','m'), 0x0d00, 0x0d7f },
-/* Mandaic */	{ CHR('m','a','n','d'), 0x0840, 0x085f },
-/* Manichaean */{ CHR('m','a','n','i'), 0x10ac0, 0x10aff },
-/* Marchen */	{ CHR('m','a','r','c'), 0x11c70, 0x11cbf },
-/* Masaram Gondi*/{CHR('g','o','n','m'), 0x11d00, 0x11d5f },
+	0xa722, 0xa787, 0xa78b, 0xa7dc, 0xa7f1, 0xa7ff, 0xab30, 0xab5a, 0xab5c, 0xab64, 0xab66, 0xab69,
+	0xfb00, 0xfb06, 0xff21, 0xff3a, 0xff41, 0xff5a, 0x10780, 0x10785, 0x10787, 0x107b0, 0x107b2, 0x107ba,
+	0x1df00, 0x1df1e, 0x1df25, 0x1df2a },
+/* Lepcha */	{ CHR('l','e','p','c'), 0x1c00, 0x1c37, 0x1c3b, 0x1c49, 0x1c4d, 0x1c4f },
+/* Limbu */	{ CHR('l','i','m','b'), 0x1900, 0x191e, 0x1920, 0x192b, 0x1930, 0x193b, 0x1940, 0x1940,
+	0x1944, 0x194f },
+/* Linear A */	{ CHR('l','i','n','a'), 0x10600, 0x10736, 0x10740, 0x10755, 0x10760, 0x10767 },
+/* Linear B */	{ CHR('l','i','n','b'), 0x10000, 0x1000b, 0x1000d, 0x10026, 0x10028, 0x1003a, 0x1003c,
+	0x1003d, 0x1003f, 0x1004d, 0x10050, 0x1005d, 0x10080, 0x100fa },
+/* Lisu */	{ CHR('l','i','s','u'), 0xa4d0, 0xa4ff, 0x11fb0, 0x11fb0 },
+/* Lycian */	{ CHR('l','y','c','i'), 0x10280, 0x1029c },
+/* Lydian */	{ CHR('l','y','d','i'), 0x10920, 0x10939, 0x1093f, 0x1093f },
+/* Mahajani */	{ CHR('m','a','h','j'), 0x11150, 0x11176 },
+/* Makasar */	{ CHR('m','a','k','a'), 0x11ee0, 0x11ef8 },
+/* Malayalam */	{ CHR('m','l','y','m'), 0x0d00, 0x0d0c, 0x0d0e, 0x0d10, 0x0d12, 0x0d44, 0x0d46, 0x0d48,
+	0x0d4a, 0x0d4f, 0x0d54, 0x0d63, 0x0d66, 0x0d7f },
+/* Mandaic */	{ CHR('m','a','n','d'), 0x0840, 0x085b, 0x085e, 0x085e },
+/* Manichaean */{ CHR('m','a','n','i'), 0x10ac0, 0x10ae6, 0x10aeb, 0x10af6 },
+/* Marchen */	{ CHR('m','a','r','c'), 0x11c70, 0x11c8f, 0x11c92, 0x11ca7, 0x11ca9, 0x11cb6 },
+/* Masaram Gondi*/{CHR('g','o','n','m'), 0x11d00, 0x11d06, 0x11d08, 0x11d09, 0x11d0b, 0x11d36,
+	0x11d3a, 0x11d3a, 0x11d3c, 0x11d3d, 0x11d3f, 0x11d47, 0x11d50, 0x11d59 },
 /* Mathematical Alphanumeric Symbols */
-		{ CHR('m','a','t','h'), 0x1d400, 0x1d7ff },
-/* Medefaidrin */{CHR('m','e','d','f'), 0x16e40, 0x16e9f },
-/* Meetei Mayek*/{CHR('m','t','e','i'), 0xabc0, 0xabff, 0xaae0, 0xaaff },
+		{ CHR('m','a','t','h'), 0x1d400, 0x1d454, 0x1d456, 0x1d49c, 0x1d49e, 0x1d49f, 0x1d4a2, 0x1d4a2,
+	0x1d4a5, 0x1d4a6, 0x1d4a9, 0x1d4ac, 0x1d4ae, 0x1d4b9, 0x1d4bb, 0x1d4bb, 0x1d4bd, 0x1d4c3,
+	0x1d4c5, 0x1d505, 0x1d507, 0x1d50a, 0x1d50d, 0x1d514, 0x1d516, 0x1d51c, 0x1d51e, 0x1d539,
+	0x1d53b, 0x1d53e, 0x1d540, 0x1d544, 0x1d546, 0x1d546, 0x1d54a, 0x1d550, 0x1d552, 0x1d6a5,
+	0x1d6a8, 0x1d7cb, 0x1d7ce, 0x1d7ff },
+/* Medefaidrin */{CHR('m','e','d','f'), 0x16e40, 0x16e9a },
+/* Meetei Mayek*/{CHR('m','t','e','i'), 0xaae0, 0xaaf6, 0xabc0, 0xabed, 0xabf0, 0xabf9 },
 /* Mende Kikakui */
-		{ CHR('m','e','n','d'), 0x1e800, 0x1e8df },
+		{ CHR('m','e','n','d'), 0x1e800, 0x1e8c4, 0x1e8c7, 0x1e8d6 },
 /* Meroitic Cursive */
-		{ CHR('m','e','r','c'), 0x109a0, 0x109ff },
+		{ CHR('m','e','r','c'), 0x109a0, 0x109b7, 0x109bc, 0x109cf, 0x109d2, 0x109ff },
 /* Meroitic Hieroglyphs */
 		{ CHR('m','e','r','o'), 0x10980, 0x1099f },
-/* Miao */	{ CHR('p','l','r','d'), 0x16f00, 0x16f9f },
-/* Modi */	{ CHR('m','o','d','i'), 0x11600, 0x1165f },
-/* Mongolian */	{ CHR('m','o','n','g'), 0x1800, 0x18af, 0x11660, 0x1167f },
-/* Mro */	{ CHR('m','r','o','o'), 0x16a40, 0x16a6f },
-/* Multani */	{ CHR('m','u','l','t'), 0x11280, 0x112af },
-/* Musical */	{ CHR('m','u','s','c'), 0x1d100, 0x1d1ff },
-/* Myanmar */	{ CHR('m','y','m','2'), 0x1000, 0x109f, 0xa9e0, 0xa9ff, 0xaa60, 0xaa7f },
-/* Nabataean */	{ CHR('n','b','a','t'), 0x10880, 0x108af },
-/* Newa */	{ CHR('n','e','w','a'), 0x11400, 0x1147f },
-/* New Tai Lue*/{ CHR('t','a','l','u'), 0x1980, 0x19df },
-/* N'Ko */	{ CHR('n','k','o',' '), 0x07c0, 0x07ff },
-/* Nushu */	{ CHR('n','s','h','u'), 0x1b170, 0x1b2ff, 0x16fe1, 0x16fe1 },
-/* Ogham */	{ CHR('o','g','a','m'), 0x1680, 0x169f },
+/* Miao */	{ CHR('p','l','r','d'), 0x16f00, 0x16f4a, 0x16f4f, 0x16f87, 0x16f8f, 0x16f9f },
+/* Modi */	{ CHR('m','o','d','i'), 0x11600, 0x11644, 0x11650, 0x11659 },
+/* Mongolian */	{ CHR('m','o','n','g'), 0x1800, 0x1801, 0x1804, 0x1804, 0x1806, 0x1819, 0x1820, 0x1878,
+	0x1880, 0x18aa, 0x11660, 0x1166c },
+/* Mro */	{ CHR('m','r','o','o'), 0x16a40, 0x16a5e, 0x16a60, 0x16a69, 0x16a6e, 0x16a6f },
+/* Multani */	{ CHR('m','u','l','t'), 0x11280, 0x11286, 0x11288, 0x11288, 0x1128a, 0x1128d,
+	0x1128f, 0x1129d, 0x1129f, 0x112a9 },
+/* Musical */	{ CHR('m','u','s','c'), 0x1d100, 0x1d126, 0x1d129, 0x1d1ea },
+/* Myanmar */	{ CHR('m','y','m','2'), 0x1000, 0x109f, 0xa9e0, 0xa9fe, 0xaa60, 0xaa7f, 0x116d0, 0x116e3 },
+/* Nabataean */	{ CHR('n','b','a','t'), 0x10880, 0x1089e, 0x108a7, 0x108af },
+/* Nandinagari */{CHR('n','a','n','d'), 0x119a0, 0x119a7, 0x119aa, 0x119d7, 0x119da, 0x119e4 },
+/* Newa */	{ CHR('n','e','w','a'), 0x11400, 0x1145b, 0x1145d, 0x11461 },
+/* New Tai Lue*/{ CHR('t','a','l','u'), 0x1980, 0x19ab, 0x19b0, 0x19c9, 0x19d0, 0x19da, 0x19de, 0x19df },
+/* N'Ko */	{ CHR('n','k','o',' '), 0x07c0, 0x07fa, 0x07fd, 0x07ff },
+/* Nag Mundari*/{ CHR('n','a','g','m'), 0x1e4d0, 0x1e4f9 },
+/* Nushu */	{ CHR('n','s','h','u'), 0x16fe1, 0x16fe1, 0x1b170, 0x1b2fb },
+/* Nyiakeng Puachue Hmong */
+		{ CHR('h','m','n','p'), 0x1e100, 0x1e12c, 0x1e130, 0x1e13d, 0x1e140, 0x1e149, 0x1e14e, 0x1e14f },
+/* Ogham */	{ CHR('o','g','a','m'), 0x1680, 0x169c },
 /* Ol Chiki */	{ CHR('o','l','c','k'), 0x1c50, 0x1c7f },
-/* Old Italic */{ CHR('i','t','a','l'), 0x10300, 0x1032f },
+/* Ol Onal */	{ CHR('o','n','a','o'), 0x1e5d0, 0x1e5fa, 0x1e5ff, 0x1e5ff },
+/* Old Italic */{ CHR('i','t','a','l'), 0x10300, 0x10323, 0x1032d, 0x1032f },
 /* Old Hungarian */
-		{ CHR('h','u','n','g'), 0x10c80, 0x10cff },
+		{ CHR('h','u','n','g'), 0x10c80, 0x10cb2, 0x10cc0, 0x10cf2, 0x10cfa, 0x10cff },
 /* Old North Arabian */
 		{ CHR('n','a','r','b'), 0x10a80, 0x10a9f },
-/* Old Permic */{ CHR('p','e','r','m'), 0x10350, 0x1037f },
+/* Old Permic */{ CHR('p','e','r','m'), 0x10350, 0x1037a },
 /* Old Persian cuneiform */
-		{ CHR('x','p','e','o'), 0x103a0, 0x103df },
-/* Old Sogdian*/{ CHR('s','o','g','o'), 0x10f00, 0x10f2f },
+		{ CHR('x','p','e','o'), 0x103a0, 0x103c3, 0x103c8, 0x103d5 },
+/* Old Sogdian*/{ CHR('s','o','g','o'), 0x10f00, 0x10f27 },
 /* Old South Arabian */
 		{ CHR('s','a','r','b'), 0x10a60, 0x10a7f },
-/* Old Turkic */{ CHR('o','r','k','h'), 0x10c00, 0x10c4f },
-/* Oriya */	{ CHR('o','r','y','a'), 0x0b00, 0x0b7f },
-/* Osage */	{ CHR('o','s','g','e'), 0x104b0, 0x104ff },
-/* Osmanya */	{ CHR('o','s','m','a'), 0x10480, 0x104af },
-/* Pahawh Hmong*/{CHR('h','m','n','g'), 0x16b00, 0x16b8f },
+/* Old Turkic */{ CHR('o','r','k','h'), 0x10c00, 0x10c48 },
+/* Old Uyghur */{ CHR('o','u','g','r'), 0x10f70, 0x10f89 },
+/* Oriya */	{ CHR('o','r','y','a'), 0x0b01, 0x0b03, 0x0b05, 0x0b0c, 0x0b0f, 0x0b10, 0x0b13, 0x0b28,
+	0x0b2a, 0x0b30, 0x0b32, 0x0b33, 0x0b35, 0x0b39, 0x0b3c, 0x0b44, 0x0b47, 0x0b48, 0x0b4b, 0x0b4d,
+	0x0b55, 0x0b57, 0x0b5c, 0x0b5d, 0x0b5f, 0x0b63, 0x0b66, 0x0b77 },
+/* Osage */	{ CHR('o','s','g','e'), 0x104b0, 0x104d3, 0x104d8, 0x104fb },
+/* Osmanya */	{ CHR('o','s','m','a'), 0x10480, 0x1049d, 0x104a0, 0x104a9 },
+/* Pahawh Hmong*/{CHR('h','m','n','g'), 0x16b00, 0x16b45, 0x16b50, 0x16b59, 0x16b5b, 0x16b61,
+	0x16b63, 0x16b77, 0x16b7d, 0x16b8f },
 /* Palmyrene */	{ CHR('p','a','l','m'), 0x10860, 0x1087f },
-/* Pau Cin Hau*/{ CHR('p','a','u','c'), 0x11ac0, 0x11aff },
-/* Phags-pa */	{ CHR('p','h','a','g'), 0xa840, 0xa87f },
-/* Phoenician */{ CHR('p','h','n','x'), 0x10900, 0x1091f },
+/* Pau Cin Hau*/{ CHR('p','a','u','c'), 0x11ac0, 0x11af8 },
+/* Phags-pa */	{ CHR('p','h','a','g'), 0xa840, 0xa877 },
+/* Phoenician */{ CHR('p','h','n','x'), 0x10900, 0x1091b, 0x1091f, 0x1091f },
 /* Psalter Pahlavi */
-		{ CHR('p','h','l','p'), 0x10b80, 0x10baf },
-/* Rejang */    { CHR('r','j','n','g'), 0xa930, 0xa95f },
-/* Runic */	{ CHR('r','u','n','r'), 0x16a0, 0x16ff },
-/* Saurashtra*/ { CHR('s','a','u','r'), 0xa880, 0xa8df },
-/* Sharada */	{ CHR('s','h','r','d'), 0x11180, 0x111df },
+		{ CHR('p','h','l','p'), 0x10b80, 0x10b91, 0x10b99, 0x10b9c, 0x10ba9, 0x10baf },
+/* Rejang */	{ CHR('r','j','n','g'), 0xa930, 0xa953, 0xa95f, 0xa95f },
+/* Runic */	{ CHR('r','u','n','r'), 0x16a0, 0x16ea, 0x16ee, 0x16f8 },
+/* Saurashtra*/ { CHR('s','a','u','r'), 0xa880, 0xa8c5, 0xa8ce, 0xa8d9 },
+/* Sharada */	{ CHR('s','h','r','d'), 0x11180, 0x111df, 0x11b60, 0x11b67 },
 /* Shavian */	{ CHR('s','h','a','w'), 0x10450, 0x1047f },
-/* Siddham */	{ CHR('s','i','d','d'), 0x11580, 0x115ff },
-/* Sinhala */	{ CHR('s','i','n','h'), 0x0d80, 0x0dff },
-/* SignWriting*/{ CHR('s','g','n','w'), 0x1d800, 0x1daaf },
-/* Sogdian */	{ CHR('s','o','g','d'), 0x10f30, 0x10f6f },
-/* Sora Sompeng*/{ CHR('s','o','r','a'), 0x110d0, 0x110ff },
-/* Soyombo */	{ CHR('s','o','y','o'), 0x11a50, 0x11aaf },
+/* Siddham */	{ CHR('s','i','d','d'), 0x11580, 0x115b5, 0x115b8, 0x115dd },
+/* Sidetic */	{ CHR('s','i','d','t'), 0x10940, 0x10959 },
+/* Sinhala */	{ CHR('s','i','n','h'), 0x0d81, 0x0d83, 0x0d85, 0x0d96, 0x0d9a, 0x0db1, 0x0db3, 0x0dbb,
+	0x0dbd, 0x0dbd, 0x0dc0, 0x0dc6, 0x0dca, 0x0dca, 0x0dcf, 0x0dd4, 0x0dd6, 0x0dd6, 0x0dd8, 0x0ddf,
+	0x0de6, 0x0def, 0x0df2, 0x0df4, 0x111e1, 0x111f4 },
+/* SignWriting*/{ CHR('s','g','n','w'), 0x1d800, 0x1da8b, 0x1da9b, 0x1da9f, 0x1daa1, 0x1daaf },
+/* Sogdian */	{ CHR('s','o','g','d'), 0x10f30, 0x10f59 },
+/* Sora Sompeng*/{ CHR('s','o','r','a'), 0x110d0, 0x110e8, 0x110f0, 0x110f9 },
+/* Soyombo */	{ CHR('s','o','y','o'), 0x11a50, 0x11aa2 },
 /* Sumero-Akkadian Cuneiform */
-		{ CHR('x','s','u','x'), 0x12000, 0x1254f },
-/* Sundanese */ { CHR('s','u','n','d'), 0x1b80, 0x1bbf, 0x1cc0, 0x1ccf },
+		{ CHR('x','s','u','x'), 0x12000, 0x12399, 0x12400, 0x1246e, 0x12470, 0x12474, 0x12480, 0x12543 },
+/* Sunuwar */	{ CHR('s','u','n','u'), 0x11bc0, 0x11be1, 0x11bf0, 0x11bf9 },
+/* Sundanese */ { CHR('s','u','n','d'), 0x1b80, 0x1bbf, 0x1cc0, 0x1cc7 },
 /* Syloti Nagri */
-		{ CHR('s','y','l','o'), 0xa800, 0xa82f },
-/* Syriac */	{ CHR('s','y','r','c'), 0x0700, 0x074f, 0x0860, 0x086f },
-/* Tagalog */	{ CHR('t','g','l','g'), 0x1700, 0x171f },
-/* Tagbanwa */	{ CHR('t','a','g','b'), 0x1760, 0x177f },
-/* Tai Le */	{ CHR('t','a','l','e'), 0x1950, 0x197f },
-/* Tai Tham */	{ CHR('l','a','n','a'), 0x1a20, 0x1aaf },
-/* Tai Viet */	{ CHR('t','a','v','t'), 0xaa80, 0xaadf },
-/* Takri */	{ CHR('t','a','k','r'), 0x11680, 0x116cf },
-/* Tamil */	{ CHR('t','a','m','l'), 0x0b80, 0x0bff, 0x11fc0, 0x11fff },
-/* Tangut */	{ CHR('t','a','n','g'), 0x17000, 0x18aff, 0x16fe0, 0x16fe0 },
-/* Telugu */	{ CHR('t','e','l','u'), 0x0c00, 0x0c7f },
-/* Thaana */	{ CHR('t','h','a','a'), 0x0780, 0x07bf },
-/* Thai */	{ CHR('t','h','a','i'), 0x0e00, 0x0e7f },
-/* Tibetan */	{ CHR('t','i','b','t'), 0x0f00, 0x0fff },
-/* Tifinagh */	{ CHR('t','f','n','g'), 0x2d30, 0x2d7f },
-/* Tirhuta */	{ CHR('t','i','r','h'), 0x11480, 0x114df },
-/* Ugaritic */	{ CHR('u','g','a','r'), 0x10380, 0x1039f },
-/* Vai */	{ CHR('v','a','i',' '), 0xa500, 0xa63f },
-/* Warang Citi*/{ CHR('v','a','i',' '), 0x118a0, 0x118ff },
-/* Yi */	{ CHR('y','i',' ',' '), 0xa000, 0xa48f },
+		{ CHR('s','y','l','o'), 0xa800, 0xa82c },
+/* Syriac */	{ CHR('s','y','r','c'), 0x0700, 0x070d, 0x070f, 0x074a, 0x074d, 0x074f, 0x0860, 0x086a },
+/* Tagalog */	{ CHR('t','g','l','g'), 0x1700, 0x1715, 0x171f, 0x171f },
+/* Tagbanwa */	{ CHR('t','a','g','b'), 0x1760, 0x176c, 0x176e, 0x1770, 0x1772, 0x1773 },
+/* Tai Le */	{ CHR('t','a','l','e'), 0x1950, 0x196d, 0x1970, 0x1974 },
+/* Tai Tham */	{ CHR('l','a','n','a'), 0x1a20, 0x1a5e, 0x1a60, 0x1a7c, 0x1a7f, 0x1a89, 0x1a90, 0x1a99,
+	0x1aa0, 0x1aad },
+/* Tai Viet */	{ CHR('t','a','v','t'), 0xaa80, 0xaac2, 0xaadb, 0xaadf },
+/* Tai Yo */	{ CHR('t','a','y','o'), 0x1e6c0, 0x1e6de, 0x1e6e0, 0x1e6f5, 0x1e6fe, 0x1e6ff },
+/* Takri */	{ CHR('t','a','k','r'), 0x11680, 0x116b9, 0x116c0, 0x116c9 },
+/* Tamil */	{ CHR('t','a','m','l'), 0x0b82, 0x0b83, 0x0b85, 0x0b8a, 0x0b8e, 0x0b90, 0x0b92, 0x0b95,
+	0x0b99, 0x0b9a, 0x0b9c, 0x0b9c, 0x0b9e, 0x0b9f, 0x0ba3, 0x0ba4, 0x0ba8, 0x0baa, 0x0bae, 0x0bb9,
+	0x0bbe, 0x0bc2, 0x0bc6, 0x0bc8, 0x0bca, 0x0bcd, 0x0bd0, 0x0bd0, 0x0bd7, 0x0bd7, 0x0be6, 0x0bfa,
+	0x11fc0, 0x11ff1, 0x11fff, 0x11fff },
+/* Tangsa */	{ CHR('t','n','s','a'), 0x16a70, 0x16abe, 0x16ac0, 0x16ac9 },
+/* Tangut */	{ CHR('t','a','n','g'), 0x16fe0, 0x16fe0, 0x17000, 0x18aff, 0x18d00, 0x18d1e,
+	0x18d80, 0x18df2 },
+/* Telugu */	{ CHR('t','e','l','u'), 0x0c00, 0x0c0c, 0x0c0e, 0x0c10, 0x0c12, 0x0c28, 0x0c2a, 0x0c39,
+	0x0c3c, 0x0c44, 0x0c46, 0x0c48, 0x0c4a, 0x0c4d, 0x0c55, 0x0c56, 0x0c58, 0x0c5a, 0x0c5c, 0x0c5d,
+	0x0c60, 0x0c63, 0x0c66, 0x0c6f, 0x0c77, 0x0c7f },
+/* Thaana */	{ CHR('t','h','a','a'), 0x0780, 0x07b1 },
+/* Thai */	{ CHR('t','h','a','i'), 0x0e01, 0x0e3a, 0x0e40, 0x0e5b },
+/* Tibetan */	{ CHR('t','i','b','t'), 0x0f00, 0x0f47, 0x0f49, 0x0f6c, 0x0f71, 0x0f97, 0x0f99, 0x0fbc,
+	0x0fbe, 0x0fcc, 0x0fce, 0x0fd4, 0x0fd9, 0x0fda },
+/* Tifinagh */	{ CHR('t','f','n','g'), 0x2d30, 0x2d67, 0x2d6f, 0x2d70, 0x2d7f, 0x2d7f },
+/* Tirhuta */	{ CHR('t','i','r','h'), 0x11480, 0x114c7, 0x114d0, 0x114d9 },
+/* Todhri */	{ CHR('t','o','d','r'), 0x105c0, 0x105f3 },
+/* Tolong Siki */{CHR('t','o','l','s'), 0x11db0, 0x11ddb, 0x11de0, 0x11de9 },
+/* Toto */	{ CHR('t','o','t','o'), 0x1e290, 0x1e2ae },
+/* Tulu-Tigalari */
+		{ CHR('t','u','t','g'), 0x11380, 0x11389, 0x1138b, 0x1138b, 0x1138e, 0x1138e, 0x11390, 0x113b5,
+	0x113b7, 0x113c0, 0x113c2, 0x113c2, 0x113c5, 0x113c5, 0x113c7, 0x113ca, 0x113cc, 0x113d5,
+	0x113d7, 0x113d8, 0x113e1, 0x113e2 },
+/* Ugaritic */	{ CHR('u','g','a','r'), 0x10380, 0x1039d, 0x1039f, 0x1039f },
+/* Vai */	{ CHR('v','a','i',' '), 0xa500, 0xa62b },
+/* Vithkuqi */	{ CHR('v','i','t','h'), 0x10570, 0x1057a, 0x1057c, 0x1058a, 0x1058c, 0x10592,
+	0x10594, 0x10595, 0x10597, 0x105a1, 0x105a3, 0x105b1, 0x105b3, 0x105b9, 0x105bb, 0x105bc },
+/* Wancho */	{ CHR('w','c','h','o'), 0x1e2c0, 0x1e2f9, 0x1e2ff, 0x1e2ff },
+/* Warang Citi*/{ CHR('w','a','r','a'), 0x118a0, 0x118f2, 0x118ff, 0x118ff },
+/* Yezidi */	{ CHR('y','e','z','i'), 0x10e80, 0x10ea9, 0x10eab, 0x10ead, 0x10eb0, 0x10eb1 },
+/* Yi */	{ CHR('y','i',' ',' '), 0xa000, 0xa48c, 0xa490, 0xa4c6 },
 /* Zanabazar Square */
-		{ CHR('z','a','n','b'), 0x11a00, 0x11a4f },
+		{ CHR('z','a','n','b'), 0x11a00, 0x11a47 },
 		{ 0 }
 };
 
 static SplineChar **SFOrderedGlyphs(SplineChar **glyphs);
 
-void ScriptMainRange(uint32 script, int *start, int *end) {
+void ScriptMainRange(uint32_t script, int *start, int *end) {
     int i;
 
     for ( i=0; scripts[i][0]!=0; ++i ) {
@@ -259,13 +367,14 @@ return;
     *start = *end = -1;
 }
 
-int ScriptIsRightToLeft(uint32 script) {
+int ScriptIsRightToLeft(uint32_t script) {
     switch ( script ) {
       case CHR('a','d','l','m'):
       case CHR('a','r','a','b'):
       case CHR('a','r','m','i'):
       case CHR('a','v','s','t'):
       case CHR('c','p','r','t'):
+      case CHR('g','a','r','a'):
       case CHR('h','a','t','r'):
       case CHR('h','e','b','r'):
       case CHR('h','u','n','g'):
@@ -288,6 +397,7 @@ int ScriptIsRightToLeft(uint32 script) {
       case CHR('r','o','h','g'):
       case CHR('s','a','m','r'):
       case CHR('s','a','r','b'):
+      case CHR('s','i','d','t'):
       case CHR('s','o','g','d'):
       case CHR('s','o','g','o'):
       case CHR('s','y','r','c'):
@@ -298,10 +408,10 @@ int ScriptIsRightToLeft(uint32 script) {
     }
 }
 
-uint32 ScriptFromUnicode(uint32 u,SplineFont *sf) {
+uint32_t ScriptFromUnicode(uint32_t u,SplineFont *sf) {
     int s, k;
 
-    if ( (int32)u!=-1 ) {
+    if ( (int32_t)u!=-1 ) {
 	for ( s=0; scripts[s][0]!=0; ++s ) {
 	    for ( k=1; scripts[s][k+1]!=0; k += 2 )
 		if ( u>=scripts[s][k] && u<=scripts[s][k+1] )
@@ -310,7 +420,7 @@ uint32 ScriptFromUnicode(uint32 u,SplineFont *sf) {
 	break;
 	}
 	if ( scripts[s][0]!=0 ) {
-	    uint32 script = scripts[s][0];
+	    uint32_t script = scripts[s][0];
 	    if ( use_second_indic_scripts ) {
 		/* MS has a parallel set of script tags for their new */
 		/*  Indic font shaper */
@@ -341,7 +451,7 @@ return( CHR('h','a','n','i') );
 return( DEFAULT_SCRIPT );
 }
 
-uint32 SCScriptFromUnicode(SplineChar *sc) {
+uint32_t SCScriptFromUnicode(SplineChar *sc) {
     const char *pt;
     PST *pst;
     SplineFont *sf;
@@ -391,8 +501,8 @@ return( ScriptFromUnicode( sc->unicodeenc,sf ));
 
 int SCRightToLeft(SplineChar *sc) {
 
-    if ( sc->unicodeenc>=0x10800 && sc->unicodeenc<=0x10fff ||
-	    sc->unicodeenc>=0x1e800 && sc->unicodeenc<=0x1efff )
+    if ( (sc->unicodeenc>=0x10800 && sc->unicodeenc<=0x10fff) ||
+	    (sc->unicodeenc>=0x1e800 && sc->unicodeenc<=0x1efff) )
 return( true );		/* Supplemental Multilingual Plane, RTL scripts */
 
 return( isrighttoleft(sc->unicodeenc ));
@@ -613,15 +723,13 @@ static void dumpcoveragetable(FILE *gpos,SplineChar **glyphs) {
 
 	// We will not emit glyphs with -1 identifiers.
 	// We count the valid glyphs and the ranges.
-	int glyph_cnt = 0;
 	for (i=0; glyphs[i]!=NULL; i++) {
 		if (i > 0 && glyphs[i]->ttf_glyph <= glyphs[i-1]->ttf_glyph) {
 			LogError(_("Glyphs must be ordered when creating coverage table"));
 		}
 		if (glyphs[i]->ttf_glyph < 0) {
-			LogError(_("-1 glyph index in dumpcoveragetable.\n"));
+			LogError(_("-1 glyph index in dumpcoveragetable."));
 		} else {
-			glyph_cnt++;
 			// On the first validly TrueType-indexed glyph or at the start of any discontinuity, start a new range.
 			if (range_cnt == 0 || glyphs[i]->ttf_glyph > last + 1)
 				range_cnt++;
@@ -709,8 +817,8 @@ return( NULL );
 return( glyphs );
 }
 
-static SplineChar **SFOrderedGlyphsWithPSTinSubtable(SplineFont *sf,struct lookup_subtable *sub) {
-    SplineChar **glyphs = SFGlyphsWithPSTinSubtable(sf,sub);
+static SplineChar **SFOrderedGlyphsWithPSTinSubtable(SplineFont *sf,struct lookup_subtable *sub,cpp_SubtableMap *map) {
+    SplineChar **glyphs = SFGlyphsWithPSTinSubtable(sf,sub,map);
     return SFOrderedGlyphs(glyphs);
 }
 
@@ -775,7 +883,6 @@ static SplineChar **TTFGlyphsFromNames(SplineFont *sf,char *names) {
 
 static SplineChar **OrderedGlyphsFromNames(SplineFont *sf,char *names) {
     SplineChar **glyphs = SFGlyphsFromNames(sf,names);
-    int i,j;
 
     if ( glyphs==NULL || glyphs[0]==NULL )
 return( glyphs );
@@ -872,7 +979,7 @@ return( 0 );
     else
 	cnt = (cnt+7)/8;
     cnt += 3;		/* first, last, type */
-return( sizeof(uint16)*cnt );
+return( sizeof(uint16_t)*cnt );
 }
 
 static int ValDevTabLen(ValDevTab *vdt) {
@@ -1006,14 +1113,14 @@ return( DevTabsSame(&vdt1->xadjust,&vdt2->xadjust) &&
 	DevTabsSame(&vdt1->yadv,&vdt2->yadv) );
 }
 
-static void dumpGPOSsimplepos(FILE *gpos,SplineFont *sf,struct lookup_subtable *sub ) {
+static void dumpGPOSsimplepos(FILE *gpos,SplineFont *sf,struct lookup_subtable *sub, struct alltabs *at ) {
     int cnt, cnt2;
-    int32 coverage_pos, end;
+    int32_t coverage_pos, end;
     PST *pst, *first=NULL;
     int bits = 0, same=true;
     SplineChar **glyphs;
 
-    glyphs = SFOrderedGlyphsWithPSTinSubtable(sf,sub);
+    glyphs = SFOrderedGlyphsWithPSTinSubtable(sf,sub,at->subtable_map);
     for ( cnt=cnt2=0; glyphs[cnt]!=NULL; ++cnt) {
 	for ( pst=glyphs[cnt]->possub; pst!=NULL; pst=pst->next ) {
 	    if ( pst->subtable==sub && pst->type==pst_position ) {
@@ -1057,7 +1164,7 @@ static void dumpGPOSsimplepos(FILE *gpos,SplineFont *sf,struct lookup_subtable *
 	if ( bits&8 ) putshort(gpos,first->u.pos.v_adv_off);
 	if ( bits&0xf0 ) {
 	    int next_dev_tab = ftell(gpos)-coverage_pos+2+
-		sizeof(int16)*((bits&0x10?1:0) + (bits&0x20?1:0) + (bits&0x40?1:0) + (bits&0x80?1:0));
+		sizeof(int16_t)*((bits&0x10?1:0) + (bits&0x20?1:0) + (bits&0x40?1:0) + (bits&0x80?1:0));
 	    if ( bits&0x10 ) { putshort(gpos,next_dev_tab); next_dev_tab += DevTabLen(&first->u.pos.adjust->xadjust); }
 	    if ( bits&0x20 ) { putshort(gpos,next_dev_tab); next_dev_tab += DevTabLen(&first->u.pos.adjust->yadjust); }
 	    if ( bits&0x40 ) { putshort(gpos,next_dev_tab); next_dev_tab += DevTabLen(&first->u.pos.adjust->xadv); }
@@ -1071,7 +1178,7 @@ static void dumpGPOSsimplepos(FILE *gpos,SplineFont *sf,struct lookup_subtable *
 	}
     } else {
 	int vr_size =
-		sizeof(int16)*((bits&0x1?1:0) + (bits&0x2?1:0) + (bits&0x4?1:0) + (bits&0x8?1:0) +
+		sizeof(int16_t)*((bits&0x1?1:0) + (bits&0x2?1:0) + (bits&0x4?1:0) + (bits&0x8?1:0) +
 		    (bits&0x10?1:0) + (bits&0x20?1:0) + (bits&0x40?1:0) + (bits&0x80?1:0));
 	int next_dev_tab = ftell(gpos)-coverage_pos+2+2+vr_size*cnt;
 	putshort(gpos,cnt);
@@ -1115,14 +1222,14 @@ static void dumpGPOSsimplepos(FILE *gpos,SplineFont *sf,struct lookup_subtable *
 }
 
 struct sckppst {
-    uint16 samewas;
-    uint16 devtablen;
-    uint16 tot;
-    uint8 isv;
-    uint8 subtable_too_big;
+    uint16_t samewas;
+    uint16_t devtablen;
+    uint16_t tot;
+    uint8_t isv;
+    uint8_t subtable_too_big;
 /* The first few fields are only meaningful in the first structure in the array*/
 /*   and provide information about the entire rest of the array */
-    uint16 other_gid;
+    uint16_t other_gid;
     SplineChar *sc;
     KernPair *kp;
     PST *pst;
@@ -1133,12 +1240,12 @@ static int cmp_gid( const void *_s1, const void *_s2 ) {
 return( ((int) s1->other_gid) - ((int) s2->other_gid) );
 }
 
-static void dumpGPOSpairpos(FILE *gpos,SplineFont *sf,struct lookup_subtable *sub) {
+static void dumpGPOSpairpos(FILE *gpos,SplineFont *sf,struct lookup_subtable *sub, struct alltabs *at) {
     int cnt;
-    int32 coverage_pos, offset_pos, end, start, pos;
+    int32_t coverage_pos, offset_pos, end, start, pos;
     PST *pst;
     KernPair *kp;
-    int vf1 = 0, vf2=0, i, j, k, tot, bit_cnt, v;
+    int vf1 = 0, vf2=0, i, j, tot, bit_cnt, v;
     int start_cnt, end_cnt;
     int chunk_cnt, chunk_max;
     SplineChar *sc, **glyphs, *gtemp;
@@ -1148,53 +1255,49 @@ static void dumpGPOSpairpos(FILE *gpos,SplineFont *sf,struct lookup_subtable *su
 
     /* Figure out all the data we need. First the glyphs with kerning info */
     /*  then the glyphs to which they kern, and by how much */
-    glyphs = SFOrderedGlyphsWithPSTinSubtable(sf,sub);
+    glyphs = SFOrderedGlyphsWithPSTinSubtable(sf,sub,at->subtable_map);
+    int max_entries = SubtableMap_get_size(at->subtable_map, sub);
+    struct sckppst *tmp_seconds = calloc(max_entries+1,sizeof(struct sckppst));
+
     for ( cnt=0; glyphs[cnt]!=NULL; ++cnt);
     seconds = malloc(cnt*sizeof(struct sckppst *));
     for ( cnt=0; glyphs[cnt]!=NULL; ++cnt) {
-	for ( k=0; k<2; ++k ) {
-	    devtablen = 0;
-	    tot = 0;
-	    for ( pst=glyphs[cnt]->possub; pst!=NULL; pst=pst->next ) {
-		if ( pst->subtable==sub && pst->type==pst_pair &&
-			(sc = SFGetChar(sf,-1,pst->u.pair.paired))!=NULL &&
-			sc->ttf_glyph!=-1 ) {
-		    if ( k ) {
-			seconds[cnt][tot].sc = sc;
-			seconds[cnt][tot].other_gid = sc->ttf_glyph;
-			seconds[cnt][tot].pst = pst;
-			devtablen += ValDevTabLen(pst->u.pair.vr[0].adjust) +
-				 ValDevTabLen(pst->u.pair.vr[1].adjust);
-
-		    }
+	devtablen = 0;
+	tot = 0;
+	for ( pst=glyphs[cnt]->possub; pst!=NULL; pst=pst->next ) {
+	    if ( pst->subtable==sub && pst->type==pst_pair &&
+		 (sc = SFGetChar(sf,-1,pst->u.pair.paired))!=NULL &&
+		 sc->ttf_glyph!=-1 ) {
+		tmp_seconds[tot].sc = sc;
+		tmp_seconds[tot].other_gid = sc->ttf_glyph;
+		tmp_seconds[tot].pst = pst;
+		devtablen += ValDevTabLen(pst->u.pair.vr[0].adjust) +
+			     ValDevTabLen(pst->u.pair.vr[1].adjust);
+		++tot;
+	    }
+	}
+	for ( v=0; v<2; ++v ) {
+	    for ( kp = v ? glyphs[cnt]->vkerns : glyphs[cnt]->kerns; kp!=NULL; kp=kp->next ) {
+		if( kp->subtable!=sub ) continue; // process only glyphs from the current subtable
+		if ( kp->sc->ttf_glyph!=-1 ) {
+		    tmp_seconds[tot].other_gid = kp->sc->ttf_glyph;
+		    tmp_seconds[tot].sc = kp->sc;
+		    tmp_seconds[tot].kp = kp;
+		    tmp_seconds[tot].isv = v;
+		    devtablen += DevTabLen(kp->adjust);
 		    ++tot;
 		}
 	    }
-	    for ( v=0; v<2; ++v ) {
-		for ( kp = v ? glyphs[cnt]->vkerns : glyphs[cnt]->kerns; kp!=NULL; kp=kp->next ) {
-		    if( kp->subtable!=sub ) continue; // process only glyphs from the current subtable
-		    if ( kp->sc->ttf_glyph!=-1 ) {
-			if ( k ) {
-			    seconds[cnt][tot].other_gid = kp->sc->ttf_glyph;
-			    seconds[cnt][tot].sc = kp->sc;
-			    seconds[cnt][tot].kp = kp;
-			    seconds[cnt][tot].isv = v;
-			    devtablen += DevTabLen(kp->adjust);
-			}
-			++tot;
-		    }
-		}
-	    }
-	    if ( k==0 ) {
-		seconds[cnt] = calloc(tot+1,sizeof(struct sckppst));
-	    } else {
-		qsort(seconds[cnt],tot,sizeof(struct sckppst),cmp_gid);
-		seconds[cnt][0].tot = tot;
-		/* Devtablen is 0 unless we are configured for device tables */
-		seconds[cnt][0].devtablen = devtablen;
-		seconds[cnt][0].samewas = 0xffff;
-	    }
 	}
+	qsort(tmp_seconds,tot,sizeof(struct sckppst),cmp_gid);
+	tmp_seconds[0].tot = tot;
+	/* Devtablen is 0 unless we are configured for device tables */
+	tmp_seconds[0].devtablen = devtablen;
+	tmp_seconds[0].samewas = 0xffff;
+
+	seconds[cnt] = calloc(tot+1,sizeof(struct sckppst));
+	memcpy(seconds[cnt], tmp_seconds, (tot+1)*sizeof(struct sckppst));
+	memset(tmp_seconds, 0, (tot+1)*sizeof(struct sckppst));
     }
 
     /* Some fonts do a primitive form of class based kerning, several glyphs */
@@ -1298,7 +1401,7 @@ static void dumpGPOSpairpos(FILE *gpos,SplineFont *sf,struct lookup_subtable *su
 				seconds[end_cnt][0].devtablen +
 			        2;	/* Number of secondary glyphs */
 	    if ( glyph_len>65535 && end_cnt==start_cnt ) {
-		LogError(_("Lookup subtable %s contains a glyph %s whose kerning information takes up more than 64k bytes\n"),
+		LogError(_("Lookup subtable %s contains a glyph %s whose kerning information takes up more than 64k bytes"),
 			sub->subtable_name, glyphs[start_cnt]->name );
 		len += glyph_len;
 	    } else if ( len+glyph_len>65535 ) {
@@ -1311,7 +1414,7 @@ static void dumpGPOSpairpos(FILE *gpos,SplineFont *sf,struct lookup_subtable *su
 	}
 	if ( start_cnt!=0 || end_cnt!=cnt ) {
 	    if ( chunk_cnt>=chunk_max )
-		sub->extra_subtables = realloc(sub->extra_subtables,((chunk_max+=10)+1)*sizeof(int32));
+		sub->extra_subtables = realloc(sub->extra_subtables,((chunk_max+=10)+1)*sizeof(int32_t));
 	    sub->extra_subtables[chunk_cnt++] = ftell(gpos);
 	    sub->extra_subtables[chunk_cnt] = -1;
 	}
@@ -1331,9 +1434,9 @@ static void dumpGPOSpairpos(FILE *gpos,SplineFont *sf,struct lookup_subtable *su
 		/* It's the same as the glyph at samewas, so just copy the */
 		/*  offset from there. We don't need to do anything else */
 		int offset;
-		fseek(gpos,offset_pos+(seconds[i][0].samewas-start_cnt)*sizeof(uint16),SEEK_SET);
+		fseek(gpos,offset_pos+(seconds[i][0].samewas-start_cnt)*sizeof(uint16_t),SEEK_SET);
 		offset = getushort(gpos);
-		fseek(gpos,offset_pos+(i-start_cnt)*sizeof(uint16),SEEK_SET);
+		fseek(gpos,offset_pos+(i-start_cnt)*sizeof(uint16_t),SEEK_SET);
 		putshort(gpos,offset);
 		fseek(gpos,0,SEEK_END);
 	continue;
@@ -1360,7 +1463,7 @@ static void dumpGPOSpairpos(FILE *gpos,SplineFont *sf,struct lookup_subtable *su
 		}
 	    }
 	    pos = ftell(gpos);
-	    fseek(gpos,offset_pos+(i-start_cnt)*sizeof(uint16),SEEK_SET);
+	    fseek(gpos,offset_pos+(i-start_cnt)*sizeof(uint16_t),SEEK_SET);
 	    putshort(gpos,pos-start);
 	    fseek(gpos,pos,SEEK_SET);
 
@@ -1408,18 +1511,19 @@ static void dumpGPOSpairpos(FILE *gpos,SplineFont *sf,struct lookup_subtable *su
     for ( i=0; i<cnt; ++i )
 	free(seconds[i]);
     free(seconds);
+    free(tmp_seconds);
     free(glyphs);
 }
 
-uint16 *ClassesFromNames(SplineFont *sf,char **classnames,int class_cnt,
+uint16_t *ClassesFromNames(SplineFont *sf,char **classnames,int class_cnt,
 	int numGlyphs, SplineChar ***glyphs, int apple_kc) {
-    uint16 *class;
+    uint16_t *class;
     int i;
     char *pt, *end, ch;
     SplineChar *sc, **gs=NULL;
     int offset = (apple_kc && classnames[0]!=NULL);
 
-    class = calloc(numGlyphs,sizeof(uint16));
+    class = calloc(numGlyphs,sizeof(uint16_t));
     if ( glyphs ) *glyphs = gs = calloc(numGlyphs,sizeof(SplineChar *));
     for ( i=0; i<class_cnt; ++i ) {
 	if ( i==0 && classnames[0]==NULL )
@@ -1462,7 +1566,7 @@ static SplineChar **GlyphsFromClasses(SplineChar **gs, int numGlyphs) {
 return( glyphs );
 }
 
-static SplineChar **GlyphsFromInitialClasses(SplineChar **gs, int numGlyphs, uint16 *classes, uint16 *initial) {
+static SplineChar **GlyphsFromInitialClasses(SplineChar **gs, int numGlyphs, uint16_t *classes, uint16_t *initial) {
     int i, j, cnt;
     SplineChar **glyphs;
 
@@ -1484,7 +1588,7 @@ static SplineChar **GlyphsFromInitialClasses(SplineChar **gs, int numGlyphs, uin
 return( glyphs );
 }
 
-static void DumpClass(FILE *gpos,uint16 *class,int numGlyphs) {
+static void DumpClass(FILE *gpos,uint16_t *class,int numGlyphs) {
     int ranges, i, cur, first= -1, last=-1, istart;
 
     for ( i=ranges=0; i<numGlyphs; ) {
@@ -1500,7 +1604,7 @@ static void DumpClass(FILE *gpos,uint16 *class,int numGlyphs) {
     }
     if ( ranges*3+1>last-first+1+2 || first==-1 ) {
 	if ( first==-1 ) first = last = 0;
-	putshort(gpos,1);		/* Format 1, list of all posibilities */
+	putshort(gpos,1);		/* Format 1, list of all possibilities */
 	putshort(gpos,first);
 	putshort(gpos,last-first+1);
 	for ( i=first; i<=last ; ++i )
@@ -1524,8 +1628,8 @@ static void DumpClass(FILE *gpos,uint16 *class,int numGlyphs) {
 
 static void dumpgposkernclass(FILE *gpos,SplineFont *sf,
 	struct lookup_subtable *sub, struct alltabs *at) {
-    uint32 begin_off = ftell(gpos), pos;
-    uint16 *class1, *class2;
+    uint32_t begin_off = ftell(gpos), pos;
+    uint16_t *class1, *class2;
     KernClass *kc = sub->kc, *test;
     SplineChar **glyphs;
     int i, isv;
@@ -1560,7 +1664,7 @@ static void dumpgposkernclass(FILE *gpos,SplineFont *sf,
     putshort(gpos,0);		/* offset to second glyph classes */
     putshort(gpos,kc->first_cnt);
     putshort(gpos,kc->second_cnt);
-    next_devtab = ftell(gpos)-begin_off + kc->first_cnt*kc->second_cnt*2*sizeof(uint16);
+    next_devtab = ftell(gpos)-begin_off + kc->first_cnt*kc->second_cnt*2*sizeof(uint16_t);
     for ( i=0; i<kc->first_cnt*kc->second_cnt; ++i ) {
 	putshort(gpos,kc->offsets[i]);
 	if ( anydevtab && kc->adjusts[i].corrections!=NULL ) {
@@ -1578,19 +1682,19 @@ static void dumpgposkernclass(FILE *gpos,SplineFont *sf,
 	    IError("Device table offsets screwed up in kerning class");
     }
     pos = ftell(gpos);
-    fseek(gpos,begin_off+4*sizeof(uint16),SEEK_SET);
+    fseek(gpos,begin_off+4*sizeof(uint16_t),SEEK_SET);
     putshort(gpos,pos-begin_off);
     fseek(gpos,pos,SEEK_SET);
     DumpClass(gpos,class1,at->maxp.numGlyphs);
 
     pos = ftell(gpos);
-    fseek(gpos,begin_off+5*sizeof(uint16),SEEK_SET);
+    fseek(gpos,begin_off+5*sizeof(uint16_t),SEEK_SET);
     putshort(gpos,pos-begin_off);
     fseek(gpos,pos,SEEK_SET);
     DumpClass(gpos,class2,at->maxp.numGlyphs);
 
     pos = ftell(gpos);
-    fseek(gpos,begin_off+sizeof(uint16),SEEK_SET);
+    fseek(gpos,begin_off+sizeof(uint16_t),SEEK_SET);
     putshort(gpos,pos-begin_off);
     fseek(gpos,pos,SEEK_SET);
     dumpcoveragetable(gpos,glyphs);
@@ -1630,7 +1734,7 @@ static void dumpgposCursiveAttach(FILE *gpos, SplineFont *sf,
     SplineChar **entryexit;
     int cnt, offset,j;
     AnchorPoint *ap, *entry, *exit;
-    uint32 coverage_offset, start;
+    uint32_t coverage_offset, start;
 
     ac = NULL;
     for ( testac=sf->anchor; testac!=NULL; testac = testac->next ) {
@@ -1717,24 +1821,24 @@ static SplineChar **allmarkglyphs(SplineChar ***glyphlist, int classcnt) {
     int i, tot, k;
 
     if ( classcnt==1 )
-return( SFOrderedGlyphs(glyphlist[0]));
+        return( SFOrderedGlyphs(glyphlist[0]));
 
     for ( i=tot=0; i<classcnt; ++i ) {
-	for ( k=0; glyphlist[i][k]!=NULL; ++k );
-	tot += k;
+        for ( k=0; glyphlist[i]!=NULL && glyphlist[i][k]!=NULL; ++k );
+        tot += k;
     }
     glyphs = malloc((tot+1)*sizeof(SplineChar *));
     for ( i=tot=0; i<classcnt; ++i ) {
-	for ( k=0; glyphlist[i][k]!=NULL; ++k )
-	    glyphs[tot++] = glyphlist[i][k];
+        for ( k=0; glyphlist[i]!=NULL && glyphlist[i][k]!=NULL; ++k )
+            glyphs[tot++] = glyphlist[i][k];
     }
     qsort(glyphs,tot,sizeof(SplineChar *),orderglyph);
     for ( i=k=0; i<tot; ++i ) {
-	while ( i+1<tot && glyphs[i]==glyphs[i+1]) ++i;
-	glyphs[k++] = glyphs[i];
+        while ( i+1<tot && glyphs[i]==glyphs[i+1]) ++i;
+        glyphs[k++] = glyphs[i];
     }
     glyphs[k] = NULL;
-return( glyphs );
+    return( glyphs );
 }
 
 static void dumpgposAnchorData(FILE *gpos,AnchorClass *_ac,
@@ -1743,7 +1847,7 @@ static void dumpgposAnchorData(FILE *gpos,AnchorClass *_ac,
 	int classcnt, struct glyphinfo *gi) {
     AnchorClass *ac=NULL;
     int j,cnt,k,l, pos, offset, tot, max;
-    uint32 coverage_offset, markarray_offset, subtable_start;
+    uint32_t coverage_offset, markarray_offset, subtable_start;
     AnchorPoint *ap, **aps;
     SplineChar **markglyphs;
 
@@ -1920,12 +2024,12 @@ static void dumpgposAnchorData(FILE *gpos,AnchorClass *_ac,
     fseek(gpos,0,SEEK_END);
 }
 
-static void dumpGSUBsimplesubs(FILE *gsub,SplineFont *sf,struct lookup_subtable *sub) {
+static void dumpGSUBsimplesubs(FILE *gsub,SplineFont *sf,struct lookup_subtable *sub, struct alltabs *at) {
     int cnt, diff, ok = true;
-    int32 coverage_pos, end;
+    int32_t coverage_pos, end;
     SplineChar **glyphs, ***maps;
 
-    glyphs = SFOrderedGlyphsWithPSTinSubtable(sf,sub);
+    glyphs = SFOrderedGlyphsWithPSTinSubtable(sf,sub,at->subtable_map);
     maps = generateMapList(glyphs,sub);
 
     diff = (*maps[0])->ttf_glyph - glyphs[0]->ttf_glyph;
@@ -1936,7 +2040,7 @@ static void dumpGSUBsimplesubs(FILE *gsub,SplineFont *sf,struct lookup_subtable 
 	putshort(gsub,1);	/* delta format */
 	coverage_pos = ftell(gsub);
 	putshort(gsub,0);		/* offset to coverage table */
-	putshort(gsub,diff);
+	putshort(gsub,diff & 0xFFFF);
     } else {
 	putshort(gsub,2);		/* glyph list format */
 	coverage_pos = ftell(gsub);
@@ -1955,13 +2059,13 @@ static void dumpGSUBsimplesubs(FILE *gsub,SplineFont *sf,struct lookup_subtable 
     GlyphMapFree(maps);
 }
 
-static void dumpGSUBmultiplesubs(FILE *gsub,SplineFont *sf,struct lookup_subtable *sub) {
+static void dumpGSUBmultiplesubs(FILE *gsub,SplineFont *sf,struct lookup_subtable *sub, struct alltabs *at) {
     int cnt, offset;
-    int32 coverage_pos, end;
+    int32_t coverage_pos, end;
     int gc;
     SplineChar **glyphs, ***maps;
 
-    glyphs = SFOrderedGlyphsWithPSTinSubtable(sf,sub);
+    glyphs = SFOrderedGlyphsWithPSTinSubtable(sf,sub,at->subtable_map);
     maps = generateMapList(glyphs,sub);
     for ( cnt=0; glyphs[cnt]!=NULL; ++cnt);
 
@@ -2013,14 +2117,14 @@ return( true );
 
 static void dumpGSUBligdata(FILE *gsub,SplineFont *sf,
 	struct lookup_subtable *sub, struct alltabs *at) {
-    int32 coverage_pos, next_val_pos, here, lig_list_start;
+    int32_t coverage_pos, next_val_pos, here, lig_list_start;
     int cnt, i, pcnt, lcnt, max=100, j;
-    uint16 *offsets=NULL, *ligoffsets=malloc(max*sizeof(uint16));
+    uint16_t *offsets=NULL, *ligoffsets=malloc(max*sizeof(uint16_t));
     SplineChar **glyphs;
     LigList *ll;
     struct splinecharlist *scl;
 
-    glyphs = SFOrderedGlyphsWithPSTinSubtable(sf,sub);
+    glyphs = SFOrderedGlyphsWithPSTinSubtable(sf,sub,at->subtable_map);
     cnt=0;
     if ( glyphs!=NULL ) for ( ; glyphs[cnt]!=NULL; ++cnt );
 
@@ -2030,7 +2134,7 @@ static void dumpGSUBligdata(FILE *gsub,SplineFont *sf,
     putshort(gsub,cnt);
     next_val_pos = ftell(gsub);
     if ( glyphs!=NULL )
-	offsets = malloc(cnt*sizeof(uint16));
+	offsets = malloc(cnt*sizeof(uint16_t));
     for ( i=0; i<cnt; ++i )
 	putshort(gsub,0);
     for ( i=0; i<cnt; ++i ) {
@@ -2080,27 +2184,27 @@ static void dumpGSUBligdata(FILE *gsub,SplineFont *sf,
 }
 
 static int ui16cmp(const void *_i1, const void *_i2) {
-    if ( *(const uint16 *) _i1 > *(const uint16 *) _i2 )
+    if ( *(const uint16_t *) _i1 > *(const uint16_t *) _i2 )
 return( 1 );
-    if ( *(const uint16 *) _i1 < *(const uint16 *) _i2 )
+    if ( *(const uint16_t *) _i1 < *(const uint16_t *) _i2 )
 return( -1 );
 
 return( 0 );
 }
 
-static uint16 *FigureInitialClasses(FPST *fpst) {
-    uint16 *initial = malloc((fpst->nccnt+1)*sizeof(uint16));
+static uint16_t *FigureInitialClasses(FPST *fpst) {
+    uint16_t *initial = malloc((fpst->nccnt+1)*sizeof(uint16_t));
     int i, cnt, j;
 
     initial[fpst->nccnt] = 0xffff;
     for ( i=cnt=0; i<fpst->rule_cnt; ++i ) {
 	for ( j=0; j<cnt ; ++j )
-	    if ( initial[j] == fpst->rules[i].u.class.nclasses[0] )
+	    if ( initial[j] == fpst->rules[i].u.fpc_class.nclasses[0] )
 	break;
 	if ( j==cnt )
-	    initial[cnt++] = fpst->rules[i].u.class.nclasses[0];
+	    initial[cnt++] = fpst->rules[i].u.fpc_class.nclasses[0];
     }
-    qsort(initial,cnt,sizeof(uint16),ui16cmp);
+    qsort(initial,cnt,sizeof(uint16_t),ui16cmp);
     initial[cnt] = 0xffff;
 return( initial );
 }
@@ -2182,11 +2286,11 @@ static int CntRulesStartingWith(FPST *fpst,SplineChar *sc) {
 return( cnt );
 }
 
-static int CntRulesStartingWithClass(FPST *fpst,uint16 cval) {
+static int CntRulesStartingWithClass(FPST *fpst,uint16_t cval) {
     int i, cnt;
 
     for ( i=cnt=0; i<fpst->rule_cnt; ++i ) {
-	if ( fpst->rules[i].u.class.nclasses[0]==cval )
+	if ( fpst->rules[i].u.fpc_class.nclasses[0]==cval )
 	    ++cnt;
     }
 return( cnt );
@@ -2196,7 +2300,7 @@ static void dumpg___ContextChainGlyphs(FILE *lfile,SplineFont *sf,
 	struct lookup_subtable *sub, struct alltabs *at) {
     FPST *fpst = sub->fpst;
     int iscontext = fpst->type==pst_contextpos || fpst->type==pst_contextsub;
-    uint32 base = ftell(lfile);
+    uint32_t base = ftell(lfile);
     int i,cnt, subcnt, j,k,l, maxcontext,curcontext;
     SplineChar **glyphs, **subglyphs;
     int lc;
@@ -2214,7 +2318,7 @@ static void dumpg___ContextChainGlyphs(FILE *lfile,SplineFont *sf,
     maxcontext = 0;
 
     for ( i=0; i<cnt; ++i ) {
-	uint32 pos = ftell(lfile);
+	uint32_t pos = ftell(lfile);
 	fseek(lfile,base+(3+i)*sizeof(short),SEEK_SET);
 	putshort(lfile,pos-base);
 	fseek(lfile,pos,SEEK_SET);
@@ -2223,7 +2327,7 @@ static void dumpg___ContextChainGlyphs(FILE *lfile,SplineFont *sf,
 	for ( j=0; j<subcnt; ++j )
 	    putshort(lfile,0);
 	for ( j=k=0; k<fpst->rule_cnt; ++k ) if ( NamesStartWith(glyphs[i],fpst->rules[k].u.glyph.names )) {
-	    uint32 subpos = ftell(lfile);
+	    uint32_t subpos = ftell(lfile);
 	    fseek(lfile,pos+(1+j)*sizeof(short),SEEK_SET);
 	    putshort(lfile,subpos-pos);
 	    fseek(lfile,subpos,SEEK_SET);
@@ -2285,8 +2389,8 @@ static void dumpg___ContextChainClass(FILE *lfile,SplineFont *sf,
 	struct lookup_subtable *sub, struct alltabs *at) {
     FPST *fpst = sub->fpst;
     int iscontext = fpst->type==pst_contextpos || fpst->type==pst_contextsub;
-    uint32 base = ftell(lfile), rulebase, pos, subpos, npos;
-    uint16 *initialclasses, *iclass, *bclass, *lclass;
+    uint32_t base = ftell(lfile), rulebase, pos, subpos, npos;
+    uint16_t *initialclasses, *iclass, *bclass, *lclass;
     SplineChar **iglyphs, **bglyphs, **lglyphs, **glyphs;
     int i,ii,cnt, subcnt, j,k,l , maxcontext,curcontext;
     int lc;
@@ -2313,7 +2417,7 @@ static void dumpg___ContextChainClass(FILE *lfile,SplineFont *sf,
 	lclass = ClassesFromNames(sf,fpst->fclass,fpst->fccnt,at->maxp.numGlyphs,&lglyphs,false);
     }
     pos = ftell(lfile);
-    fseek(lfile,base+sizeof(uint16),SEEK_SET);
+    fseek(lfile,base+sizeof(uint16_t),SEEK_SET);
     putshort(lfile,pos-base);
     fseek(lfile,pos,SEEK_SET);
     glyphs = GlyphsFromInitialClasses(iglyphs,at->maxp.numGlyphs,iclass,initialclasses);
@@ -2323,40 +2427,40 @@ static void dumpg___ContextChainClass(FILE *lfile,SplineFont *sf,
 
     if ( iscontext ) {
 	pos = ftell(lfile);
-	fseek(lfile,base+2*sizeof(uint16),SEEK_SET);
+	fseek(lfile,base+2*sizeof(uint16_t),SEEK_SET);
 	putshort(lfile,pos-base);
 	fseek(lfile,pos,SEEK_SET);
 	DumpClass(lfile,iclass,at->maxp.numGlyphs);
 	free(iclass);
     } else {
 	pos = ftell(lfile);
-	fseek(lfile,base+2*sizeof(uint16),SEEK_SET);
+	fseek(lfile,base+2*sizeof(uint16_t),SEEK_SET);
 	putshort(lfile,pos-base);
 	fseek(lfile,pos,SEEK_SET);
 	DumpClass(lfile,bclass,at->maxp.numGlyphs);
 	if ( ClassesMatch(fpst->bccnt,fpst->bclass,fpst->nccnt,fpst->nclass)) {
 	    npos = pos;
-	    fseek(lfile,base+3*sizeof(uint16),SEEK_SET);
+	    fseek(lfile,base+3*sizeof(uint16_t),SEEK_SET);
 	    putshort(lfile,npos-base);
 	    fseek(lfile,0,SEEK_END);
 	} else {
 	    npos = ftell(lfile);
-	    fseek(lfile,base+3*sizeof(uint16),SEEK_SET);
+	    fseek(lfile,base+3*sizeof(uint16_t),SEEK_SET);
 	    putshort(lfile,npos-base);
 	    fseek(lfile,npos,SEEK_SET);
 	    DumpClass(lfile,iclass,at->maxp.numGlyphs);
 	}
 	if ( ClassesMatch(fpst->fccnt,fpst->fclass,fpst->bccnt,fpst->bclass)) {
-	    fseek(lfile,base+4*sizeof(uint16),SEEK_SET);
+	    fseek(lfile,base+4*sizeof(uint16_t),SEEK_SET);
 	    putshort(lfile,pos-base);
 	    fseek(lfile,0,SEEK_END);
 	} else if ( ClassesMatch(fpst->fccnt,fpst->fclass,fpst->nccnt,fpst->nclass)) {
-	    fseek(lfile,base+4*sizeof(uint16),SEEK_SET);
+	    fseek(lfile,base+4*sizeof(uint16_t),SEEK_SET);
 	    putshort(lfile,npos-base);
 	    fseek(lfile,0,SEEK_END);
 	} else {
 	    pos = ftell(lfile);
-	    fseek(lfile,base+4*sizeof(uint16),SEEK_SET);
+	    fseek(lfile,base+4*sizeof(uint16_t),SEEK_SET);
 	    putshort(lfile,pos-base);
 	    fseek(lfile,pos,SEEK_SET);
 	    DumpClass(lfile,lclass,at->maxp.numGlyphs);
@@ -2378,7 +2482,7 @@ static void dumpg___ContextChainClass(FILE *lfile,SplineFont *sf,
 	    putshort(lfile,subcnt);
 	    for ( j=0; j<subcnt; ++j )
 		putshort(lfile,0);
-	    for ( j=k=0; k<fpst->rule_cnt; ++k ) if ( i==fpst->rules[k].u.class.nclasses[0] ) {
+	    for ( j=k=0; k<fpst->rule_cnt; ++k ) if ( i==fpst->rules[k].u.fpc_class.nclasses[0] ) {
 		subpos = ftell(lfile);
 		fseek(lfile,pos+(1+j)*sizeof(short),SEEK_SET);
 		putshort(lfile,subpos-pos);
@@ -2388,20 +2492,20 @@ static void dumpg___ContextChainClass(FILE *lfile,SplineFont *sf,
 		    if ( fpst->rules[k].lookups[l].lookup->lookup_index!=-1 )
 			++lc;
 		if ( iscontext ) {
-		    putshort(lfile,fpst->rules[k].u.class.ncnt);
+		    putshort(lfile,fpst->rules[k].u.fpc_class.ncnt);
 		    putshort(lfile,lc);
-		    for ( l=1; l<fpst->rules[k].u.class.ncnt; ++l )
-			putshort(lfile,fpst->rules[k].u.class.nclasses[l]);
+		    for ( l=1; l<fpst->rules[k].u.fpc_class.ncnt; ++l )
+			putshort(lfile,fpst->rules[k].u.fpc_class.nclasses[l]);
 		} else {
-		    putshort(lfile,fpst->rules[k].u.class.bcnt);
-		    for ( l=0; l<fpst->rules[k].u.class.bcnt; ++l )
-			putshort(lfile,fpst->rules[k].u.class.bclasses[l]);
-		    putshort(lfile,fpst->rules[k].u.class.ncnt);
-		    for ( l=1; l<fpst->rules[k].u.class.ncnt; ++l )
-			putshort(lfile,fpst->rules[k].u.class.nclasses[l]);
-		    putshort(lfile,fpst->rules[k].u.class.fcnt);
-		    for ( l=0; l<fpst->rules[k].u.class.fcnt; ++l )
-			putshort(lfile,fpst->rules[k].u.class.fclasses[l]);
+		    putshort(lfile,fpst->rules[k].u.fpc_class.bcnt);
+		    for ( l=0; l<fpst->rules[k].u.fpc_class.bcnt; ++l )
+			putshort(lfile,fpst->rules[k].u.fpc_class.bclasses[l]);
+		    putshort(lfile,fpst->rules[k].u.fpc_class.ncnt);
+		    for ( l=1; l<fpst->rules[k].u.fpc_class.ncnt; ++l )
+			putshort(lfile,fpst->rules[k].u.fpc_class.nclasses[l]);
+		    putshort(lfile,fpst->rules[k].u.fpc_class.fcnt);
+		    for ( l=0; l<fpst->rules[k].u.fpc_class.fcnt; ++l )
+			putshort(lfile,fpst->rules[k].u.fpc_class.fclasses[l]);
 		    putshort(lfile,lc);
 		}
 		for ( l=0; l<fpst->rules[k].lookup_cnt; ++l )
@@ -2417,7 +2521,7 @@ static void dumpg___ContextChainClass(FILE *lfile,SplineFont *sf,
 
     maxcontext = 0;
     for ( i=0; i<fpst->rule_cnt; ++i ) {
-	curcontext = fpst->rules[i].u.class.ncnt+fpst->rules[i].u.class.bcnt+fpst->rules[i].u.class.fcnt;
+	curcontext = fpst->rules[i].u.fpc_class.ncnt+fpst->rules[i].u.fpc_class.bcnt+fpst->rules[i].u.fpc_class.fcnt;
 	if ( curcontext>maxcontext ) maxcontext = curcontext;
     }
     if ( maxcontext>at->os2.maxContext )
@@ -2428,7 +2532,7 @@ static void dumpg___ContextChainCoverage(FILE *lfile,SplineFont *sf,
 	struct lookup_subtable *sub, struct alltabs *at) {
     FPST *fpst = sub->fpst;
     int iscontext = fpst->type==pst_contextpos || fpst->type==pst_contextsub;
-    uint32 base = ftell(lfile), ibase, lbase, bbase;
+    uint32_t base = ftell(lfile), ibase, lbase, bbase;
     int i, l;
     SplineChar **glyphs;
     int curcontext;
@@ -2457,7 +2561,7 @@ static void dumpg___ContextChainCoverage(FILE *lfile,SplineFont *sf,
 		putshort(lfile,fpst->rules[0].lookups[i].lookup->lookup_index);
 	    }
 	for ( i=0; i<fpst->rules[0].u.coverage.ncnt; ++i ) {
-	    uint32 pos = ftell(lfile);
+	    uint32_t pos = ftell(lfile);
 	    fseek(lfile,base+6+2*i,SEEK_SET);
 	    putshort(lfile,pos-base);
 	    fseek(lfile,pos,SEEK_SET);
@@ -2502,7 +2606,7 @@ static void dumpg___ContextChainCoverage(FILE *lfile,SplineFont *sf,
 	    free(glyphs);
 	}
 	for ( i=0; i<fpst->rules[0].u.coverage.ncnt; ++i ) {
-	    uint32 pos = ftell(lfile);
+	    uint32_t pos = ftell(lfile);
 	    fseek(lfile,ibase+2*i,SEEK_SET);
 	    putshort(lfile,pos-base);
 	    fseek(lfile,pos,SEEK_SET);
@@ -2511,7 +2615,7 @@ static void dumpg___ContextChainCoverage(FILE *lfile,SplineFont *sf,
 	    free(glyphs);
 	}
 	for ( i=0; i<fpst->rules[0].u.coverage.bcnt; ++i ) {
-	    uint32 pos = ftell(lfile);
+	    uint32_t pos = ftell(lfile);
 	    fseek(lfile,bbase+2*i,SEEK_SET);
 	    putshort(lfile,pos-base);
 	    fseek(lfile,pos,SEEK_SET);
@@ -2520,7 +2624,7 @@ static void dumpg___ContextChainCoverage(FILE *lfile,SplineFont *sf,
 	    free(glyphs);
 	}
 	for ( i=0; i<fpst->rules[0].u.coverage.fcnt; ++i ) {
-	    uint32 pos = ftell(lfile);
+	    uint32_t pos = ftell(lfile);
 	    fseek(lfile,lbase+2*i,SEEK_SET);
 	    putshort(lfile,pos-base);
 	    fseek(lfile,pos,SEEK_SET);
@@ -2601,6 +2705,7 @@ static void AnchorsAway(FILE *lfile,SplineFont *sf,
 	if ( marks[0]!=NULL && mkmk!=NULL )
 	    dumpgposAnchorData(lfile,acfirst,at_basemark,marks,mkmk,classcnt,gi);
       break;
+      default: break;
     }
     for ( i=0; i<classcnt; ++i )
 	free(marks[i]);
@@ -2677,6 +2782,7 @@ return( true );
 	/*  Let's output it anyway, just in case we ever support some other */
 	/*  table that uses GPOS/GSUB lookups (I think JUST) */
 return( false );
+      default: break;
     }
     /* Should never get here, but gcc probably thinks we might */
 return( true );
@@ -2698,7 +2804,7 @@ static void otf_dumpALookup(FILE *lfile, OTLookup *otl, SplineFont *sf,
 	    switch ( otl->lookup_type ) {
 	    /* GPOS lookup types */
 	      case gpos_single:
-		dumpGPOSsimplepos(lfile,sf,sub);
+		dumpGPOSsimplepos(lfile,sf,sub,at);
 	      break;
 
 	      case gpos_pair:
@@ -2707,7 +2813,7 @@ static void otf_dumpALookup(FILE *lfile, OTLookup *otl, SplineFont *sf,
 		if ( sub->kc!=NULL )
 		    dumpgposkernclass(lfile,sf,sub,at);
 		else
-		    dumpGPOSpairpos(lfile,sf,sub);
+		    dumpGPOSpairpos(lfile,sf,sub,at);
 	      break;
 
 	      case gpos_cursive:
@@ -2727,12 +2833,12 @@ static void otf_dumpALookup(FILE *lfile, OTLookup *otl, SplineFont *sf,
 
 	    /* GSUB lookup types */
 	      case gsub_single:
-		dumpGSUBsimplesubs(lfile,sf,sub);
+		dumpGSUBsimplesubs(lfile,sf,sub,at);
 	      break;
 
 	      case gsub_multiple:
 	      case gsub_alternate:
-		dumpGSUBmultiplesubs(lfile,sf,sub);
+		dumpGSUBmultiplesubs(lfile,sf,sub,at);
 	      break;
 
 	      case gsub_ligature:
@@ -2744,6 +2850,7 @@ static void otf_dumpALookup(FILE *lfile, OTLookup *otl, SplineFont *sf,
 	      case gsub_reversecchain:
 		dumpg___ContextChain(lfile,sf,sub,at);
 	      break;
+	      default: break;
 	    }
 	    if ( ftell(lfile)-sub->subtable_offset==0 ) {
 		if ( lookup_sub_table_contains_no_data_count < 32 ) {
@@ -2810,7 +2917,7 @@ return( lfile );
     final = GFileTmpfile();
     buffer = malloc(32768);
     for ( i=0; i<index; ++i ) {
-	uint32 diff;
+	uint32_t diff;
 	otl = sizeordered[i];
 	fseek(lfile,otl->lookup_offset,SEEK_SET);
 	diff = ftell(final) - otl->lookup_offset;
@@ -2846,23 +2953,23 @@ return( final );
 }
 
 struct feat_lookups {
-    uint32 tag;
+    uint32_t tag;
     int lcnt;
     OTLookup **lookups;
     int feature_id;		/* Initially consecutive, but may be rearranged by sorting */
-    uint32 name_param_ptr;
+    uint32_t name_param_ptr;
 };
 
 struct langsys {
-    uint32 lang;
+    uint32_t lang;
     int fc;
     int *feature_id;
     int same_as;
-    int32 offset;
+    int32_t offset;
 };
 
 struct scriptset {
-    uint32 script;
+    uint32_t script;
     int lc;
     struct langsys *langsys;
 };
@@ -2875,7 +2982,7 @@ struct ginfo {
 };
 
 static int FindOrMakeNewFeatureLookup(struct ginfo *ginfo,OTLookup **lookups,
-	uint32 tag) {
+	uint32_t tag) {
     int i, j;
 
     for ( i=0; i<ginfo->fcnt; ++i ) {
@@ -2941,13 +3048,13 @@ return( true );
 }
 
 static void FindFeatures(SplineFont *sf,int is_gpos,struct ginfo *ginfo) {
-    uint32 *scripts, *langs, *features;
+    uint32_t *scripts, *langs, *features;
     OTLookup **lookups;
     int sc, lc, fc, j;
 
     memset(ginfo,0,sizeof(struct ginfo));
 
-    scripts = SFScriptsInLookups(sf,is_gpos);
+    scripts = SFScriptsInLookups(sf);
     if ( scripts==NULL )	/* All lookups unused */
 return;
     for ( sc=0; scripts[sc]!=0; ++sc );
@@ -3011,9 +3118,9 @@ return;
 
 static void dump_script_table(FILE *g___,struct scriptset *ss,struct ginfo *ginfo) {
     int i, lcnt, dflt_lang = -1;
-    uint32 base;
+    uint32_t base;
     int j, req_index;
-    uint32 offset;
+    uint32_t offset;
 
     /* Count the languages, and find default */
     for ( lcnt=0; lcnt<ss->lc; ++lcnt )
@@ -3082,12 +3189,12 @@ return( NULL );
 	    continue;
 		if ( sub->extra_subtables!=NULL ) {
 		    for ( i=0; sub->extra_subtables[i]!=-1; ++i ) {
-			if ( sub->extra_subtables[i]+offset>65535 )
+			if ( sub->extra_subtables[i]+offset+len>65535 )
 		    break;
 		    }
 		    if ( sub->extra_subtables[i]!=-1 )
 	    break;
-		} else if ( sub->subtable_offset+offset>65535 )
+		} else if ( sub->subtable_offset+offset+len>65535 )
 	    break;
 	    }
 	    if ( sub!=NULL ) {
@@ -3142,20 +3249,36 @@ return( NULL );
 return( efile );
 }
 
-struct otffeatname *findotffeatname(uint32 tag,SplineFont *sf) {
+struct otffeatname *findotffeatname(uint32_t tag,enum otffn_field field,SplineFont *sf) {
     struct otffeatname *fn;
 
-    for ( fn=sf->feat_names; fn!=NULL && fn->tag!=tag; fn=fn->next );
-return( fn );
+    for ( fn=sf->feat_names; fn!=NULL && (fn->tag!=tag || fn->field!=field); fn=fn->next );
+    return( fn );
+}
+
+static bool getfeatnamefromginfo(struct alltabs *at, FILE *g___, uint32_t tag, enum otffn_field field, SplineFont *sf, uint32_t name_param_loc, uint32_t name_param_ptr, uint16_t *nameid) {
+	struct otffeatname *fn;
+	if ( (fn = findotffeatname(tag,field,sf))!=NULL ) {
+		if ( fn->nid==0 )
+			fn->nid = at->next_strid++;
+		fseek(g___,name_param_ptr,SEEK_SET);
+		putshort(g___,name_param_loc-name_param_ptr);
+		if ( nameid )
+			*nameid = fn->nid;
+		return true;
+	}
+	else {
+		return false;
+	}
 }
 
 static FILE *dumpg___info(struct alltabs *at, SplineFont *sf,int is_gpos) {
     /* Dump out either a gpos or a gsub table. gpos handles kerns, gsub ligs */
     /*  we assume that SFFindUnusedLookups has been called */
     FILE *lfile, *g___, *efile;
-    uint32 lookup_list_table_start, feature_list_table_start, here, scripts_start_offset;
+    uint32_t lookup_list_table_start, feature_list_table_start, here, scripts_start_offset;
     struct ginfo ginfo;
-    int32 size_params_loc, size_params_ptr;
+    int32_t size_params_loc, size_params_ptr;
     int i,j, cnt, scnt, offset;
     OTLookup *otf, *all;
     struct lookup_subtable *sub;
@@ -3175,7 +3298,7 @@ return( NULL );
 	/* ginfo.sc==0 => There are no scripts. */
 	/* If both are true then we don't need to output the table */
 	/* It is perfectly possible to have lookups without scripts */
-	/*  (if some other table refered to them -- we don't currently */
+	/*  (if some other table referred to them -- we don't currently */
 	/*  support this, but we might some day). */
 	/* It is also possible to have scripts without lookups (to get */
 	/*  around a bug in Uniscribe which only processes some scripts */
@@ -3242,7 +3365,7 @@ return( NULL );
 	ginfo.feat_lookups[i].name_param_ptr = 0;
 	if ( ginfo.feat_lookups[i].tag==CHR('s','i','z','e') )
 	    size_params_ptr = ftell(g___);
-	else if ( ginfo.feat_lookups[i].tag>=CHR('s','s','0','1') && ginfo.feat_lookups[i].tag<=CHR('s','s','2','0'))
+	else if ( (ginfo.feat_lookups[i].tag>=CHR('s','s','0','1') && ginfo.feat_lookups[i].tag<=CHR('s','s','2','0')) || (ginfo.feat_lookups[i].tag>=CHR('c','v','0','1') && ginfo.feat_lookups[i].tag<=CHR('c','v','9','9')) )
 	    ginfo.feat_lookups[i].name_param_ptr = ftell(g___);
 	putshort(g___,0);			/* No feature params (we'll come back for 'size') */
 	putshort(g___,ginfo.feat_lookups[i].lcnt);/* this many lookups */
@@ -3268,17 +3391,48 @@ return( NULL );
 	putshort(g___,sf->design_range_top);
     }
     for ( i=0; i<ginfo.fcnt; ++i ) {
-	if ( ginfo.feat_lookups[i].name_param_ptr!=0 &&
-		(fn = findotffeatname(ginfo.feat_lookups[i].tag,sf))!=NULL ) {
-	    if ( fn->nid==0 )
-		fn->nid = at->next_strid++;
-	    uint32 name_param_loc = ftell(g___);
-	    fseek(g___,ginfo.feat_lookups[i].name_param_ptr,SEEK_SET);
-	    putshort(g___,name_param_loc-ginfo.feat_lookups[i].name_param_ptr);
-	    fseek(g___,name_param_loc,SEEK_SET);
-	    putshort(g___,0);		/* Minor version number */
-	    putshort(g___,fn->nid);
-	}
+		if ( ginfo.feat_lookups[i].name_param_ptr!=0 ) {
+			if ( (ginfo.feat_lookups[i].tag & 0xffff0000) == CHR('c','v','\0','\0') ) {
+				uint16_t featUiLabelNameId = 0;
+				uint16_t featUiTooltipTextNameId = 0;
+				uint16_t sampleTextNameId = 0;
+				uint16_t numNamedParameters = 0;
+				uint16_t firstParamUiLabelNameId = 0;
+				uint32_t name_param_loc = ftell(g___);
+				getfeatnamefromginfo(at, g___, ginfo.feat_lookups[i].tag, otffn_featname, sf,
+					name_param_loc, ginfo.feat_lookups[i].name_param_ptr, &featUiLabelNameId);
+				getfeatnamefromginfo(at, g___, ginfo.feat_lookups[i].tag, otffn_tooltiptext, sf,
+					name_param_loc, ginfo.feat_lookups[i].name_param_ptr, &featUiTooltipTextNameId);
+				getfeatnamefromginfo(at, g___, ginfo.feat_lookups[i].tag, otffn_sampletext, sf,
+					name_param_loc, ginfo.feat_lookups[i].name_param_ptr, &sampleTextNameId);
+				for ( numNamedParameters = 0; numNamedParameters < 65536-256; ++numNamedParameters ) {
+					if ( !getfeatnamefromginfo(at, g___, ginfo.feat_lookups[i].tag,
+						otffn_paramname_begin + numNamedParameters, sf, name_param_loc,
+						ginfo.feat_lookups[i].name_param_ptr,
+						numNamedParameters == 0 ? &firstParamUiLabelNameId : NULL) )
+							break;
+				}
+
+				fseek(g___,name_param_loc,SEEK_SET);
+				putshort(g___,0); // format
+				putshort(g___,featUiLabelNameId);
+				putshort(g___,featUiTooltipTextNameId);
+				putshort(g___,sampleTextNameId);
+				putshort(g___,numNamedParameters);
+				putshort(g___,firstParamUiLabelNameId);
+				putshort(g___,0); // TODO: charCount
+				//putu24(g___,0); // TODO: character[charCount]
+			}
+			else {
+				uint32_t name_param_loc = ftell(g___);
+				uint16_t nameId = 0;
+				getfeatnamefromginfo(at, g___, ginfo.feat_lookups[i].tag, otffn_featname, sf,
+					name_param_loc, ginfo.feat_lookups[i].name_param_ptr, &nameId);
+				fseek(g___,name_param_loc,SEEK_SET);
+				putshort(g___,0);		/* Minor version number */
+				putshort(g___,nameId);
+			}
+		}
     }
     /* And that should finish all the features */
 
@@ -3438,7 +3592,7 @@ return;
 	for ( i=0; i<pst->u.lcaret.cnt-1; ++i )
 	    for ( j=i+1; j<pst->u.lcaret.cnt; ++j )
 		if ( pst->u.lcaret.carets[i]<pst->u.lcaret.carets[j] ) {
-		    int16 temp = pst->u.lcaret.carets[i];
+		    int16_t temp = pst->u.lcaret.carets[i];
 		    pst->u.lcaret.carets[i] = pst->u.lcaret.carets[j];
 		    pst->u.lcaret.carets[j] = temp;
 		}
@@ -3446,14 +3600,14 @@ return;
 	for ( i=0; i<pst->u.lcaret.cnt-1; ++i )
 	    for ( j=i+1; j<pst->u.lcaret.cnt; ++j )
 		if ( pst->u.lcaret.carets[i]>pst->u.lcaret.carets[j] ) {
-		    int16 temp = pst->u.lcaret.carets[i];
+		    int16_t temp = pst->u.lcaret.carets[i];
 		    pst->u.lcaret.carets[i] = pst->u.lcaret.carets[j];
 		    pst->u.lcaret.carets[j] = temp;
 		}
     }
 
     putshort(gdef,cnt);			/* this many carets */
-    offset = sizeof(uint16) + sizeof(uint16)*cnt;
+    offset = sizeof(uint16_t) + sizeof(uint16_t)*cnt;
     for ( i=0; i<cnt; ++i ) {
 	putshort(gdef,offset);
 	offset+=4;
@@ -3536,7 +3690,7 @@ return( 3 );
 return( 2 );			/* Ligature */
     }
 
-	/* I not quite sure what a componant glyph is. Probably something */
+	/* I not quite sure what a component glyph is. Probably something */
 	/*  that is not in the cmap table and is referenced in other glyphs */
 	/* (I've never seen it used by others) */
 	/* (Note: No glyph in a CID font can be components as all CIDs mean */
@@ -3552,7 +3706,7 @@ void otf_dumpgdef(struct alltabs *at, SplineFont *sf) {
     /* In spite of what the open type docs say, this table does appear to be */
     /*  required (at least the glyph class def table) if we do mark to base */
     /*  positioning */
-    /* I was wondering at the apperant contradiction: something can be both a */
+    /* I was wondering at the apparent contradiction: something can be both a */
     /*  base glyph and a ligature component, but it appears that the component*/
     /*  class is unused and everything is a base unless it is a ligature or */
     /*  mark */
@@ -3677,7 +3831,7 @@ return;					/* No anchor positioning, no ligature carets */
 
 	/* Mark Attachment Class Subtable */
     if ( sf->mark_class_cnt>0 ) {
-	uint16 *mclasses = ClassesFromNames(sf,sf->mark_classes,sf->mark_class_cnt,at->maxp.numGlyphs,NULL,false);
+	uint16_t *mclasses = ClassesFromNames(sf,sf->mark_classes,sf->mark_class_cnt,at->maxp.numGlyphs,NULL,false);
 	pos = ftell(at->gdef);
 	fseek(at->gdef,10,SEEK_SET);		/* location of mark attach table offset */
 	putshort(at->gdef,pos);
@@ -3753,8 +3907,8 @@ return( ret );
 static void ttf_math_dump_italic_top(FILE *mathf,struct alltabs *at, SplineFont *sf, int is_italic) {
     int i, gid, len;
     SplineChar *sc, **glyphs;
-    uint32 coverage_pos, coverage_table;
-    uint32 devtab_offset;
+    uint32_t coverage_pos, coverage_table;
+    uint32_t devtab_offset;
     DeviceTable *devtab;
 
     /* Figure out our glyph list (and count) */
@@ -3823,7 +3977,7 @@ return( 2+8*mkv->cnt-4 );
 static int ttf_math_dump_mathkernvertex(FILE *mathf,struct mathkernvertex *mkv,
 	int devtab_pos) {
     int i;
-    uint32 here = ftell(mathf);
+    uint32_t here = ftell(mathf);
 
     putshort(mathf,mkv->cnt-1);
 
@@ -3860,7 +4014,7 @@ static void ttf_math_dump_mathkerndevtab(FILE *mathf,struct mathkernvertex *mkv)
 static void ttf_math_dump_mathkern(FILE *mathf,struct alltabs *at, SplineFont *sf) {
     int i, gid, len;
     SplineChar *sc, **glyphs;
-    uint32 coverage_pos, coverage_table, kr_pos, midpos2;
+    uint32_t coverage_pos, coverage_table, kr_pos, midpos2;
 
     /* Figure out our glyph list (and count) */
     for ( i=len=0; i<at->gi.gcnt; ++i )
@@ -3979,12 +4133,12 @@ return( 0 );
 return( 6+10*gv->part_cnt );
 }
 
-static uint32 ttf_math_dump_mathglyphconstructiontable(FILE *mathf,
-	struct glyphvariants *gv,SplineFont *sf, uint32 pos,int is_v) {
+static uint32_t ttf_math_dump_mathglyphconstructiontable(FILE *mathf,
+	struct glyphvariants *gv,SplineFont *sf, uint32_t pos,int is_v) {
     char *pt, *start;
     int ch, cnt;
     SplineChar *sc;
-    uint32 here = ftell(mathf);
+    uint32_t here = ftell(mathf);
     DBounds b;
 
     putshort(mathf,gv->part_cnt==0? 0 : pos-here);
@@ -4030,10 +4184,10 @@ static uint32 ttf_math_dump_mathglyphconstructiontable(FILE *mathf,
 return( pos + gvc_len(gv));
 }
 
-static uint32 ttf_math_dump_mathglyphassemblytable(FILE *mathf,
-	struct glyphvariants *gv,SplineFont *sf, uint32 devtab_pos) {
+static uint32_t ttf_math_dump_mathglyphassemblytable(FILE *mathf,
+	struct glyphvariants *gv,SplineFont *sf, uint32_t devtab_pos) {
     SplineChar *sc;
-    uint32 here = ftell(mathf);
+    uint32_t here = ftell(mathf);
     int i;
 
     if ( gv->part_cnt==0 )
@@ -4062,7 +4216,7 @@ return(devtab_pos);
 static void ttf_math_dump_glyphvariant(FILE *mathf,struct alltabs *at, SplineFont *sf) {
     int i, gid, vlen, hlen;
     SplineChar *sc, **vglyphs, **hglyphs;
-    uint32 coverage_pos, coverage_table, offset, pos, assembly_pos;
+    uint32_t coverage_pos, coverage_table, offset, pos, assembly_pos;
 
     /* Figure out our glyph list (and count) */
     for ( i=vlen=hlen=0; i<at->gi.gcnt; ++i )
@@ -4102,14 +4256,14 @@ static void ttf_math_dump_glyphvariant(FILE *mathf,struct alltabs *at, SplineFon
     }
     assembly_pos = pos = (coverage_pos-2)+offset;
     for ( i=0; i<vlen; ++i ) {
-	/*uint32 start = ftell(mathf);*/
+	/*uint32_t start = ftell(mathf);*/
 	pos = ttf_math_dump_mathglyphconstructiontable(mathf,
 		vglyphs[i]->vert_variants,sf,pos,true);
 	/*if ( ftell(mathf)-start != gv_len(sf,vglyphs[i]->vert_variants))*/
 	    /*IError("v gv_len incorrect");*/
     }
     for ( i=0; i<hlen; ++i ) {
-	/*uint32 start = ftell(mathf);*/
+	/*uint32_t start = ftell(mathf);*/
 	pos = ttf_math_dump_mathglyphconstructiontable(mathf,
 		hglyphs[i]->horiz_variants,sf,pos,false);
 	/*if ( ftell(mathf)-start != gv_len(sf,hglyphs[i]->horiz_variants))*/
@@ -4154,7 +4308,7 @@ void otf_dump_math(struct alltabs *at, SplineFont *sf) {
     FILE *mathf;
     struct MATH *math;
     int i;
-    uint32 devtab_offsets[60], const_start, gi_start, v_start;
+    uint32_t devtab_offsets[60], const_start, gi_start, v_start;
     int bits = MathBits(at,sf);
 
     if ( sf->MATH!=NULL )
@@ -4175,8 +4329,8 @@ void otf_dump_math(struct alltabs *at, SplineFont *sf) {
     memset(devtab_offsets,0,sizeof(devtab_offsets));
     const_start = ftell(mathf);
     for ( i=0; math_constants_descriptor[i].script_name!=NULL; ++i ) {
-	int16 *pos = (int16 *) (((char *) math) + math_constants_descriptor[i].offset );
-	if ( pos == (int16 *) &math->MinConnectorOverlap )
+	int16_t *pos = (int16_t *) (((char *) math) + math_constants_descriptor[i].offset );
+	if ( pos == (int16_t *) &math->MinConnectorOverlap )
     continue;		/* Actually lives in the Variant table, not here */
 	putshort(mathf, *pos);
 	if ( math_constants_descriptor[i].devtab_offset != -1 ) {
@@ -4185,12 +4339,12 @@ void otf_dump_math(struct alltabs *at, SplineFont *sf) {
 	}
     }
     for ( i=0; math_constants_descriptor[i].script_name!=NULL; ++i ) {
-	int16 *pos = (int16 *) (((char *) math) + math_constants_descriptor[i].offset );
+	int16_t *pos = (int16_t *) (((char *) math) + math_constants_descriptor[i].offset );
 	DeviceTable **devtab = (DeviceTable **) (((char *) math) + math_constants_descriptor[i].devtab_offset );
-	if ( pos == (int16 *) &math->MinConnectorOverlap )
+	if ( pos == (int16_t *) &math->MinConnectorOverlap )
     continue;		/* Actually lives in the Variant table, not here */
 	if ( math_constants_descriptor[i].devtab_offset >= 0 && *devtab!=NULL ) {
-	    uint32 here = ftell(mathf);
+	    uint32_t here = ftell(mathf);
 	    fseek(mathf,devtab_offsets[i],SEEK_SET);
 	    putshort(mathf, here-const_start);
 	    fseek(mathf,here,SEEK_SET);
@@ -4268,7 +4422,7 @@ void otf_dump_math(struct alltabs *at, SplineFont *sf) {
 }
 
 struct taglist {
-    uint32 tag;
+    uint32_t tag;
     struct taglist *next;
 };
 
@@ -4381,7 +4535,7 @@ static void dump_minmax(FILE *basef,struct baselangextent *bl) {
 void otf_dumpbase(struct alltabs *at, SplineFont *sf) {
     FILE *basef;
     int i,j, cnt, lcnt;
-    uint32 here, bsl;
+    uint32_t here, bsl;
     struct basescript *bs;
     struct baselangextent *bl, *dflt;
     int offset;
@@ -4429,7 +4583,7 @@ return;
 
 	/* BaseScript table */
 	for ( bs=base->scripts, cnt=0; bs!=NULL; bs=bs->next, ++cnt ) {
-	    uint32 bst = ftell(basef);
+	    uint32_t bst = ftell(basef);
 	    fseek(basef,bsl+2+6*cnt+4,SEEK_SET);
 	    putshort(basef,bst-bsl);
 	    fseek(basef,bst,SEEK_SET);
@@ -4469,7 +4623,7 @@ return;
 	    if ( dflt!=NULL )
 		dump_minmax(basef,dflt);
 	    for ( bl=bs->langs, dflt=NULL, lcnt=0; bl!=NULL; bl=bl->next ) if ( bl->lang!=DEFAULT_LANG ) {
-		uint32 here = ftell(basef);
+		uint32_t here = ftell(basef);
 		fseek(basef,bst+6+6*lcnt+4,SEEK_SET);
 		putshort(basef,here-bst);
 		fseek(basef,here,SEEK_SET);
@@ -4618,8 +4772,8 @@ return;
     *_POS = POS;
 }
 
-static uint32 jstf_dumplklist(FILE *jstf,OTLookup **PS,uint32 base) {
-    uint32 here;
+static uint32_t jstf_dumplklist(FILE *jstf,OTLookup **PS,uint32_t base) {
+    uint32_t here;
     int i;
 
     if ( PS==NULL )
@@ -4634,9 +4788,9 @@ return( 0 );
 return( here - base );
 }
 
-static uint32 jstf_dumpmaxlookups(FILE *jstf,SplineFont *sf,struct alltabs *at,
-	OTLookup **maxes,uint32 base) {
-    uint32 here, lbase;
+static uint32_t jstf_dumpmaxlookups(FILE *jstf,SplineFont *sf,struct alltabs *at,
+	OTLookup **maxes,uint32_t base) {
+    uint32_t here, lbase;
     int cnt,i;
     int scnt, j;
     struct lookup_subtable *sub;
@@ -4689,7 +4843,7 @@ return( here - base );
 void otf_dumpjstf(struct alltabs *at, SplineFont *sf) {
     FILE *jstf;
     int i, cnt, lcnt, offset;
-    uint32 here, base;
+    uint32_t here, base;
     Justify *jscript;
     struct jstf_lang *jlang;
 
@@ -4765,8 +4919,8 @@ return;
 		putshort(jstf,0);
 	    for ( i=0; i<jlang->cnt; ++i ) {
 		OTLookup **enSUB, **enPOS, **disSUB, **disPOS;
-		uint32 enSUBoff, enPOSoff, disSUBoff, disPOSoff, maxOff;
-		uint32 pbase;
+		uint32_t enSUBoff, enPOSoff, disSUBoff, disPOSoff, maxOff;
+		uint32_t pbase;
 		pbase = ftell(jstf);
 		fseek(jstf,here+2+i*2,SEEK_SET);
 		putshort(jstf,pbase-here);
@@ -4835,7 +4989,7 @@ void otf_dump_dummydsig(struct alltabs *at, SplineFont *sf) {
     /* I think it is even more stupid that MS choses this useless table as a*/
     /*  mark of whether a ttf font is OpenType or not. */
     /* But users want their fonts to show up as OpenType under MS. And I'm  */
-    /*  told an empty DSIG table works for that. So... a truely pointless   */
+    /*  told an empty DSIG table works for that. So... a truly pointless   */
     /*  instance of a pointless table. I suppose that's a bit ironic. */
 
     at->dsigf = dsigf = GFileTmpfile();

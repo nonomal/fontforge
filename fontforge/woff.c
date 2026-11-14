@@ -89,10 +89,10 @@ return( true );
         }
         if (strm.avail_in == 0)
     break;
-        strm.next_in = in;
+        strm.next_in = (Bytef *)in;
         do {
             strm.avail_out = CHUNK;
-            strm.next_out = out;
+            strm.next_out = (Bytef *)out;
             ret = inflate(&strm, Z_NO_FLUSH);
 	    if ( ret!=Z_OK && ret!=Z_STREAM_END ) {
 		(void)inflateEnd(&strm);
@@ -154,10 +154,10 @@ return(0);
         }
         if (strm.avail_in == 0)
     break;
-        strm.next_in = in;
+        strm.next_in = (Bytef *)in;
         do {
             strm.avail_out = CHUNK;
-            strm.next_out = out;
+            strm.next_out = (Bytef *)out;
             ret = deflate(&strm, len==0 ? Z_FINISH : Z_NO_FLUSH);
 	    if ( ret==Z_STREAM_ERROR ) {
 		(void)deflateEnd(&strm);
@@ -192,12 +192,10 @@ return( strm.total_out );
 
 SplineFont *_SFReadWOFF(FILE *woff,int flags,enum openflags openflags, char *filename,char *chosenname,struct fontdict *fd) {
     int flavour;
-    int iscff;
     int len, len_stated;
     int num_tabs;
     int major, minor;
     uint32_t metaOffset, metaLenCompressed, metaLenUncompressed;
-    int privOffset, privLength;
     int i,j,err;
     int tag, offset, compLen, uncompLen, checksum;
     FILE *sfnt;
@@ -216,7 +214,6 @@ SplineFont *_SFReadWOFF(FILE *woff,int flags,enum openflags openflags, char *fil
         }
     }
     flavour = getlong(woff);
-    iscff = (flavour==CHR('O','T','T','O'));
     len_stated = getlong(woff);
     if ( len!=len_stated ) {
 	LogError(_("File length as specified in the WOFF header does not match the actual file length."));
@@ -235,8 +232,8 @@ return( NULL );
     metaOffset = (uint32_t)getlong(woff);
     metaLenCompressed = (uint32_t)getlong(woff);
     metaLenUncompressed = (uint32_t)getlong(woff);
-    privOffset = getlong(woff);
-    privLength = getlong(woff);
+    /*privOffset =*/ getlong(woff);
+    /*privLength =*/ getlong(woff);
 
     sfnt = GFileTmpfile();
     if ( sfnt==NULL ) {
@@ -339,23 +336,23 @@ return( NULL );
 	* NULL first
 	*/
 	if(metaLenUncompressed == UINT32_MAX) {
-		LogError(_("WOFF uncompressed metadata section too large.\n"));
+		LogError(_("WOFF uncompressed metadata section too large."));
 		sf->woffMetadata = NULL; 
 		return( sf );
 	}
 	if(metaLenCompressed == UINT32_MAX) {
-		LogError(_("WOFF compressed metadata section too large.\n"));
+		LogError(_("WOFF compressed metadata section too large."));
 		sf->woffMetadata = NULL;
 		return( sf );
 	}
 	sf->woffMetadata = malloc(metaLenUncompressed+1);
 	if(sf->woffMetadata == NULL) { 
-		LogError(_("WOFF uncompressed metadata section too large.\n"));
+		LogError(_("WOFF uncompressed metadata section too large."));
 		return( sf );
 	}
 	unsigned char *temp = malloc(metaLenCompressed+1);
 	if(temp == NULL) { 
-		LogError(_("WOFF compressed metadata section too large.\n"));
+		LogError(_("WOFF compressed metadata section too large."));
 		free(sf->woffMetadata); 
 		sf->woffMetadata = NULL;
 		free(temp);
@@ -390,9 +387,24 @@ compareOffsets(const void * lhs, const void * rhs)
            0;
 }
 
+static FILE* WriteSfnt(SplineFont *sf, enum fontformat format,
+	int32_t *bsizes, enum bitmapformat bf,int flags,EncMap *enc,int layer) {
+    FILE *sfnt = GFileTmpfile();
+    if (!sfnt) {
+        return NULL;
+    }
+    enum fontformat inner_format = (isttflike_ff(format)) ? ff_ttf :
+                                   (sf->subfonts!=NULL) ? ff_otfcid : ff_otf;
+    bool ret = _WriteTTFFont(sfnt, sf, inner_format, bsizes, bf, flags, enc, layer);
+    if (!ret) {
+        fclose(sfnt);
+        return NULL;
+    }
+    return sfnt;
+}
+
 int _WriteWOFFFont(FILE *woff,SplineFont *sf, enum fontformat format,
-	int32 *bsizes, enum bitmapformat bf,int flags,EncMap *enc,int layer) {
-    int ret;
+	int32_t *bsizes, enum bitmapformat bf,int flags,EncMap *enc,int layer) {
     FILE *sfnt;
     int major=sf->woffMajor, minor=sf->woffMinor;
     int flavour, num_tabs;
@@ -427,13 +439,9 @@ int _WriteWOFFFont(FILE *woff,SplineFont *sf, enum fontformat format,
 	}
     }
 
-    format = sf->subfonts!=NULL ? ff_otfcid :
-		sf->layers[layer].order2 ? ff_ttf : ff_otf;
-    sfnt = GFileTmpfile();
-    ret = _WriteTTFFont(sfnt,sf,format,bsizes,bf,flags,enc,layer);
-    if ( !ret ) {
-	fclose(sfnt);
-return( ret );
+    sfnt = WriteSfnt(sf,format,bsizes,bf,flags,enc,layer);
+    if ( !sfnt ) {
+        return false ;
     }
 
     fseek(sfnt,0,SEEK_END);
@@ -443,7 +451,7 @@ return( ret );
     flavour = getlong(sfnt);
     /* The woff standard says we should accept all flavours of sfnt, so can't */
     /*  test flavour to make sure we've got a valid sfnt */
-    /* But we can test the rest of the header for consistancy */
+    /* But we can test the rest of the header for consistency */
     num_tabs = getushort(sfnt);
     (void) getushort(sfnt);
     (void) getushort(sfnt);
@@ -465,7 +473,7 @@ return( ret );
         return false;
     }
     for ( i=0; i<num_tabs; ++i ) {
-        fseek(sfnt,(3 + 4*i + 2)*sizeof(int32),SEEK_SET);
+        fseek(sfnt,(3 + 4*i + 2)*sizeof(int32_t),SEEK_SET);
         tableOrder[i].index = i;
         tableOrder[i].offset = getlong(sfnt);
     }
@@ -492,7 +500,7 @@ return( ret );
 	putlong(woff,0);
 
     for ( i=0; i<num_tabs; ++i ) {
-	fseek(sfnt,(3 + 4*tableOrder[i].index)*sizeof(int32),SEEK_SET);
+	fseek(sfnt,(3 + 4*tableOrder[i].index)*sizeof(int32_t),SEEK_SET);
 	tag = getlong(sfnt);
 	checksum = getlong(sfnt);
 	offset = getlong(sfnt);
@@ -506,7 +514,7 @@ return( ret );
 	    if ( ftell(woff)&2 )
 		putshort(woff,0);
 	}
-	fseek(woff,tab_start+(5*tableOrder[i].index)*sizeof(int32),SEEK_SET);
+	fseek(woff,tab_start+(5*tableOrder[i].index)*sizeof(int32_t),SEEK_SET);
 	putlong(woff,tag);
 	putlong(woff,newoffset);
 	putlong(woff,compLen);
@@ -548,7 +556,7 @@ return( true );		/* No errors */
 }
 
 int WriteWOFFFont(char *fontname,SplineFont *sf, enum fontformat format,
-	int32 *bsizes, enum bitmapformat bf,int flags,EncMap *enc,int layer) {
+	int32_t *bsizes, enum bitmapformat bf,int flags,EncMap *enc,int layer) {
     FILE *woff;
     int ret;
 
@@ -632,30 +640,20 @@ int WriteWOFF2Font(char *fontname, SplineFont *sf, enum fontformat format, int32
 
 int _WriteWOFF2Font(FILE *fp, SplineFont *sf, enum fontformat format, int32_t *bsizes, enum bitmapformat bf, int flags, EncMap *enc, int layer)
 {
-    FILE *tmp = GFileTmpfile();
-    if (!tmp) {
-        return 0;
-    }
-    int ret = _WriteTTFFont(tmp, sf, format, bsizes, bf, flags, enc, layer);
-    if (!ret) {
-        fclose(tmp);
-        return 0;
+    FILE* sfnt = WriteSfnt(sf,format,bsizes,bf,flags,enc,layer);
+    if ( !sfnt ) {
+        return false ;
     }
 
-    size_t raw_input_length = 0;
-    uint8_t *raw_input = ReadFileToBuffer(tmp, &raw_input_length);
-    fclose(tmp);
+    size_t raw_input_length = 0, comp_size;
+    uint8_t *raw_input = ReadFileToBuffer(sfnt, &raw_input_length);
+    fclose(sfnt);
     if (!raw_input) {
         return 0;
     }
 
-    size_t comp_size = woff2_max_woff2_compressed_size(raw_input, raw_input_length);
-    uint8_t *comp_buffer = calloc(comp_size, 1);
-    if (!comp_buffer) {
-        free(raw_input);
-        return 0;
-    }
-    ret = woff2_convert_ttf_to_woff2(raw_input, raw_input_length, comp_buffer, &comp_size);
+    uint8_t *comp_buffer;
+    int ret = woff2_convert_ttf_to_woff2(raw_input, raw_input_length, &comp_buffer, &comp_size);
     free(raw_input);
     if (!ret) {
         free(comp_buffer);
@@ -669,23 +667,14 @@ int _WriteWOFF2Font(FILE *fp, SplineFont *sf, enum fontformat format, int32_t *b
 
 SplineFont *_SFReadWOFF2(FILE *fp, int flags, enum openflags openflags, char *filename,char *chosenname,struct fontdict *fd)
 {
-    size_t raw_input_length = 0;
+    size_t raw_input_length = 0, decomp_size;
     if (!fp) {
         return NULL;
     }
 
     uint8_t *raw_input = ReadFileToBuffer(fp, &raw_input_length);
-
-    size_t decomp_size = woff2_compute_woff2_final_size(raw_input, raw_input_length);
-    if (decomp_size > WOFF2_DEFAULT_MAX_SIZE) {
-        decomp_size = WOFF2_DEFAULT_MAX_SIZE;
-    }
-    uint8_t *decomp_buffer = calloc(decomp_size, 1);
-    if (!decomp_buffer) {
-        free(raw_input);
-        return NULL;
-    }
-    int success = woff2_convert_woff2_to_ttf(raw_input, raw_input_length, decomp_buffer, &decomp_size);
+    uint8_t *decomp_buffer;
+    int success = woff2_convert_woff2_to_ttf(raw_input, raw_input_length, &decomp_buffer, &decomp_size);
     free(raw_input);
     if (!success) {
         free(decomp_buffer);

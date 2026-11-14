@@ -50,8 +50,8 @@
 #include "tottfgpos.h"
 #include "ustring.h"
 #include "utype.h"
-#include "views.h"
 
+#include "ffunistd.h"
 #include <math.h>
 
 #ifndef HAVE_EXECINFO_H
@@ -77,8 +77,8 @@ int export_clipboard = 1;
 int maxundoes = 120;		/* -1 is infinite */
 int preserve_hint_undoes = true;
 
-static uint8 *bmpcopy(uint8 *bitmap,int bytes_per_line, int lines) {
-    uint8 *ret = malloc(bytes_per_line*lines);
+static uint8_t *bmpcopy(uint8_t *bitmap,int bytes_per_line, int lines) {
+    uint8_t *ret = malloc(bytes_per_line*lines);
     memcpy(ret,bitmap,bytes_per_line*lines);
 return( ret );
 }
@@ -93,6 +93,11 @@ return( NULL );
 	free(new->layers);
 	*new = *crefs;
 	new->layers = calloc(new->layer_cnt,sizeof(struct reflayer));
+	for ( layer=0; layer<new->layer_cnt; ++layer ) {
+	    new->layers[layer] = crefs->layers[layer];
+	    new->layers[layer].splines = SplinePointListCopy(crefs->layers[layer].splines);
+	    new->layers[layer].images = NULL;
+	}
 	new->next = NULL;
 	if ( last==NULL )
 	    head = last = new;
@@ -655,7 +660,7 @@ Undoes *CVPreserveStateHints(CharViewBase *cv) {
     if ( CVLayer(cv)==ly_fore ) {
 	undo->undotype = ut_statehint;
 	undo->u.state.hints = UHintCopy(cv->sc,true);
-	undo->u.state.instrs = (uint8*) copyn((char*) cv->sc->ttf_instrs, cv->sc->ttf_instrs_len);
+	undo->u.state.instrs = (uint8_t*) copyn((char*) cv->sc->ttf_instrs, cv->sc->ttf_instrs_len);
 	undo->u.state.instrs_len = cv->sc->ttf_instrs_len;
     }
 return( undo );
@@ -677,7 +682,7 @@ return( NULL );
     undo->was_modified = sc->changed;
     undo->undotype = ut_hints;
     undo->u.state.hints = UHintCopy(sc,true);
-    undo->u.state.instrs = (uint8*) copyn((char *) sc->ttf_instrs, sc->ttf_instrs_len);
+    undo->u.state.instrs = (uint8_t*) copyn((char *) sc->ttf_instrs, sc->ttf_instrs_len);
     undo->u.state.instrs_len = sc->ttf_instrs_len;
     undo->copied_from = sc->parent;
 return( AddUndo(undo,&sc->layers[layer].undoes,&sc->layers[layer].redoes));
@@ -709,7 +714,7 @@ return(NULL);
     if ( dohints ) {
 	undo->undotype = ut_statehint;
 	undo->u.state.hints = UHintCopy(sc,true);
-	undo->u.state.instrs = (uint8 *) copyn((char *) sc->ttf_instrs, sc->ttf_instrs_len);
+	undo->u.state.instrs = (uint8_t *) copyn((char *) sc->ttf_instrs, sc->ttf_instrs_len);
 	undo->u.state.instrs_len = sc->ttf_instrs_len;
 	if ( dohints==2 ) {
 	    undo->undotype = ut_statename;
@@ -924,7 +929,7 @@ static void SCUndoAct(SplineChar *sc,int layer, Undoes *undo) {
       } break;
       case ut_hints: {
 	void *hints = UHintCopy(sc,false);
-	uint8 *instrs = sc->ttf_instrs;
+	uint8_t *instrs = sc->ttf_instrs;
 	int instrs_len = sc->ttf_instrs_len;
 	ExtractHints(sc,undo->u.state.hints,false);
 	sc->ttf_instrs = undo->u.state.instrs;
@@ -932,7 +937,6 @@ static void SCUndoAct(SplineChar *sc,int layer, Undoes *undo) {
 	undo->u.state.hints = hints;
 	undo->u.state.instrs = instrs;
 	undo->u.state.instrs_len = instrs_len;
-	SCOutOfDateBackground(sc);
       } break;
       case ut_state: case ut_tstate: case ut_statehint: case ut_statename: {
 	Layer *head = layer==ly_grid ? &sc->parent->grid : &sc->layers[layer];
@@ -968,7 +972,7 @@ static void SCUndoAct(SplineChar *sc,int layer, Undoes *undo) {
 	if ( layer==ly_fore &&
 		(undo->undotype==ut_statehint || undo->undotype==ut_statename)) {
 	    void *hints = UHintCopy(sc,false);
-	    uint8 *instrs = sc->ttf_instrs;
+	    uint8_t *instrs = sc->ttf_instrs;
 	    int instrs_len = sc->ttf_instrs_len;
 	    ExtractHints(sc,undo->u.state.hints,false);
 	    sc->ttf_instrs = undo->u.state.instrs;
@@ -981,7 +985,6 @@ static void SCUndoAct(SplineChar *sc,int layer, Undoes *undo) {
 	    ImageList *images = ImageListCopy(head->images);
 	    FixupImages(sc,undo->u.state.images,layer);
 	    undo->u.state.images = images;
-	    SCOutOfDateBackground(sc);
 	}
 	undo->u.state.splines = spl;
 	if ( undo->u.state.lbearingchange ) {
@@ -1086,6 +1089,7 @@ void _CVRestoreTOriginalState(CharViewBase *cv,PressedOn *p) {
 		    SplinePointListFree(cv->layerheads[cv->drawmode]->splines);
 		    cv->layerheads[cv->drawmode]->splines = SplinePointListCopy(undo->u.state.splines);
 		    memcpy(&ref->transform,&uref->transform,sizeof(ref->transform));
+		    ref->layers[j].splines = SplinePointListCopy(uref->layers[j].splines);
 		}
     }
     for ( img=cv->layerheads[cv->drawmode]->images, uimg=undo->u.state.images; uimg!=NULL;
@@ -1095,6 +1099,9 @@ void _CVRestoreTOriginalState(CharViewBase *cv,PressedOn *p) {
 	img->xscale = uimg->xscale;
 	img->yscale = uimg->yscale;
     }
+    /* Restore metrics during incremental transforms to avoid mousemove drift. */
+    cv->sc->width  = undo->u.state.width;
+    cv->sc->vwidth = undo->u.state.vwidth;
 }
 
 void _CVUndoCleanup(CharViewBase *cv,PressedOn *p) {
@@ -1131,7 +1138,7 @@ void CVRemoveTopUndo(CharViewBase *cv) {
 }
 
 static void BCUndoAct(BDFChar *bc,Undoes *undo) {
-    uint8 *b;
+    uint8_t *b;
     int temp;
     BDFFloat *sel;
     BDFRefChar *ref, *head, *prev = NULL, *uhead = NULL;
@@ -1252,7 +1259,7 @@ static void CopyBufferFreeGrab(void) {
 static void noop(void *UNUSED(_copybuffer)) {
 }
 
-static void *copybufferPt2str(void *UNUSED(_copybuffer),int32 *len) {
+static void *copybufferPt2str(void *UNUSED(_copybuffer),int32_t *len) {
     Undoes *cur = &copybuffer;
     SplinePoint *sp;
     char buffer[100];
@@ -1287,7 +1294,7 @@ return( copy(""));
 return( copy(buffer));
 }
 
-static void *copybufferName2str(void *UNUSED(_copybuffer),int32 *len) {
+static void *copybufferName2str(void *UNUSED(_copybuffer),int32_t *len) {
     Undoes *cur = &copybuffer;
 
     while ( cur ) {
@@ -1378,7 +1385,7 @@ return( false );
 return( true );
 }
 
-static void *copybuffer2svg(void *UNUSED(_copybuffer),int32 *len) {
+static void *copybuffer2svg(void *UNUSED(_copybuffer),int32_t *len) {
     Undoes *cur = &copybuffer;
     SplineChar dummy;
     static Layer layers[2];
@@ -1445,7 +1452,7 @@ return( ret );
 }
 
 /* When a selection contains multiple glyphs, save them into an svg font */
-static void *copybuffer2svgmult(void *UNUSED(_copybuffer),int32 *len) {
+static void *copybuffer2svgmult(void *UNUSED(_copybuffer),int32_t *len) {
     Undoes *cur = &copybuffer, *c, *c2;
     SplineFont *sf;
     int cnt,i;
@@ -1511,7 +1518,7 @@ return( copy(""));
 return( ret );
 }
 
-static void *copybuffer2eps(void *UNUSED(_copybuffer),int32 *len) {
+static void *copybuffer2eps(void *UNUSED(_copybuffer),int32_t *len) {
     Undoes *cur = &copybuffer;
     SplineChar dummy;
     static Layer layers[2];
@@ -1906,7 +1913,7 @@ static Undoes *SCCopyAllLayer(SplineChar *sc,enum fvcopy_type full,int layer) {
 	    cur->u.state.anchor = AnchorPointsCopy(sc->anchor);
 	    cur->u.state.hints = UHintCopy(sc,true);
 	    if ( copyttfinstr ) {
-		cur->u.state.instrs = (uint8 *) copyn((char *) sc->ttf_instrs, sc->ttf_instrs_len);
+		cur->u.state.instrs = (uint8_t *) copyn((char *) sc->ttf_instrs, sc->ttf_instrs_len);
 		cur->u.state.instrs_len = sc->ttf_instrs_len;
 	    }
 	    cur->u.state.unicodeenc = sc->unicodeenc;
@@ -2142,7 +2149,7 @@ int SCClipboardHasPasteableContents(void) {
 }
 
 static void SCCheckXClipboard(SplineChar *sc,int layer,int doclear) {
-    int type; int32 len;
+    int type; int32_t len;
     const char *mime;
     char *paste;
     FILE *temp;
@@ -2179,7 +2186,7 @@ return;
 }
 
 static void XClipFontToFFClip(void) {
-    int32 len;
+    int32_t len;
     int i;
     char *paste;
     SplineFont *sf;
@@ -2272,11 +2279,7 @@ return;
 	next = ap->next;
 	for ( test=sc->anchor; test!=NULL; test=test->next )
 	    if ( test->anchor==ap->anchor ) {
-		if (( test->type==at_centry && ap->type==at_cexit) ||
-			(test->type==at_cexit && ap->type==at_centry))
-		    /* It's ok */;
-		else if ( test->type!=at_baselig || ap->type!=at_baselig ||
-			test->lig_index==ap->lig_index )
+		if ( test->type==ap->type || ( test->type==at_baselig && test->lig_index==ap->lig_index ))
 	break;
 	    }
 	if ( test!=NULL ) {
@@ -2366,8 +2369,7 @@ static void _PasteToSC(SplineChar *sc,Undoes *paster,FontViewBase *fv,int pastei
 	if ( !pasteinto ) {
 	    if ( !sc->layers[layer].background &&
 		    SCWasEmpty(sc,pasteinto==0?layer:-1) ) {
-		if ( !sc->parent->onlybitmaps )
-		    SCSynchronizeWidth(sc,width,sc->width,fv);
+		SCSynchronizeWidth(sc,width,sc->width,fv);
 		sc->vwidth = vwidth;
 	    }
 	    SplinePointListsFree(sc->layers[layer].splines);
@@ -2460,7 +2462,6 @@ static void _PasteToSC(SplineChar *sc,Undoes *paster,FontViewBase *fv,int pastei
 		new->next = sc->layers[layer].images;
 		sc->layers[layer].images = new;
 	    }
-	    SCOutOfDateBackground(sc);
 	}
 	if ( (paster->undotype==ut_statehint || paster->undotype==ut_statename ) &&
 		!sc->layers[layer].background ) {
@@ -2470,7 +2471,7 @@ static void _PasteToSC(SplineChar *sc,Undoes *paster,FontViewBase *fv,int pastei
 		    free(sc->ttf_instrs);
 		    if ( paster->u.state.instrs_len!=0 && sc->layers[layer].order2 &&
 			    InstrsSameParent(sc,paster->copied_from)) {
-			sc->ttf_instrs = (uint8 *) copyn((char *) paster->u.state.instrs,paster->u.state.instrs_len);
+			sc->ttf_instrs = (uint8_t *) copyn((char *) paster->u.state.instrs,paster->u.state.instrs_len);
 			sc->ttf_instrs_len = paster->u.state.instrs_len;
 		    } else {
 			sc->ttf_instrs = NULL;
@@ -3056,7 +3057,6 @@ return;
 		new->next = cvsc->layers[ly].images;
 		cvsc->layers[ly].images = new;
 	    }
-	    SCOutOfDateBackground(cvsc);
 	} else if ( paster->undotype==ut_statehint && cv->container==NULL &&
 		!cv->layerheads[cv->drawmode]->background ) {
 	    ExtractHints(cvsc,paster->u.state.hints,true);
@@ -3064,7 +3064,7 @@ return;
 		free(cvsc->ttf_instrs);
 		if ( paster->u.state.instrs_len!=0 && cv->layerheads[cv->drawmode]->order2 &&
 			InstrsSameParent(cvsc,paster->copied_from)) {
-		    cvsc->ttf_instrs = (uint8 *) copyn((char *) paster->u.state.instrs,paster->u.state.instrs_len);
+		    cvsc->ttf_instrs = (uint8_t *) copyn((char *) paster->u.state.instrs,paster->u.state.instrs_len);
 		    cvsc->ttf_instrs_len = paster->u.state.instrs_len;
 		} else {
 		    cvsc->ttf_instrs = NULL;
@@ -3248,7 +3248,7 @@ static Undoes *BCCopyAll(BDFChar *bc,int pixelsize, int depth, enum fvcopy_type 
 	    }
 	} else {		/* Or just make a reference */
 	    cur->u.bmpstate.bytes_per_line = 1;
-	    cur->u.bmpstate.bitmap = calloc(1,sizeof(uint8));
+	    cur->u.bmpstate.bitmap = calloc(1,sizeof(uint8_t));
 
 	    ref = calloc(1,sizeof(BDFRefChar));
 	    ref->bdfc = bc;
@@ -3283,7 +3283,7 @@ void BCCopySelected(BDFChar *bc,int pixelsize,int depth) {
 	    copybuffer.undotype = ut_bitmap;
 	    copybuffer.u.bmpstate.width = bc->width;
 	    copybuffer.u.bmpstate.bytes_per_line = 1;
-	    copybuffer.u.bmpstate.bitmap = calloc(1,sizeof(uint8));
+	    copybuffer.u.bmpstate.bitmap = calloc(1,sizeof(uint8_t));
 	    copybuffer.u.bmpstate.selection = NULL;
 	} else {
 	    copybuffer.undotype = ut_bitmapsel;
@@ -3420,7 +3420,7 @@ void FVCopyWidth(FontViewBase *fv,enum undotype ut) {
     copybuffer.u.multiple.mult = head;
     copybuffer.copied_from = fv->sf;
     if ( !any )
-	LogError( _("No selection\n") );
+	LogError( _("No selection") );
 }
 
 void FVCopyAnchors(FontViewBase *fv) {
@@ -3448,7 +3448,7 @@ void FVCopyAnchors(FontViewBase *fv) {
     copybuffer.u.multiple.mult = head;
     copybuffer.copied_from = fv->sf;
     if ( !any )
-	LogError( _("No selection\n") );
+	LogError( _("No selection") );
 }
 
 void FVCopy(FontViewBase *fv, enum fvcopy_type fullcopy) {
@@ -3602,7 +3602,7 @@ void PasteIntoFV(FontViewBase *fv,int pasteinto,real trans[6]) {
     BDFFont *bdf;
     int i, j, cnt=0, gid;
     int yestoall=0, first=true;
-    uint8 *oldsel = fv->selected;
+    uint8_t *oldsel = fv->selected;
     SplineFont *sf = fv->sf, *origsf = sf;
     MMSet *mm = sf->mm;
     struct sfmergecontext mc;
@@ -3741,7 +3741,7 @@ return;
     /*  contain references, and the width of the original glyph is the same as*/
     /*  the width of the original referred character, then we should make sure */
     /*  that the new width of the glyph is the same as the current width of   */
-    /*  the referred char. We can't do this earlier because of foreward refs.  */
+    /*  the referred char. We can't do this earlier because of forward refs.  */
     for ( i=0; i<fv->map->enccount; ++i ) if ( fv->selected[i] ) {
 	SplineChar *sc = SFMakeChar(sf,fv->map,i);
 	if ( sc->layers[ly_fore].refs!=NULL && sc->layers[ly_fore].splines==NULL ) {

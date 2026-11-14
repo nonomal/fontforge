@@ -146,7 +146,6 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
     int err;
     GWindow sw = sd->gw;
     GGadget *clg;
-    const char *msg;
 
     assert( sd->si!=NULL );
     if ( isapply )
@@ -502,6 +501,7 @@ static int stroke_sub_e_h(GWindow gw, GEvent *event) {
       case et_mouseup: case et_mousedown: case et_mousemove:
 return( false );
       break;
+      default: break;
     }
 return( true );
 }
@@ -531,7 +531,6 @@ struct cvcontainer_funcs stroke_funcs = {
 
 
 static void StrokeInit(StrokeDlg *sd) {
-    real transform[6];
 
     sd->base.funcs = &stroke_funcs;
 
@@ -798,7 +797,7 @@ static void MakeStrokeDlg(void *cv, void (*strokeit)(void *,StrokeInfo *,int),
 	gcd[gcdoff].gd.popup_msg = _(
 	    "A calligraphic pen or an elliptical pen has two widths\n"
 	    "(which may be the same, giving a circular or square pen,\n"
-	    "or different giving an eliptical or rectangular pen).");
+	    "or different giving an elliptical or rectangular pen).");
 	tfpos[1] = gcdoff;
 	gcd[gcdoff++].creator = GTextFieldCreate;
 	split[sp][4] = &gcd[gcdoff-1];
@@ -1469,6 +1468,7 @@ static int gdd_sub_e_h(GWindow gw, GEvent *event) {
       case et_mouseup: case et_mousedown: case et_mousemove:
 return( false );
       break;
+      default: break;
     }
 return( true );
 }
@@ -1500,6 +1500,7 @@ static int gdd_e_h(GWindow gw, GEvent *event) {
 	}
 	/* gdd->isvisible = event->u.map.is_visible; */
       break;
+      default: break;
     }
 return( true );
 }
@@ -2000,10 +2001,6 @@ static struct gradient *GradientEdit(struct layer_dlg *ld,struct gradient *activ
 
     {
 	CharView *cv = &gdd.cv_grad;
-	if ( cv->backimgs!=NULL ) {
-	    GDrawDestroyWindow(cv->backimgs);
-	    cv->backimgs = NULL;
-	}
 	CVPalettesHideIfMine(cv);
     }
     GDrawDestroyWindow(gdd.gw);
@@ -2277,6 +2274,7 @@ return( false );
       case et_close:
 	ld->pat_done = true;
       break;
+      default: break;
     }
 return( true );
 }
@@ -2590,10 +2588,10 @@ static int Layer_StrokePatAddEdit(GGadget *g, GEvent *e) {
 return( true );
 }
 
-static uint32 getcol(GGadget *g,int *err) {
+static uint32_t getcol(GGadget *g,int *err) {
     const unichar_t *ret=_GGadgetGetTitle(g);
     unichar_t *end;
-    uint32 col = COLOR_INHERITED;
+    uint32_t col = COLOR_INHERITED;
 
     if ( *ret=='#' ) ++ret;
     col = u_strtol(ret,&end,16);
@@ -2720,7 +2718,7 @@ return( true );
 static int Layer_Inherit(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_radiochanged ) {
 	GWindow gw = GGadgetGetWindow(g);
-	int cid = (intpt) GGadgetGetUserData(g);
+	int cid = (intptr_t) GGadgetGetUserData(g);
 	GGadgetSetEnabled(GWidgetGetControl(gw,cid),
 		!GGadgetIsChecked(g));
     }
@@ -2730,7 +2728,7 @@ return( true );
 static int Layer_DoColorWheel(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
 	GWindow gw = GGadgetGetWindow(g);
-	int cid = (intpt) GGadgetGetUserData(g);
+	int cid = (intptr_t) GGadgetGetUserData(g);
 	GGadget *tf = GWidgetGetControl(gw,cid);
 	if ( GGadgetIsEnabled(tf)) {
 	    char *pt, *text = GGadgetGetTitle8(tf);

@@ -30,7 +30,6 @@
 
 #include <fontforge-config.h>
 
-#include "ffglib.h"
 #include "fontforgevw.h"
 #include "gprogress.h"
 
@@ -168,19 +167,10 @@ extern char *script_filenames[SCRIPT_MENU_MAX];
 #define RECENT_MAX	10
 extern char *RecentFiles[RECENT_MAX];
 
-/* I would like these to be const ints, but gcc doesn't treat them as consts */
-#define et_sb_halfup et_sb_thumbrelease+1
-#define et_sb_halfdown  et_sb_thumbrelease+2
-
 extern FontView *fv_list;
 
 extern struct openfilefilters { char *name, *filter; } def_font_filters[], *user_font_filters;
 extern int default_font_filter_index;
-
-#define SERIF_UI_FAMILIES	"dejavu serif,times,caslon,serif,clearlyu,unifont,unifont upper"
-#define SANS_UI_FAMILIES	"dejavu sans,helvetica,caliban,sans,clearlyu,unifont,unifont upper"
-#define MONO_UI_FAMILIES	"courier,monospace,clearlyu,unifont,unifont upper"
-#define FIXED_UI_FAMILIES	"monospace,fixed,clearlyu,unifont,unifont upper"
 
 #define isprivateuse(enc) ((enc)>=0xe000 && (enc)<=0xf8ff)
 #define issurrogate(enc) ((enc)>=0xd800 && (enc)<=0xd8ff)

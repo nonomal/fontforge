@@ -32,6 +32,10 @@
 
 #include "basics.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* This encapsulates a set of callbacks and stubs. The callbacks get activated*/
 /*  when an event happens (a glyph in a font changes for example, then all */
 /*  charviews looking at it must be updated), and the stubs provide some simple*/
@@ -43,6 +47,7 @@
 
 struct importparams;
 struct exportparams;
+struct multi_dlg_spec;
 
 struct ui_interface {
    /* The following is used to post a fontforge internal error */
@@ -132,6 +137,7 @@ struct ui_interface {
 #ifndef _NO_PYTHON
     void (*plugin_dlg)(void);
 #endif
+    int (*ask_multi)(const char *title, struct multi_dlg_spec *spec);
 };
 extern struct ui_interface *ui_interface;
 
@@ -173,6 +179,7 @@ extern struct ui_interface *ui_interface;
 #ifndef _NO_PYTHON
 #define PluginDlg			(ui_interface->plugin_dlg)
 #endif
+#define ff_ask_multi			(ui_interface->ask_multi)
 
 void FF_SetUiInterface(struct ui_interface *uii);
 
@@ -186,7 +193,7 @@ struct prefs_interface {
     void  (*load_prefs)(void);
     int   (*get_prefs)(char *name,struct val *value);
     int   (*set_prefs)(char *name,struct val *val1, struct val *val2);
-    char *(*get_exe_share_dir)(void);
+    const char *(*get_exe_share_dir)(void);
     void  (*init_prefs)(void);
 };
 extern struct prefs_interface *prefs_interface;
@@ -210,10 +217,6 @@ struct layer;
 struct sc_interface {
    /* Update all windows looking at this glyph */
     void  (*update_all)(struct splinechar *);
-
-   /* Background images or kerning info have changed for this glyph and */
-   /*  all windows displaying them need to be refreshed */
-    void  (*out_of_date_background)(struct splinechar *);
 
    /* The name or code point or encoding of this glyph has changed */
    /*  update all window titles of any windows looking at us */
@@ -244,7 +247,6 @@ struct sc_interface {
 extern struct sc_interface *sc_interface;
 
 #define SCUpdateAll			(sc_interface->update_all)
-#define SCOutOfDateBackground		(sc_interface->out_of_date_background)
 #define SCRefreshTitles			(sc_interface->refresh_titles)
 #define SCHintsChanged			(sc_interface->hints_changed)
 #define _SCCharChangedUpdate		(sc_interface->glyph__changed_update)
@@ -446,7 +448,7 @@ struct fv_interface {
 
    /* When we revert a font we need to change the alegence of all outline */
    /*  glyph windows to the new value of the font */
-    void (*reattach_cvs)(struct splinefont *old, struct splinefont *new);
+    void (*reattach_cvs)(struct splinefont *old, struct splinefont *new_sf);
 
    /* deselect any selected glyphs */
     void (*deselect_all)(struct fontviewbase *);
@@ -507,7 +509,7 @@ struct clip_interface {
    /*  provide a routine to call which will give data on demand */
    /*  (and another routine to clean things up) */
     void  (*add_data_type)(const char *type, void *data, int cnt, int size,
-	void *(*gendata)(void *,int32 *len), void (*freedata)(void *));
+	void *(*gendata)(void *,int32_t *len), void (*freedata)(void *));
    /* Does the clipboard contain something of the given type? */
     int   (*clip_has_type)(const char *mimetype);
    /* Ask for the clipboard, and waits (and returns) for the response */
@@ -523,5 +525,9 @@ extern struct clip_interface *clip_interface;
 
 extern const char *NOUI_TTFNameIds(int id);
 extern const char *NOUI_MSLangString(int language);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* FONTFORGE_UIINTERFACE_H */

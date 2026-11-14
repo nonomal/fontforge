@@ -164,7 +164,7 @@ which you must select a set of hints that bound a set of counters.
 The Private dictionary
 ^^^^^^^^^^^^^^^^^^^^^^
 
-This contains font-wide hinting infomation. Things like: The standard width of a
+This contains font-wide hinting information. Things like: The standard width of a
 stem in the font (StdVW, StdHW), The standard height of capitals and lower case
 letters (BlueValues, OtherBlues), and so forth. These live in the PostScript
 Private dictionary. Once you have hinted your font fontforge can generate
@@ -181,7 +181,7 @@ Hints and previously existing fonts.
 FontForge will not be able to convert TrueType instructions into PostScript
 hints when it reads a TrueType font (the format is too complex, there are too
 many possibilities, instead FontForge stores all the truetype instructions and
-writes them back out uninterpretted).
+writes them back out uninterpreted).
 
 From a Type1 font it will happily read all the hints in a glyph, and keep track
 of hint substitution points. It will not read counter hints though.
@@ -213,10 +213,10 @@ Hint questions:
 I find the hint documentation inadequate for me to do a good job at hinting.
 
 * Section 2.4 of
-  `T1_Supp.pdf <http://partners.adobe.com/asn/developer/pdfs/tn/5015.Type1_Supp.pdf>`__
+  `T1_Supp.pdf <http://adobe-type-tools.github.io/font-tech-notes/pdfs/5015.Type1_Supp.pdf>`__
   says that vertical counters are offset from the lbearing, but the example 2.6
   shows them being offset from 0.
-* In `Type2 <http://partners.adobe.com/asn/developer/pdfs/tn/5177.Type2.pdf>`__ is
+* In `Type2 <http://adobe-type-tools.github.io/font-tech-notes/pdfs/5177.Type2.pdf>`__ is
   it ok to use Counter mask if LanguageGroup is not 1 and the stems don't fit into
   a \*stem3 pattern? Or can cntrmask only be used for \*stem3 in latin letters?
 * .. image:: /images/NoPointHint.png

@@ -32,10 +32,11 @@
 #include "autohint.h"
 #include "bvedit.h"
 #include "dumppfa.h"
+#include "ffglib_compat.h"
 #include "fontforgevw.h"
+#include "bvedit.h"
 #include "gfile.h"
 #include "gicons.h"
-#include "gio.h"
 #include "gutils.h"
 #include "print.h"	/* For pdf output routines */
 #include "spiro.h"
@@ -183,10 +184,9 @@ int _ExportPDF(FILE *pdf,SplineChar *sc,int layer) {
 /* TODO: Note, maybe this routine can be combined with print.c dump_pdfprologue() */
     DBounds b;
     time_t now;
-    GDateTime *gdt;
-    GTimeSpan zoffset;
+    struct tm tm_buf;
+    long zoffset;
     int ret;
-    char oldloc[24];
     int _objlocs[8], xrefloc, streamstart, streamlength, resid = 0, nextobj;
     int *objlocs = _objlocs;
     const char *author = GetAuthor();
@@ -247,14 +247,23 @@ int _ExportPDF(FILE *pdf,SplineChar *sc,int layer) {
     fprintf( pdf, "    /Creator (FontForge)\n" );
     now = GetTime();
     if (!getenv("SOURCE_DATE_EPOCH")) {
-	gdt = g_date_time_new_from_unix_local((gint64)now);
+#ifdef _WIN32
+	localtime_s(&tm_buf, &now);
+#else
+	localtime_r(&now, &tm_buf);
+#endif
+	zoffset = ff_get_utc_offset(now);
     } else {
-	gdt = g_date_time_new_from_unix_utc((gint64)now);
+#ifdef _WIN32
+	gmtime_s(&tm_buf, &now);
+#else
+	gmtime_r(&now, &tm_buf);
+#endif
+	zoffset = 0;
     }
     fprintf( pdf, "    /CreationDate (D:%04d%02d%02d%02d%02d%02d",
-	    g_date_time_get_year(gdt), g_date_time_get_month(gdt), g_date_time_get_day_of_month(gdt),
-	    g_date_time_get_hour(gdt), g_date_time_get_minute(gdt), g_date_time_get_second(gdt) );
-    zoffset = g_date_time_get_utc_offset(gdt)/1000000;
+	    tm_buf.tm_year + 1900, tm_buf.tm_mon + 1, tm_buf.tm_mday,
+	    tm_buf.tm_hour, tm_buf.tm_min, tm_buf.tm_sec );
     if ( zoffset==0 || getenv("SOURCE_DATE_EPOCH") )
 	fprintf( pdf, "Z)\n" );
     else {
@@ -265,8 +274,6 @@ int _ExportPDF(FILE *pdf,SplineChar *sc,int layer) {
 	    fprintf( pdf, "+" );
 	fprintf( pdf, "%02d'%02d')\n", (int)(zoffset/3600),(int)(zoffset/60-(zoffset/3600)*60) );
     }
-    g_date_time_unref(gdt);
-    gdt = NULL;
     fprintf( pdf, "    /Title (%s from %s)\n", sc->name, sc->parent->fontname );
     if ( author!=NULL )
 	fprintf( pdf, "    /Author (%s)\n", author );
@@ -329,7 +336,6 @@ return( ret );
 
 
 int _ExportPlate(FILE *plate,SplineChar *sc,int layer) {
-    char oldloc[24];
     int do_open;
     SplineSet *ss;
     spiro_cp *spiros;
@@ -526,102 +532,108 @@ return(0);
 return( ret );
 }
 
-int ExportImage(char *filename,SplineChar *sc, int layer, int format, int pixelsize, int bitsperpixel) {
-/* 0=*.xbm, 1=*.bmp, 2=*.png, 3=*.xpm, 4=*.c(fontforge-internal) */
+int ExportImage(char* filename, SplineChar* sc, int layer, int format,
+                int pixelsize, int bitsperpixel) {
+    /* 0=*.xbm, 1=*.bmp, 2=*.png, 3=*.xpm, 4=*.c(fontforge-internal) */
     struct _GImage base;
     GImage gi;
     GClut clut;
-    BDFChar *bdfc;
+    BDFChar* bdfc = NULL;
     int ret;
     int tot, i;
-    uint8 *pt, *end;
-    int scale;
-    void *freetypecontext;
-    double emsize = sc->parent->ascent+sc->parent->descent;
+    uint8_t *pt, *end;
+    void* freetypecontext;
+    double emsize = sc->parent->ascent + sc->parent->descent;
 
-    if ( autohint_before_generate && sc->changedsincelasthinted && !sc->manualhints )
-	SplineCharAutoHint(sc,layer,NULL);
+    if (autohint_before_generate && sc->changedsincelasthinted &&
+        !sc->manualhints)
+        SplineCharAutoHint(sc, layer, NULL);
 
-    memset(&gi,'\0', sizeof(gi));
-    memset(&base,'\0', sizeof(base));
-    memset(&clut,'\0', sizeof(clut));
+    memset(&gi, '\0', sizeof(gi));
+    memset(&base, '\0', sizeof(base));
+    memset(&clut, '\0', sizeof(clut));
     gi.u.image = &base;
 
-    if ( bitsperpixel==1 ) {
-	if ( (freetypecontext = FreeTypeFontContext(sc->parent,sc,NULL,layer))==NULL )
-	    bdfc = SplineCharRasterize(sc,layer,pixelsize);
-	else {
-	    bdfc = SplineCharFreeTypeRasterize(freetypecontext,sc->orig_pos,pixelsize,72,1);
-	    FreeTypeFreeContext(freetypecontext);
+    if (sc->parent->onlybitmaps) {
+        BDFFont* bdf;
+        for (bdf = sc->parent->bitmaps; bdf != NULL; bdf = bdf->next) {
+            bdfc = bdf->glyphs[sc->orig_pos];
+            if (bdfc != NULL) break;
+        }
+	if (bdfc == NULL) {
+	    fprintf(stderr,"Failed to retrieve bitmap character \"%s\"\n",
+		    sc->name ? sc->name : "unknown");
+	    return false;
 	}
-	BCRegularizeBitmap(bdfc);
-	/* People don't seem to like having a minimal bounding box for their */
-	/*  images. */
-	BCExpandBitmapToEmBox(bdfc,
-		0,
-		(int) rint(sc->parent->ascent*pixelsize/emsize)-pixelsize,
-		(int) rint(sc->width*pixelsize/emsize),
-		(int) rint(sc->parent->ascent*pixelsize/emsize));
-
-	/* Sigh. Bitmaps use a different defn of set than images do. make it consistant */
-	tot = bdfc->bytes_per_line*(bdfc->ymax-bdfc->ymin+1);
-	for ( pt = bdfc->bitmap, end = pt+tot; pt<end; *pt++ ^= 0xff );
-
-	base.image_type = it_mono;
-	base.data = bdfc->bitmap;
-	base.bytes_per_line = bdfc->bytes_per_line;
-	base.width = bdfc->xmax-bdfc->xmin+1;
-	base.height = bdfc->ymax-bdfc->ymin+1;
-	base.trans = -1;
-	if ( format==0 )
-	    ret = !GImageWriteXbm(&gi,filename);
-#ifndef _NO_LIBPNG
-	else if ( format==2 )
-	    ret = GImageWritePng(&gi,filename,false);
-#endif
-	else if ( format==3 )
-	    ret = !GImageWriteXpm(&gi,filename);
-	else if ( format==4 )
-	    ret = !GImageWriteGImage(&gi,filename);
-	else
-	    ret = GImageWriteBmp(&gi,filename);
-	BDFCharFree(bdfc);
+        if (bdfc->byte_data) {
+            int depth = BDFDepth(bdf);
+            bdfc = BCScaleGrey(bdfc, bdf->pixelsize, depth, pixelsize, depth);
+	    if (bitsperpixel != depth)
+		fprintf(stderr, "The bitmap font can be exported in its native depth %d only.\n", depth);
+            bitsperpixel = depth;
+        } else {
+            bdfc = BCScale(bdfc, bdf->pixelsize, pixelsize);
+            bitsperpixel = 1;
+        }
+    } else if ((freetypecontext =
+                    FreeTypeFontContext(sc->parent, sc, NULL, layer)) == NULL) {
+        if (bitsperpixel == 1)
+            bdfc = SplineCharRasterize(sc, layer, pixelsize);
+        else
+            bdfc = SplineCharAntiAlias(sc, pixelsize, layer,
+                                       (1 << (bitsperpixel / 2)));
     } else {
-	if ( (freetypecontext = FreeTypeFontContext(sc->parent,sc,NULL,layer))==NULL )
-	    bdfc = SplineCharAntiAlias(sc,pixelsize,layer,(1<<(bitsperpixel/2)));
-	else {
-	    bdfc = SplineCharFreeTypeRasterize(freetypecontext,sc->orig_pos,pixelsize,72,bitsperpixel);
-	    FreeTypeFreeContext(freetypecontext);
-	}
-	BCRegularizeGreymap(bdfc);
-	BCExpandBitmapToEmBox(bdfc,
-		0,
-		(int) rint(sc->parent->ascent*pixelsize/emsize) - pixelsize,
-		(int) rint(sc->width*pixelsize/emsize),
-		(int) rint(sc->parent->ascent*pixelsize/emsize));
-	base.image_type = it_index;
-	base.data = bdfc->bitmap;
-	base.bytes_per_line = bdfc->bytes_per_line;
-	base.width = bdfc->xmax-bdfc->xmin+1;
-	base.height = bdfc->ymax-bdfc->ymin+1;
-	base.clut = &clut;
-	base.trans = -1;
-	clut.clut_len = 1<<bitsperpixel;
-	clut.is_grey = true;
-	clut.trans_index = -1;
-	scale = 255/((1<<bitsperpixel)-1);
-	scale = COLOR_CREATE(scale,scale,scale);
-	for ( i=0; i< 1<<bitsperpixel; ++i )
-	    clut.clut[(1<<bitsperpixel)-1 - i] = i*scale;
-#ifndef _NO_LIBPNG
-	if ( format==2 )
-	    ret = GImageWritePng(&gi,filename,false);
-	else
-#endif
-	    ret = GImageWriteBmp(&gi,filename);
-	BDFCharFree(bdfc);
+        bdfc = SplineCharFreeTypeRasterize(freetypecontext, sc->orig_pos,
+                                           pixelsize, 72, bitsperpixel);
+        FreeTypeFreeContext(freetypecontext);
     }
-return( ret );
+
+    BCRegularizeBitmap(bdfc, bdfc->byte_data ? 8 : 1);
+    /* People don't seem to like having a minimal bounding box for their */
+    /*  images. */
+    BCExpandBitmapToEmBox(
+        bdfc, 0, (int)rint(sc->parent->ascent * pixelsize / emsize) - pixelsize,
+        (int)rint(sc->width * pixelsize / emsize),
+        (int)rint(sc->parent->ascent * pixelsize / emsize));
+
+    if (bitsperpixel == 1) {
+        /* Sigh. Bitmaps use a different defn of set than images do. make it
+         * consistent */
+        tot = bdfc->bytes_per_line * (bdfc->ymax - bdfc->ymin + 1);
+        for (pt = bdfc->bitmap, end = pt + tot; pt < end; *pt++ ^= 0xff);
+
+        base.image_type = it_mono;
+    } else {
+        int scale;
+        base.image_type = it_index;
+        clut.clut_len = 1 << bitsperpixel;
+        clut.is_grey = true;
+        clut.trans_index = -1;
+        scale = 255 / ((1 << bitsperpixel) - 1);
+        scale = COLOR_CREATE(scale, scale, scale);
+        for (i = 0; i < 1 << bitsperpixel; ++i)
+            clut.clut[(1 << bitsperpixel) - 1 - i] = i * scale;
+        base.clut = &clut;
+    }
+
+    base.data = bdfc->bitmap;
+    base.bytes_per_line = bdfc->bytes_per_line;
+    base.width = bdfc->xmax - bdfc->xmin + 1;
+    base.height = bdfc->ymax - bdfc->ymin + 1;
+    base.trans = -1;
+    if (format == 0) ret = !GImageWriteXbm(&gi, filename);
+#ifndef _NO_LIBPNG
+    else if (format == 2)
+        ret = GImageWritePng(&gi, filename, false);
+#endif
+    else if (format == 3)
+        ret = !GImageWriteXpm(&gi, filename);
+    else if (format == 4)
+        ret = !GImageWriteGImage(&gi, filename);
+    else
+        ret = GImageWriteBmp(&gi, filename);
+    BDFCharFree(bdfc);
+    return (ret);
 }
 
 int BCExportXBM(char *filename,BDFChar *bdfc, int format) {
@@ -631,15 +643,15 @@ int BCExportXBM(char *filename,BDFChar *bdfc, int format) {
     int ret;
     int tot;
     int scale, i;
-    uint8 *pt, *end;
+    uint8_t *pt, *end;
 
     memset(&gi,'\0', sizeof(gi));
     memset(&base,'\0', sizeof(base));
     gi.u.image = &base;
 
     if ( !bdfc->byte_data ) {
-	BCRegularizeBitmap(bdfc);
-	/* Sigh. Bitmaps use a different defn of set than images do. make it consistant */
+	BCRegularizeBitmap(bdfc, 1);
+	/* Sigh. Bitmaps use a different defn of set than images do. make it consistent */
 	tot = bdfc->bytes_per_line*(bdfc->ymax-bdfc->ymin+1);
 	for ( pt = bdfc->bitmap, end = pt+tot; pt<end; *pt++ ^= 0xff );
 
@@ -664,7 +676,7 @@ int BCExportXBM(char *filename,BDFChar *bdfc, int format) {
 	/* And back to normal */
 	for ( pt = bdfc->bitmap, end = pt+tot; pt<end; *pt++ ^= 0xff );
     } else {
-	BCRegularizeGreymap(bdfc);
+	BCRegularizeBitmap(bdfc, 8);
 	base.image_type = it_index;
 	base.data = bdfc->bitmap;
 	base.bytes_per_line = bdfc->bytes_per_line;

@@ -19,7 +19,8 @@ install(FILES
   editcopyrbearing.png editcopyref.png editcopyvwidth.png editcopywidth.png editcut.png editfind.png
   editjoin.png editmerge.png editpasteafter.png editpasteinto.png editpaste.png editredo.png
   editrmundoes.png editrplref.png editsameas.png editselect.png editundo.png editunlink.png
-  elementaddextrema.png elementalign.png elementanticlock.png elementautotrace.png elementbdfinfo.png
+  elementaddextrema.png elementaddinflections.png elementbalance.png elementharmonize.png 
+  elementalign.png elementanticlock.png elementautotrace.png elementbdfinfo.png 
   elementbitmapsavail.png elementbuildaccent.png elementbuildcomposite.png elementclockwise.png
   elementcomparefonts.png elementcomparelayers.png elementcorrectdir.png elementexpandstroke.png
   elementfindprobs.png elementfontinfo.png elementgetinfo.png elementglyphinfo.png
@@ -68,6 +69,10 @@ install(FILES
   viewbiggersize.png viewfindinfont.png viewfit.png viewformer.png viewgoto.png viewinsertafter.png
   viewinsertbefore.png viewlayers.png viewnextdef.png viewnext.png viewpalettes.png viewprevdef.png
   viewprev.png viewreplace.png viewsmallersize.png viewzoomin.png viewzoomout.png wireframe.png
+
+  check_off.png check_off_disabled.png check_on.png check_on_disabled.png
+  radio_off.png radio_off_disabled.png radio_on.png radio_on_disabled.png
+  downarrow.png downarrow_disabled.png
 
   charviewicon.xbm fontview2.xbm logo.xbm
 

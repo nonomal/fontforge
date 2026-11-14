@@ -126,7 +126,7 @@ Image file questions
 Random questions
 ----------------
 
-* :ref:`FontForge's grey background distesses me. How do I change it? <faq.background>`
+* :ref:`FontForge's grey background distresses me. How do I change it? <faq.background>`
 * :ref:`The fonts FontForge uses in its GUI are too small (too big) how do I change them? <faq.fontsize>`
 * :ref:`How do I mark a font as monospaced? <faq.monospace>`
 * :ref:`How do I tell fontforge about a new encoding? <faq.new-encoding>`
@@ -138,10 +138,12 @@ Random questions
   "Delta", or "Omega", or "pi1")
 * :ref:`Why doesn't Edit->Copy copy glyph names as well as glyph info? <faq.no-copy-names>`
 * :ref:`Why does Edit->Paste complain about name duplication? <faq.copy-names>`
+* :ref:`Why is Element->Build->Build Accented Glyph disabled (or gray)? <faq.disabled-build-menu>`
 * :ref:`How do I set the default glyph of a font? <faq.default-char>`
 * :ref:`I looked at kaiu.ttf or mingliu.ttf and the outlines looked nothing like the correct glyphs. What's wrong? <faq.mingliu>`
 * :ref:`When I use Element->Build->Build Accented Glyph to build one of the Extended Greek glyphs (U+1F00-U+1FFF) FontForge picks the wrong accents. Why? <faq.greek-accents>`
 * :ref:`When I use Element->Build->Build Accented Glyph to build accents over "u" or "y" I get the accent over one of the stems not centered on the glyph. Why? <faq.u-accents>`
+* :ref:`When I use Element->Overlap->Remove Overlap the glyph gets inverted (or white) on the overlapping sections. Why? <faq.remove-overlap>`
 * :ref:`Why does ttf2afm crash on FontForge ttf files? <faq.ttf2afm>`
 * `Where can I find a list of known bugs in FontForge? <https://github.com/fontforge/fontforge/issues>`__
 * :ref:`My system keeps crashing because FontForge keeps running out of memory. What can I do about it? <faq.memory>`
@@ -295,7 +297,7 @@ Random questions
      * So I tend to wrestle with it for a while and then decide than my current
        widgets are better after all.
      * I did get a limited version of fontforge running under gtk. I would be
-       greatful if someone else would choose to extend and maintain it.
+       grateful if someone else would choose to extend and maintain it.
 
 .. _faq.C-plus-plus:
 
@@ -415,7 +417,7 @@ Random questions
 
       -- *The Lady's not for Burning* -- Christopher Fry
 
-   Mostly because I don't thnk that way. I don't plan things out, I have a vague
+   Mostly because I don't think that way. I don't plan things out, I have a vague
    idea where I want to go and I explore in that direction.
 
    Consider python scripting. I decided to add python to fontforge. I found that
@@ -588,7 +590,7 @@ Random questions
        :ref:`Element->Font Info->OS/2->Metrics <fontinfo.TTF-Metrics>`.
      * On windows
 
-       Line spacing is supposed to be set to the Typo Ascent/Typo Desent values
+       Line spacing is supposed to be set to the Typo Ascent/Typo Descent values
        specified in the OS/2 table. And these in turn are supposed to sum to the
        emsize. (FontForge sets these values to the ascent/descent values you specify
        for your font). Unfortunately most windows applications don't follow this
@@ -601,7 +603,7 @@ Random questions
        (The clipping region should be bigger than the bounding box if a GPOS lookup
        could move a glyph so that it extended beyond the bounding box (mark to base
        is likely to cause problems). I'm not sure how this applies to cursive
-       positioning in Urdu where GPOS lookups can make lines arbetrarily tall)
+       positioning in Urdu where GPOS lookups can make lines arbitrarily tall)
 
        MicroSoft has added a redundant bit to the OS/2 table, which essentially
        tells applications they should follow the standard and use the Typographic
@@ -663,8 +665,8 @@ Random questions
    -- but these generally do not meet the specific needs of font designers. I
    know of two licenses specifically produced for fonts:
 
-   * `The Open Font License from SIL <http://scripts.sil.org/OFL>`__ (and its
-     `FAQ <http://scripts.sil.org/OFL-FAQ_web>`__)
+   * `The Open Font License from SIL <https://openfontlicense.org>`__ (and its
+     `FAQ <https://openfontlicense.org/ofl-faq/>`__)
 
      The above is the license I would
      recommend.:doc:`A collection of unofficial translations of the OFL </appendices/OFL-Unofficial>`.
@@ -684,7 +686,7 @@ Random questions
    * If you are interested in scripts with no more than few hundred simple glyphs
      (like the latin alphabet) then 192Mb is more than enough.
    * If you are doing serious editing of CJK fonts then 512Mb is on the low end of
-     useablity.
+     useability.
 
    FontForge requires a color (or grey-scale) monitor -- black & white will not
    suffice.
@@ -950,7 +952,7 @@ Random questions
       postscript file. It is based on the postscript font name but suffers a
       transformation. Don't try to rename this file. Basically the rules are
       (see
-      `Adobe Technical Note 0091 <http://partners.adobe.com/asn/developer/pdfs/tn/0091.Mac_Fond.pdf>`__):
+      `Adobe Technical Note 0091 <http://adobe-type-tools.github.io/font-tech-notes/pdfs/0091.Mac_Fond.pdf>`__):
 
       * The fontname is broken into chunks where each chunk starts with a capital
         letter.
@@ -980,8 +982,8 @@ Random questions
 .. _faq.How-family:
 
 **How do I create a mac font family? (How do I get the mac to group my fonts so that the italic and bold styles work)?**
-   I am told that in 10.6 the prefered method of grouping fonts is to use ttc
-   files, prior to 10.6 ttc files didn't work (well) and the prefered method was
+   I am told that in 10.6 the preferred method of grouping fonts is to use ttc
+   files, prior to 10.6 ttc files didn't work (well) and the preferred method was
    to produce mac font families.
 
    Snow Leopard (10.6) and after
@@ -1673,6 +1675,20 @@ Random questions
    Because you have :menuselection:`Edit --> Copy From --> Copy Metadata`
    checked. Uncheck it.
 
+.. _faq.disabled-build-menu:
+
+**Why is** ::menuselection:`Element --> Build` **disabled (or gray)?**
+   When you click on a glyph such as cacute (ć) and you would like to build this
+   glyph by using the :menuselection:`Element --> Build --> Build Accented Glyph`
+   you must have two things: the letter c and the '. More specifically: you would
+   need to have **COMBINING ACUTE ACCENT** (and not just **MODIFIER LETTER ACUTE ACCENT**).
+   You can find the modifier glyph in the section with the circles. When both are
+   present you the option will become active.
+   
+   How can you know what the requirements are for the glyph?
+   :menuselection:`Element --> Glyph Info...` on the left side go to components.
+   Fontforge will spell out for you what the Accented glyph is composed of.
+
 .. _faq.cidmaps:
 
 **What on earth are cidmap files and should I care about them?**
@@ -1768,7 +1784,7 @@ Random questions
    Unfortunately FontForge cannot do this. FontForge needs to understand and
    then convert the eps file into a simpler format (fonts can use far fewer
    operations than an eps file). So unlike most programs FontForge must
-   interpret each eps file -- but interpretting all of PostScript is a huge job
+   interpret each eps file -- but interpreting all of PostScript is a huge job
    and ff is limited in what it understands. Sometimes it will find a file it
    can't handle.
 
@@ -1912,7 +1928,7 @@ Random questions
      This corresponds to the PostScript Family
    * SubFamily
 
-     Vaguely like the weight field, but takes all stylistic varients not just
+     Vaguely like the weight field, but takes all stylistic variants not just
      weight.
 
      This might be "Bold", "Italic", "Bold Italic", "SemiBold", "Condensed", ...
@@ -1992,6 +2008,14 @@ Random questions
 
    If you make all your stems be the same height then the accent should be
    properly centered.
+
+.. _faq.remove-overlap:
+
+**When I use** :menuselection:`Element --> Overlap --> Remove Overlap` **the glyph gets inverted (or white) on the overlapping sections. Why?** 
+   Because the path that you are combining are ordered in opposing directions.
+   You might have flipped a glyph, and tried to combine it.
+   The resolution is rather simple, select the offending shape, and then
+   :menuselection:`Element --> Reverse Direction`.
 
 .. _faq.ttf2afm:
 

@@ -28,9 +28,9 @@
 #include <fontforge-config.h>
 
 #include "gdraw.h"
+#include "gfile.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "gresourceP.h"
 #include "hotkeys.h"
 #include "ustring.h"
@@ -142,28 +142,38 @@ return( iheight );
 }
 
 int GTextInfoDraw(GWindow base,int x,int y,GTextInfo *ti,
-	FontInstance *font,Color fg, Color sel, int ymax) {
-    int fh=0, as=0, ds=0, ld;
+	FontInstance *font,Color fg, Color sel, int ymax, int as, int ds) {
+    int fh=0, tas=0, tds=0, ld;
     int iwidth=0, iheight=0;
     int height, skip = 0;
     GTextBounds bounds;
     GRect r, old;
 
-    GDrawWindowFontMetrics(base,font,&as, &ds, &ld);
+    GDrawWindowFontMetrics(base, font, &tas, &tds, &ld);
     if ( ti->text!=NULL ) {
 	if ( ti->font!=NULL )
 	    font = ti->font;
-	if ( ti->fg!=COLOR_DEFAULT && ti->fg!=COLOR_UNKNOWN )
+	if ( ti->fg!=COLOR_DEFAULT && ti->fg!=COLOR_UNKNOWN && ti->fg!=COLOR_WARNING )
 	    fg = ti->fg;
 
 	GDrawSetFont(base,font);
-	GDrawGetTextBounds(base,ti->text, -1, &bounds);
-	if ( as<bounds.as ) as = bounds.as;
-	if ( ds<bounds.ds ) ds = bounds.ds;
+	if ( as<0 || ds<0 ) {
+	    GDrawGetTextBounds(base,ti->text, -1, &bounds);
+            if ( as<0 )
+		as = (tas<bounds.as) ? bounds.as : tas;
+            if ( ds<0 )
+		ds = (tds<bounds.ds) ? bounds.ds : tds;
+	}
+
+    } else {
+	as = tas;
+	ds = tds;
     }
     fh = as+ds;
     if ( fg == COLOR_DEFAULT )
 	fg = GDrawGetDefaultForeground(GDrawGetDisplayOfWindow(base));
+    else if ( fg == COLOR_WARNING )
+	fg = GDrawGetWarningForeground(GDrawGetDisplayOfWindow(base));
     if ( ti->image!=NULL ) {
 	iwidth = GImageGetScaledWidth(base,ti->image);
 	iheight = GImageGetScaledHeight(base,ti->image)+1;
@@ -221,7 +231,7 @@ unichar_t *utf82u_mncopy(const char *utf8buf,unichar_t *mn) {
     int len = strlen(utf8buf);
     unichar_t *ubuf = malloc((len+1)*sizeof(unichar_t));
     unichar_t *upt=ubuf, *uend=ubuf+len;
-    const uint8 *pt = (const uint8 *) utf8buf, *end = pt+strlen(utf8buf);
+    const uint8_t *pt = (const uint8_t *) utf8buf, *end = pt+strlen(utf8buf);
     int w;
     int was_mn = false;
 
@@ -267,24 +277,17 @@ GTextInfo *GTextInfoCopy(GTextInfo *ti) {
 
     copy = malloc(sizeof(GTextInfo));
     *copy = *ti;
-    copy->text_is_1byte = false;
     if ( copy->fg == 0 && copy->bg == 0 ) {
 	copy->fg = copy->bg = COLOR_UNKNOWN;
     }
     if ( ti->text!=NULL ) {
-	if ( ti->text_is_1byte && ti->text_in_resource ) {
+	if ( ti->text_is_1byte ) {
 	    copy->text = utf82u_mncopy((char *) copy->text,&copy->mnemonic);
-	    copy->text_in_resource = false;
-	    copy->text_is_1byte = false;
-	} else if ( ti->text_in_resource ) {
-	    copy->text = u_copy((unichar_t *) GStringGetResource((intpt) copy->text,&copy->mnemonic));
-	    copy->text_in_resource = false;
-	} else if ( ti->text_is_1byte ) {
-	    copy->text = utf82u_copy((char *) copy->text);
-	    copy->text_is_1byte = false;
 	} else
 	    copy->text = u_copy(copy->text);
     }
+    copy->text_in_resource = false;
+    copy->text_is_1byte = false;
 return( copy);
 }
 
@@ -293,23 +296,17 @@ static char *imagedir = NULL;	/* This is the system pixmap directory */
 static char **imagepath = NULL;			/* May contain user directories too */
 static size_t imagepathlenmax = 0;
 
-struct image_bucket {
-    struct image_bucket *next;
-    char *filename, *absname;
-    GImage *image;
-};
-
 #define IC_SIZE	127
-static struct image_bucket *imagecache[IC_SIZE];
+static GImageCacheBucket *imagecache[IC_SIZE];
 
 void InitImageCache() {
-  memset(imagecache, 0, IC_SIZE * sizeof(struct image_bucket *));
+  memset(imagecache, 0, IC_SIZE * sizeof(GImageCacheBucket *));
 }
 
 void ClearImageCache() {
       for ( int i=0; i<IC_SIZE; ++i ) {
-        struct image_bucket * bucket;
-        struct image_bucket * nextbucket;
+        GImageCacheBucket * bucket;
+        GImageCacheBucket * nextbucket;
 	for ( bucket = imagecache[i]; bucket!=NULL; bucket=nextbucket ) {
           nextbucket = bucket->next;
           if (bucket->filename != NULL) { free(bucket->filename); bucket->filename = NULL; }
@@ -336,14 +333,12 @@ static int hash_filename(const char *_pt ) {
 return( val%IC_SIZE );
 }
 
-static void ImagePathDefault(void) {
+static void InitImagePath(void) {
     if ( imagepath==NULL ) {
 	imagepath = malloc(2*sizeof(void *));
 	imagepath[0] = (imagedir == NULL) ? copy(imagedir_default) : copy(imagedir);
 	imagepath[1] = NULL;
 	imagepathlenmax = strlen(imagepath[0]);
-	if (_GGadget_ImagePath != NULL) free(_GGadget_ImagePath);
-	_GGadget_ImagePath = copy("=");
     }
 }
 
@@ -351,13 +346,13 @@ static void ImagePathDefault(void) {
  * \return The image path. The return value should not be freed or modified.
  */
 const char* const* _GGadget_GetImagePath(void) {
-    ImagePathDefault();
+    InitImagePath();
     return (const char* const*) imagepath;
 }
 
 int _GGadget_ImageInCache(GImage *image) {
     int i;
-    struct image_bucket *bucket;
+    GImageCacheBucket *bucket;
 
     for ( i=0; i<IC_SIZE; ++i ) {
 	for ( bucket=imagecache[i]; bucket!=NULL; bucket=bucket->next )
@@ -367,30 +362,111 @@ return( true );
 return( false );
 }
 
-static void ImageCacheReload(void) {
+static GImage *GadgetNormalizeImageFilenames(const char *inname, char **relname, char **absname) {
+    int l, k;
+    char *home = GFileGetHomeDir(), *path;
+    GImage *img;
+
+    if ( relname!=NULL )
+	*relname=NULL;
+    if ( absname!=NULL )
+	*absname=NULL;
+
+    if ( inname==NULL )
+	return NULL;
+
+    InitImagePath();
+
+    if ( *inname=='/' ) {
+	img = GImageRead((char *)inname);
+	if ( img==NULL )
+	    return NULL;
+	if ( absname!=NULL )
+	    *absname = copy(inname);
+	if ( relname!=NULL ) {
+	    for ( k=0; imagepath[k]!=NULL; ++k ) {
+		l = strlen(imagepath[k]);
+		if ( strncmp(imagepath[k],inname,l)==0 && inname[l]=='/') {
+		    *relname = copy(inname+l+1);
+		    return img;
+		}
+	    }
+	    if ( home!=NULL ) {
+		l = strlen(home);
+		if ( strncmp(home,inname,l)==0 && inname[l]=='/') {
+		    *relname = copy(inname+l+1);
+		    return img;
+		}
+	    }
+	    *relname = copy(inname);
+	    return img;
+	}
+    } else if ( *inname=='~' && inname[1]=='/' ) {
+	if ( home==NULL )
+	    return NULL;
+	path = smprintf("%s/%s", home, inname+1);
+	img = GImageRead(path);
+	if ( img==NULL ) {
+	    free(path);
+	    return NULL;
+	}
+	if ( relname!=NULL )
+	    *relname = copy(inname);
+	if ( absname!=NULL )
+	    *absname = path;
+	return img;
+    }
+
+    for ( k=0; imagepath[k]!=NULL; ++k ) {
+	path = smprintf("%s/%s", imagepath[k], inname );
+	img = GImageRead(path);
+	if ( img!=NULL ) {
+	    if ( relname!=NULL )
+		*relname = copy(inname);
+	    if ( absname!=NULL )
+		*absname = path;
+	    return img;
+	}
+	free(path);
+    }
+    return NULL;
+}
+
+static void ImageCacheReload(int do_absolute) {
     int i,k;
-    struct image_bucket *bucket;
-    char *path=NULL;
-    size_t pathlen;
+    GImageCacheBucket *bucket;
+    char *path;
     GImage *temp, hold;
 
-    ImagePathDefault();
+    InitImagePath();
 
     /* Try to reload the cache from the new directory */
     /* If a file doesn't exist in the new dir when it did in the old then */
     /*  retain the old copy (people may hold pointers to it) */
-    pathlen = imagepathlenmax+270; path = malloc(pathlen);
     for ( i=0; i<IC_SIZE; ++i ) {
 	for ( bucket = imagecache[i]; bucket!=NULL; bucket=bucket->next ) {
-	    if ( strlen(bucket->filename)+imagepathlenmax+3 > pathlen ) {
-		pathlen = strlen(bucket->filename)+imagepathlenmax+20;
-		path = realloc(path,pathlen);
-	    }
-	    for ( k=0; imagepath[k]!=NULL; ++k ) {
-		sprintf( path,"%s/%s", imagepath[k], bucket->filename );
-		temp = GImageRead(path);
-		if ( temp!=NULL )
-	    break;
+	    if ( *bucket->filename=='/' || *bucket->filename=='~' ) {
+		if ( !do_absolute )
+		    continue;
+		if ( bucket->absname!=NULL ) {
+		    temp = GImageRead(bucket->absname);
+		    if ( temp!=NULL )
+			path = copy(bucket->absname);
+		} else {
+		    // This was a negative cache value which means there are
+		    // no references to it. Not much point in attempting to
+		    // reload.
+		    ;
+		}
+	    } else {
+		for ( k=0; imagepath[k]!=NULL; ++k ) {
+		    path = smprintf("%s/%s", imagepath[k], bucket->filename );
+		    temp = GImageRead(path);
+		    if ( temp!=NULL )
+			break;
+		    else
+			free(path);
+		}
 	    }
 	    if ( temp!=NULL ) {
 		if ( bucket->image==NULL )
@@ -404,14 +480,13 @@ static void ImageCacheReload(void) {
 		    GImageDestroy(temp);
 		}
 		free( bucket->absname );
-		bucket->absname = copy( path );
+		bucket->absname = path;
 	    }
 	}
     }
-    free(path);
 }
 
-void GGadgetSetImageDir(char *dir) {
+void GGadgetSetImageDir(const char *dir) {
     int k;
     char *ptr = imagedir;
     //Check if imagedir has been initialised
@@ -419,7 +494,7 @@ void GGadgetSetImageDir(char *dir) {
         //We shall check later if ptr should be freed or not
         ptr = (char*) imagedir_default;
     }
-    
+
     if (dir != NULL && strcmp(ptr,dir) != 0) {
         imagedir = copy(dir);
         if (imagepath != NULL) {
@@ -435,25 +510,24 @@ void GGadgetSetImageDir(char *dir) {
             if (imagepath[k] != NULL) {
                 free(imagepath[k]);
                 imagepath[k] = copy(imagedir);
-                ImageCacheReload();
+                ImageCacheReload(false);
             }
-            if (_GGadget_ImagePath != NULL) free(_GGadget_ImagePath);
-            _GGadget_ImagePath = copy("=");
         }
     }
 }
 
-static char *ImagePathFigureElement(char *start, int len) {
+static char *ImagePathFigureElement(const char *start, int len) {
+	const char *homedir = GFileGetHomeDir();
     if ( *start=='=' && len==1 ) {
         if (imagedir == NULL) {
             return copy(imagedir_default);
         }
         return copy(imagedir);
     }
-    else if ( *start=='~' && start[1]=='/' && len>=2 && getenv("HOME")!=NULL ) {
-	int hlen = strlen(getenv("HOME"));
+    else if ( *start=='~' && start[1]=='/' && len>=2 && homedir!=NULL ) {
+	int hlen = strlen(homedir);
 	char *absname = malloc( hlen+len+8 );
-	strcpy(absname,getenv("HOME"));
+	strcpy(absname,homedir);
 	strncpy(absname+hlen,start+1,len-1);
 	absname[hlen+len-1] = '\0';
 return( absname );
@@ -465,14 +539,19 @@ return( copyn(start,len));
 # define PATH_SEPARATOR ':'
 #endif
 
-void GGadgetSetImagePath(char *path) {
+void GGadgetSetImagePath(const char *path) {
     int cnt, k;
-    char *pt, *end;
-    extern char *_GGadget_ImagePath;
+    const char *pt, *end;
+    static char *_GGadget_CurrentImagePath=NULL;
 
     if ( path==NULL )
-return;
-    if (_GGadget_ImagePath != NULL) free( _GGadget_ImagePath );
+	return;
+
+    if ( _GGadget_CurrentImagePath!=NULL &&
+         strcmp(_GGadget_CurrentImagePath, path)==0 )
+	return;
+
+    free(_GGadget_CurrentImagePath);
 
     if ( imagepath!=NULL ) {
 	for ( k=0; imagepath[k]!=NULL; ++k )
@@ -489,61 +568,74 @@ return;
     for ( cnt=0; imagepath[cnt]!=NULL; ++cnt )
 	if ( strlen(imagepath[cnt]) > imagepathlenmax )
 	    imagepathlenmax = strlen(imagepath[cnt]);
-    ImageCacheReload();
-    _GGadget_ImagePath = copy(path);
+    ImageCacheReload(false);
+    _GGadget_CurrentImagePath = copy(path);
 }
 
-static GImage *_GGadgetImageCache(const char *filename, char **foundname) {
-    int index = hash_filename(filename);
-    struct image_bucket *bucket;
-    char *path;
-    int k;
+GImageCacheBucket *_GGadgetImageCache(const char *filename, int keep_empty) {
+    int index;
+    GImageCacheBucket *bucket;
+    char *relname, *absname;
+    GImage *img;
 
+    index = hash_filename(filename);
     for ( bucket = imagecache[index]; bucket!=NULL; bucket = bucket->next ) {
-	if ( strcmp(bucket->filename,filename)==0 ) {
-	    if ( foundname!=NULL ) *foundname = copy( bucket->absname );
-return( bucket->image );
+	if ( strcmp(bucket->filename, filename)==0 )
+	    return bucket;
+    }
+
+    img = GadgetNormalizeImageFilenames(filename, &relname, &absname);
+
+    if ( img==NULL ) {
+	if ( keep_empty ) { // Add negative cache value
+	    bucket = calloc(1,sizeof(GImageCacheBucket));
+	    bucket->filename = copy(filename);
+	    bucket->next = imagecache[index];
+	    imagecache[index] = bucket;
+	    return bucket;
+	}
+	return NULL;
+    }
+
+    // Recheck for normalized name in cache
+    index = hash_filename(relname);
+    for ( bucket = imagecache[index]; bucket!=NULL; bucket = bucket->next ) {
+	if ( strcmp(bucket->filename, relname)==0 ) {
+	    GImageDestroy(img);
+	    free(absname);
+	    free(relname);
+	    return bucket;
 	}
     }
-    bucket = calloc(1,sizeof(struct image_bucket));
-    bucket->next = imagecache[index];
-    imagecache[index] = bucket;
-    bucket->filename = copy(filename);
 
-    ImagePathDefault();
-
-    path = malloc(strlen(filename)+imagepathlenmax+10 );
-    for ( k=0; imagepath[k]!=NULL; ++k ) {
-	sprintf( path,"%s/%s", imagepath[k], filename );
-	bucket->image = GImageRead(path);
-	if ( bucket->image!=NULL ) {
-	    bucket->absname = copy(path);
-    break;
-	}
-    }
-    free(path);
-    if ( bucket->image!=NULL ) {
-	/* Play with the clut to make white be transparent */
-	struct _GImage *base = bucket->image->u.image;
-	if ( base->image_type==it_mono && base->clut==NULL )
-	    base->trans = 1;
-	else if ( base->image_type!=it_true && base->clut!=NULL && base->trans==0xffffffff ) {
-	    int i;
-	    for ( i=0 ; i<base->clut->clut_len; ++i ) {
-		if ( base->clut->clut[i]==0xffffff ) {
-		    base->trans = i;
-	    break;
-		}
+    /* Play with the clut to make white be transparent */
+    struct _GImage *base = img->u.image;
+    if ( base->image_type==it_mono && base->clut==NULL )
+	base->trans = 1;
+    else if ( base->image_type!=it_true && base->clut!=NULL && base->trans==0xffffffff ) {
+	int i;
+	for ( i=0 ; i<base->clut->clut_len; ++i ) {
+	    if ( base->clut->clut[i]==0xffffff ) {
+		base->trans = i;
+		break;
 	    }
 	}
     }
-    if ( foundname!=NULL && bucket->image!=NULL )
-	*foundname = copy( bucket->absname );
-return(bucket->image);
+
+    bucket = calloc(1,sizeof(GImageCacheBucket));
+    bucket->filename = relname;
+    bucket->absname = absname;
+    bucket->image = img;
+    bucket->next = imagecache[index];
+    imagecache[index] = bucket;
+    return bucket;
 }
 
 GImage *GGadgetImageCache(const char *filename) {
-return( _GGadgetImageCache(filename,NULL));
+    GImageCacheBucket *bucket = _GGadgetImageCache(filename,true);
+    if ( bucket!=NULL )
+	return bucket->image;
+    return NULL;
 }
 
 /* Substitutes an image contents with what's found in cache. */
@@ -554,46 +646,6 @@ int TryGGadgetImageCache(GImage *image, const char *name) {
 return (loaded != NULL);
 }
 
-GResImage *GGadgetResourceFindImage(char *name, GImage *def) {
-    GImage *ret;
-    char *fname;
-    GResImage *ri;
-
-    fname = GResourceFindString(name);
-    if ( fname==NULL && def==NULL )
-return( NULL );
-    ri = calloc(1,sizeof(GResImage));
-    ri->filename = fname;
-    ri->image = def;
-    if ( fname==NULL )
-return( ri );
-
-    if ( *fname=='/' )
-	ret = GImageRead(fname);
-    else if ( *fname=='~' && fname[1]=='/' && getenv("HOME")!=NULL ) {
-	char *absname = malloc( strlen(getenv("HOME"))+strlen(fname)+8 );
-	strcpy(absname,getenv("HOME"));
-	strcat(absname,fname+1);
-	ret = GImageRead(absname);
-	free(fname);
-	ri->filename = fname = absname;
-    } else {
-	char *absname;
-	ret = _GGadgetImageCache(fname,&absname);
-	if ( ret ) {
-	    free(fname);
-	    ri->filename = fname = absname;
-	}
-    }
-    if ( ret==NULL ) {
-	ri->filename = NULL;
-	free(fname);
-    } else
-	ri->image = ret;
-
-return( ri );
-}
-    
 static void GTextInfoImageLookup(GTextInfo *ti) {
     char *pt;
     int any;
@@ -618,7 +670,7 @@ return;
     ti->image = GGadgetImageCache((char *) (ti->image));
 }
 
-GTextInfo **GTextInfoArrayFromList(GTextInfo *ti, uint16 *cnt) {
+GTextInfo **GTextInfoArrayFromList(GTextInfo *ti, uint16_t *cnt) {
     int i;
     GTextInfo **arr;
 
@@ -680,7 +732,7 @@ return;
     free(ti);
 }
 
-/* The list is terminated with an empty entry. Not a NULL pointer, but 
+/* The list is terminated with an empty entry. Not a NULL pointer, but
  * rather an empty entry terminates lists of GTextInfo entries.  (!)
  */
 void GTextInfoArrayFree(GTextInfo **ti) {
@@ -755,7 +807,7 @@ return;
     free(mi);
 }
 
-GMenuItem *GMenuItemArrayCopy(GMenuItem *mi, uint16 *cnt) {
+GMenuItem *GMenuItemArrayCopy(GMenuItem *mi, uint16_t *cnt) {
     int i;
     GMenuItem *arr;
 
@@ -769,12 +821,8 @@ return( NULL );
 	arr[i] = mi[i];
 	GTextInfoImageLookup(&arr[i].ti);
 	if ( mi[i].ti.text!=NULL ) {
-	    if ( mi[i].ti.text_in_resource && mi[i].ti.text_is_1byte )
+	    if ( mi[i].ti.text_is_1byte )
 		arr[i].ti.text = utf82u_mncopy((char *) mi[i].ti.text,&arr[i].ti.mnemonic);
-	    else if ( mi[i].ti.text_in_resource )
-		arr[i].ti.text = u_copy((unichar_t *) GStringGetResource((intpt) mi[i].ti.text,&arr[i].ti.mnemonic));
-	    else if ( mi[i].ti.text_is_1byte )
-		arr[i].ti.text = utf82u_copy((char *) mi[i].ti.text);
 	    else
 		arr[i].ti.text = u_copy(mi[i].ti.text);
 	    arr[i].ti.text_in_resource = arr[i].ti.text_is_1byte = false;
@@ -928,14 +976,16 @@ return(0);
     }
 }
 
-void HotkeyParse( Hotkey* hk, const char *shortcut ) {
+int HotkeyParse( Hotkey* hk, const char *shortcut ) {
     char *pt;
     const char *sh;
     int mask, temp, i;
 
-    hk->state  = 0;
-    hk->keysym = 0;
-    strncpy( hk->text, shortcut, HOTKEY_TEXT_MAX_SIZE );
+    if ( hk!=NULL ) {
+	hk->state  = 0;
+	hk->keysym = 0;
+	strncpy( hk->text, shortcut, HOTKEY_TEXT_MAX_SIZE );
+    }
 
     sh = dgettext(shortcut_domain,shortcut);
     /* shortcut might be "Open|Ctl+O" meaning the Open menu item is bound to ^O */
@@ -950,7 +1000,7 @@ void HotkeyParse( Hotkey* hk, const char *shortcut ) {
     if ( pt!=NULL )
 	sh = pt+1;
     if ( *sh=='\0' || strcmp(sh,"No Shortcut")==0 || strcmp(sh,"None")==0 )
-	return;
+	return true;
 
     initmods();
 
@@ -971,25 +1021,32 @@ void HotkeyParse( Hotkey* hk, const char *shortcut ) {
 	else if ( sscanf( sh, "0x%x", &temp)==1 )
 	    mask |= temp;
 	else {
-	    fprintf( stderr, "Could not parse short cut: %s\n", shortcut );
-	    return;
+	    fprintf(stderr, "Could not parse short cut: %s\n", shortcut );
+	    return false;
 	}
 	sh = pt+1;
     }
-    hk->state = mask;
+    if ( hk!=NULL )
+	hk->state = mask;
     for ( i=0; i<0x100; ++i ) {
 	if ( GDrawKeysyms[i]!=NULL && uc_strcmp(GDrawKeysyms[i],sh)==0 ) {
-	    hk->keysym = 0xff00 + i;
+	    if ( hk!=NULL )
+		hk->keysym = 0xff00 + i;
 	    break;
 	}
     }
     if ( i==0x100 ) {
-	hk->keysym = utf8_ildb((const char **) &sh);
+	char tmp = utf8_ildb((const char **) &sh);
+	if ( hk!=NULL ) 
+	    hk->keysym = tmp;
 	if ( *sh!='\0' ) {
-	    fprintf( stderr, "Unexpected characters at end of short cut: %s\n", shortcut );
-	    return;
+	    fprintf(stderr, "Unexpected characters at end of short cut: %s  %c\n", shortcut, *sh );
+	    return false;
 	}
     }
+
+    if ( hk==NULL )
+	return true;
     //
     // The user really means lower case keys unless they have
     // given the "shift" modifier too. Like: Ctl+Shft+L
@@ -1008,10 +1065,10 @@ void HotkeyParse( Hotkey* hk, const char *shortcut ) {
 	}
 #endif
     }
-    
+    return true;
 //    fprintf(stderr,"HotkeyParse(end) spec:%d hk->state:%d hk->keysym:%d shortcut:%s\n", GK_Special, hk->state, hk->keysym, shortcut );
 }
-    
+
 void GMenuItemParseShortCut(GMenuItem *mi,char *shortcut) {
     char *pt, *sh;
     int mask, temp, i;
@@ -1081,7 +1138,7 @@ return;
     }
 }
 
-GMenuItem *GMenuItem2ArrayCopy(GMenuItem2 *mi, uint16 *cnt) {
+GMenuItem *GMenuItem2ArrayCopy(GMenuItem2 *mi, uint16_t *cnt) {
     int i;
     GMenuItem *arr;
 
@@ -1100,12 +1157,8 @@ return( NULL );
 	if ( mi[i].shortcut!=NULL )
 	    GMenuItemParseShortCut(&arr[i],mi[i].shortcut);
 	if ( mi[i].ti.text!=NULL ) {
-	    if ( mi[i].ti.text_in_resource && mi[i].ti.text_is_1byte )
+	    if ( mi[i].ti.text_is_1byte )
 		arr[i].ti.text = utf82u_mncopy((char *) mi[i].ti.text,&arr[i].ti.mnemonic);
-	    else if ( mi[i].ti.text_in_resource )
-		arr[i].ti.text = u_copy((unichar_t *) GStringGetResource((intpt) mi[i].ti.text,&arr[i].ti.mnemonic));
-	    else if ( mi[i].ti.text_is_1byte )
-		arr[i].ti.text = utf82u_copy((char *) mi[i].ti.text);
 	    else
 		arr[i].ti.text = u_copy(mi[i].ti.text);
 	    arr[i].ti.text_in_resource = arr[i].ti.text_is_1byte = false;
@@ -1122,79 +1175,8 @@ return( NULL );
 return( arr );
 }
 
-/* **************************** String Resources **************************** */
-
-/* This is obsolete now. I use gettext instead */
-
-/* A string resource file should begin with two shorts, the first containing
-the number of string resources, and the second the number of integer resources.
-(not the number of resources in the file, but the maximum resource index+1)
-String resources look like
-    <resource number-short> <flag,length-short> <mnemonics?> <unichar_t string>
-Integer resources look like:
-    <resource number-short> <resource value-int>
-(numbers are stored with the high byte first)
-
-We include a resource number because translations may not be provided for all
-strings, so we will need to skip around. The flag,length field is a short where
-the high-order bit is a flag indicating whether a mnemonic is present and the
-remaining 15 bits containing the length of the following char string. If a
-mnemonic is present it follows immediately after the flag,length short. After
-that comes the string. After that a new string.
-After all strings comes the integer list.
-
-By convention string resource 0 should always be present and should be the
-name of the language (or some other identifying name).
-The first 10 or so resources are used by gadgets and containers and must be
- present even if the program doesn't set any resources itself.
-Resource 1 should be the translation of "OK"
-Resource 2 should be the translation of "Cancel"
-   ...
-Resource 7 should be the translation of "Replace"
-   ...
-*/
-static unichar_t lang[] = { 'E', 'n', 'g', 'l', 'i', 's', 'h', '\0' };
-static unichar_t ok[] = { 'O', 'k', '\0' };
-static unichar_t cancel[] = { 'C', 'a', 'n', 'c', 'e', 'l', '\0' };
-static unichar_t _open[] = { 'O', 'p', 'e', 'n', '\0' };
-static unichar_t save[] = { 'S', 'a', 'v', 'e', '\0' };
-static unichar_t filter[] = { 'F', 'i', 'l', 't', 'e', 'r', '\0' };
-static unichar_t new[] = { 'N', 'e', 'w', '.', '.', '.', '\0' };
-static unichar_t replace[] = { 'R', 'e', 'p', 'l', 'a', 'c', 'e', '\0' };
-static unichar_t fileexists[] = { 'F','i','l','e',' ','E','x','i','s','t','s',  '\0' };
-/* "File, %s, exists. Replace it?" */
-static unichar_t fileexistspre[] = { 'F','i','l','e',',',' ',  '\0' };
-static unichar_t fileexistspost[] = { ',',' ','e','x','i','s','t','s','.',' ','R','e','p','l','a','c','e',' ','i','t','?',  '\0' };
-static unichar_t createdir[] = { 'C','r','e','a','t','e',' ','d','i','r','e','c','t','o','r','y','.','.','.',  '\0' };
-static unichar_t dirname_[] = { 'D','i','r','e','c','t','o','r','y',' ','n','a','m','e','?',  '\0' };
-static unichar_t couldntcreatedir[] = { 'C','o','u','l','d','n','\'','t',' ','c','r','e','a','t','e',' ','d','i','r','e','c','t','o','r','y',  '\0' };
-static unichar_t selectall[] = { 'S','e','l','e','c','t',' ','A','l','l',  '\0' };
-static unichar_t none[] = { 'N','o','n','e',  '\0' };
-static const unichar_t *deffall[] = { lang, ok, cancel, _open, save, filter, new,
-	replace, fileexists, fileexistspre, fileexistspost, createdir,
-	dirname_, couldntcreatedir, selectall, none, NULL };
-static const unichar_t deffallmn[] = { 0, 'O', 'C', 'O', 'S', 'F', 'N', 'R', 0, 0, 0, 'A', 'N' };
-static const int deffallint[] = { 55, 100 };
-
-static unichar_t **strarray=NULL; static const unichar_t **fallback=deffall;
-static unichar_t *smnemonics=NULL; static const unichar_t *fmnemonics=deffallmn;
-static int *intarray; static const int *fallbackint = deffallint;
-static int slen=0, flen=sizeof(deffall)/sizeof(deffall[0])-1, ilen=0, filen=sizeof(deffallint)/sizeof(deffallint[0]);
-
-const unichar_t *GStringGetResource(int index,unichar_t *mnemonic) {
-    if ( index<0 || (index>=slen && index>=flen ))
-return( NULL );
-    if ( index<slen && strarray[index]!=NULL ) {
-	if ( mnemonic!=NULL ) *mnemonic = smnemonics[index];
-return( strarray[index]);
-    }
-    if ( mnemonic!=NULL && fmnemonics!=NULL )
-	*mnemonic = fmnemonics[index];
-return( fallback[index]);
-}
-
 int GIntGetResource(int index) {
-    if ( _ggadget_use_gettext && index<2 ) {
+    if ( index<2 ) {
 	static int gt_intarray[2];
 	if ( gt_intarray[0]==0 ) {
 	    char *pt, *end;
@@ -1224,15 +1206,5 @@ int GIntGetResource(int index) {
 return( gt_intarray[index] );
     }
 
-    if ( index<0 || (index>=ilen && index>=filen ))
-return( -1 );
-    if ( index<ilen && intarray[index]!=0x80000000 ) {
-return( intarray[index]);
-    }
-return( fallbackint[index]);
-}
-
-int _ggadget_use_gettext = false;
-void GResourceUseGetText(void) {
-    _ggadget_use_gettext = true;
+    return -1;
 }

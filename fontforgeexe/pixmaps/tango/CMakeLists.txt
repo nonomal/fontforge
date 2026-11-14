@@ -8,19 +8,20 @@ install(FILES
 )
 
 install(FILES
-  changeweight.png check_off_disabled.png check_off.png check_on_disabled.png check_on.png
+  check_off_disabled.png check_off.png check_on_disabled.png check_on.png
   chooseraudio.png chooserback.png chooserbookmark.png choosercid.png choosercompressed.png
   chooserconfigtool.png choosercore.png chooserdir.png chooserforward.png chooserhomefolder.png
   chooserimage.png choosermac.png choosermacttf.png choosernobookmark.png chooserobject.png
   choosersfdir.png choosertar.png choosertextbdf.png choosertextc.png choosertextcss.png
   choosertextfontps.png choosertextfontsfd.png choosertexthtml.png choosertextjava.png
   choosertextmake.png choosertextplain.png choosertextps.png choosertextxml.png chooserttf.png
-  chooserunknown.png chooserupdir.png chooservideo.png colorwheel.png downarrow.png editclearback.png
+  chooserunknown.png chooserupdir.png chooservideo.png colorwheel.png downarrow.png downarrow_disabled.png editclearback.png
   editclear.png editcopyfg2bg.png editcopylayer2layer.png editcopylbearing.png editcopylookupdata.png
   editcopy.png editcopyrbearing.png editcopyref.png editcopyvwidth.png editcopywidth.png editcut.png
   editfind.png editjoin.png editmerge.png editmergetoline.png editpasteafter.png editpasteinto.png
   editpaste.png editredo.png editrmundoes.png editrplref.png editsameas.png editselect.png
-  editundo.png editunlink.png elementaddextrema.png elementalign.png elementanticlock.png
+  editundo.png editunlink.png elementaddextrema.png elementaddinflections.png 
+  elementbalance.png elementharmonize.png elementalign.png elementanticlock.png
   elementautotrace.png elementbdfinfo.png elementbitmapsavail.png elementbuildaccent.png
   elementbuildcomposite.png elementclockwise.png elementcomparefonts.png elementcomparelayers.png
   elementcorrectdir.png elementexpandstroke.png elementfindprobs.png elementfontinfo.png
@@ -28,17 +29,17 @@ install(FILES
   elementmathinfo.png elementmergefonts.png elementorder.png elementotherinfo.png
   elementregenbitmaps.png elementremovebitmaps.png elementrenameglyph.png elementround.png
   elementshowdep.png elementsimplify.png elementstyles.png elementtilepath.png elementtilepattern.png
-  elementtransform.png elementvalidate.png elementvbaselines.png exclude.png extendcondense.png
-  fflogo13.png fflogo.png ffsplash1.png ffsplash2.png ffsplash3.png fileclose2.png fileclose.png
+  elementtransform.png elementvalidate.png elementvbaselines.png
+  fflogo13.png fflogo.png ffsplash1.png ffsplash2.png ffsplash3.png fileclose.png
   filedisplay.png fileexecute.png fileexport.png filegeneratefamily.png filegenerate.png
   fileimport.png filemergefeature.png filenew.png fileopen.png fileprefs.png fileprint.png
   filequit.png filerecent.png filerevertbackup.png filerevertglyph.png filerevert.png filesaveall.png
-  filesaveas.png filesave.png findinter.png fliphor.png flipvert.png helpabout.png helphelp.png
+  filesaveas.png filesave.png helpabout.png helphelp.png
   helpindex.png hintsadddstem.png hintsaddhstem.png hintsaddvstem.png hintsautohint.png
   hintscleardstems.png hintsclearhstems.png hintsclearvstems.png hintsdontautohint.png
-  hintsreviewhints.png inline.png intersection.png menuempty.png metricscenter.png
-  metricssetlbearing.png metricssetrbearing.png metricssetvwidth.png metricssetwidth.png oblique.png
-  outline.png overlapexclude.png overlapfindinter.png overlapintersection.png overlaprm.png
+  hintsreviewhints.png menuempty.png metricscenter.png
+  metricssetlbearing.png metricssetrbearing.png metricssetvwidth.png metricssetwidth.png
+  overlapexclude.png overlapfindinter.png overlapintersection.png overlaprm.png
   palette3drotate.png palette3drotate-selected.png palettecorner.png palettecorner-selected.png
   palettecurve.png palettecurve-selected.png paletteelipse.png paletteelipse-selected.png
   paletteflip.png paletteflip-selected.png palettefreehand.png palettefreehand-selected.png
@@ -65,11 +66,11 @@ install(FILES
   pointsG2curve.png pointshvcurve.png pointsmakearc.png pointsmakeline.png pointsnamecontour.png
   pointsnamepoint.png pointsspironext.png pointsspiroprev.png pointstangent.png ptinfocorner.png
   ptinfocurve.png ptinfohvcurve.png ptinfotangent.png python.png radio_off_disabled.png radio_off.png
-  radio_on_disabled.png radio_on.png rmoverlap.png rotate180.png rotateccw.png rotatecw.png
+  radio_on_disabled.png radio_on.png
   selectblue.png selectcyan.png selectdefault.png selectgreen.png selectmagenta.png selectred.png
-  selectwhite.png selectyellow.png shadow.png skew.png styleschangeweight.png styleschangexheight.png
+  selectwhite.png selectyellow.png styleschangeweight.png styleschangexheight.png
   stylesextendcondense.png stylesinline.png stylesitalic.png stylesoblique.png stylesoutline.png
-  stylesshadow.png stylessmallcaps.png stylessubsuper.png styleswireframe.png text12210.png
+  stylesshadow.png stylessmallcaps.png stylessubsuper.png styleswireframe.png
   tools3drotate.png toolselipse.png toolsflip.png toolsfreehand.png toolsknife.png toolsmagnify.png
   toolspen.png toolsperspective.png toolspointer.png toolspolygon.png toolsrect.png toolsrotate.png
   toolsruler.png toolsscale.png toolsscroll.png toolsskew.png toolsspiro.png toolsstar.png
@@ -79,7 +80,7 @@ install(FILES
   ttdebugwatchpnt.png viewbiggersize.png viewfindinfont.png viewfit.png viewformer.png viewgoto.png
   viewinsertafter.png viewinsertbefore.png viewlayers.png viewnextdef.png viewnext.png
   viewpalettes.png viewprevdef.png viewprev.png viewreplace.png viewsmallersize.png viewzoomin.png
-  viewzoomout.png wireframe.png
+  viewzoomout.png
 
   charviewicon.xbm fontview2.xbm logo.xbm
 

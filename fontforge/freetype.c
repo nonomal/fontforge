@@ -90,7 +90,6 @@ int hasFreeTypeDebugger(void) {
     if ( !hasFreeTypeByteCode())
 return( false );
 #if FREETYPE_HAS_DEBUGGER
-    if ( FT_Set_Debug_Hook!=NULL && TT_RunIns!=NULL )
 return( true );
 #endif
 
@@ -149,7 +148,7 @@ return;
     if ( ftc->shared_ftc )
 return;
     if ( ftc->mappedfile )
-#if defined(__MINGW32__)
+#if defined(__MINGW32__) || defined(_MSC_VER)
 		UnmapViewOfFile(ftc->mappedfile);
 #else
 		munmap(ftc->mappedfile,ftc->len);
@@ -171,7 +170,7 @@ void *__FreeTypeFontContext(FT_Library context,
      */
     FTC *ftc;
     SplineChar **old=sf->glyphs, **new;
-    uint8 *selected = fv!=NULL ? fv->selected : NULL;
+    uint8_t *selected = fv!=NULL ? fv->selected : NULL;
     EncMap *map = fv!=NULL ? fv->map : sf->fv!=NULL ? sf->fv->map : sf->map;
     int i,cnt, notdefpos;
 
@@ -212,7 +211,7 @@ return( NULL );
 		    TransitiveClosureAdd(new,old,old[map->map[i]],layer);
 	    /* Add these guys so we'll get reasonable blue values */
 	    /* we won't rasterize them */
-	    if ( PSDictHasEntry(sf->private,"BlueValues")==NULL ) {
+	    if ( PSDictHasEntry(sf->private_dict,"BlueValues")==NULL ) {
 		AddIf(sf,new,old,'I',layer);
 		AddIf(sf,new,old,'O',layer);
 		AddIf(sf,new,old,'x',layer);
@@ -311,12 +310,12 @@ return( NULL );
 
 	fseek(ftc->file,0,SEEK_END);
 	ftc->len = ftell(ftc->file);
-#if defined (__MINGW32__)
+#if defined(__MINGW32__) || defined(_MSC_VER)
         ftc->mappedfile = NULL;
         {
             int fd = _fileno(ftc->file);
             if (fd != -1) {
-                HANDLE handle = CreateFileMapping((HANDLE)_get_osfhandle(fd), 
+                HANDLE handle = CreateFileMapping((HANDLE)_get_osfhandle(fd),
                                     NULL, PAGE_READONLY, 0, ftc->len, NULL);
                 if (handle != NULL) {
                     ftc->mappedfile = MapViewOfFile(handle, FILE_MAP_READ,
@@ -418,7 +417,7 @@ return( bdfc );
 
 static BDFChar *BDFCReClut(BDFChar *bdfc) {
     /* Made for something with a bit depth of 4, but we use 8 here */
-    uint8 *pt, *end;
+    uint8_t *pt, *end;
 
     if ( bdfc==NULL )
 return( NULL );
@@ -634,7 +633,7 @@ static FT_Outline_Funcs outlinefuncs = {
 };
 
 SplineSet *FreeType_GridFitChar(void *single_glyph_context, int enc,
-	real ptsizey, real ptsizex, int dpi, uint16 *width, SplineChar *sc,
+	real ptsizey, real ptsizex, int dpi, uint16_t *width, SplineChar *sc,
 	int depth, int scaled) {
     FT_GlyphSlot slot;
     FTC *ftc = (FTC *) single_glyph_context;
@@ -719,7 +718,7 @@ return( NULL );
     ret->bytes_per_row = slot->bitmap.pitch;
     ret->as = slot->bitmap_top;
     ret->lb = slot->bitmap_left;
-    ret->num_greys = slot->bitmap.num_grays;
+    ret->num_greys = slot->bitmap.pixel_mode == ft_pixel_mode_mono ?  2 : slot->bitmap.num_grays;
 	/* Can't find any description of freetype's bitendianness */
 	/* But the obvious seems to work */
     ret->bitmap = malloc(ret->rows*ret->bytes_per_row);
@@ -908,9 +907,9 @@ return( SplineSetStroke(layer->splines,&si,layer->order2));
 }
 
 static void MergeBitmaps(FT_Bitmap *bitmap,FT_Bitmap *newstuff,struct brush *brush,
-	uint8 *clipmask,double scale,DBounds *bbox,SplineChar *sc) {
+	uint8_t *clipmask,double scale,DBounds *bbox,SplineChar *sc) {
     int i, j;
-    uint32 col = brush->col;
+    uint32_t col = brush->col;
 
     if ( col == COLOR_INHERITED ) col = 0x000000;
     col = 3*((col>>16)&0xff) + 6*((col>>8)&0xff) + 1*(col&0xff);
@@ -959,12 +958,17 @@ BDFChar *SplineCharFreeTypeRasterizeNoHints(SplineChar *sc,int layer,
     FT_Bitmap bitmap, temp;
     int i;
     int cmax, pmax;
-    real rscale = (ptsize*dpi)/72.0/(double) (sc->parent->ascent+sc->parent->descent);
-    real scale = rscale*(1<<6);
+    real rscale, scale;
     BDFChar *bdfc;
     int err = 0;
     DBounds b;
     SplineSet *all;
+
+    if ( sc->parent->ascent+sc->parent->descent == 0 )
+	return NULL;
+
+    rscale = (ptsize*dpi)/72.0/(double) (sc->parent->ascent+sc->parent->descent);
+    scale = rscale*(1<<6);
 
     if ( !hasFreeType())
 return( NULL );
@@ -1009,7 +1013,7 @@ return( NULL );
 	bitmap.num_grays = 256;
 	bitmap.pixel_mode = ft_pixel_mode_grays;
     }
-    bitmap.buffer = calloc(bitmap.pitch*bitmap.rows,sizeof(uint8));
+    bitmap.buffer = calloc(bitmap.pitch*bitmap.rows,sizeof(uint8_t));
     memset(&temp,0,sizeof(temp));
     if ( sc->parent->multilayer && !(sc->layer_cnt==2 &&
 	    !sc->layers[ly_fore].dostroke &&
@@ -1042,7 +1046,7 @@ return( NULL );
 	/* Can only get here if multilayer */
 	err = 0;
 	for ( i=ly_fore; i<sc->layer_cnt; ++i ) {
-	    uint8 *clipmask = NULL;
+	    uint8_t *clipmask = NULL;
 	    if ( SSHasClip(sc->layers[i].splines)) {
 		memset(temp.buffer,0,temp.pitch*temp.rows);
 		FillOutline(sc->layers[i].splines,&outline,&pmax,&cmax,

@@ -6,7 +6,7 @@ The exact method to do this depends on your OS distribution.
 To download all dependencies on Ubuntu, run:
 
 ```sh
-sudo apt-get install libjpeg-dev libtiff5-dev libpng-dev libfreetype6-dev libgif-dev libgtk-3-dev libxml2-dev libpango1.0-dev libcairo2-dev libspiro-dev python3-dev ninja-build cmake build-essential gettext;
+sudo apt-get install libjpeg-dev libtiff5-dev libpng-dev libfreetype-dev libgif-dev libgtk-3-dev libgtkmm-3.0-dev libxml2-dev libpango1.0-dev libcairo2-dev libspiro-dev libwoff-dev python3-dev ninja-build cmake build-essential gettext;
 ```
 
 Now run the build and installation scripts:
@@ -17,10 +17,20 @@ mkdir build
 cd build
 cmake -GNinja ..
 ninja
-ninja install
+sudo ninja install
 ```
 
 For even more details on the build system itself, see [this wiki page](https://github.com/fontforge/fontforge/wiki/CMake-guide-for-FontForge).
+
+## Python Module
+
+FontForge's Python bindings are also available directly from PyPI:
+
+```sh
+pip install fontforge
+```
+
+If you install the Python module via pip, building and installing FontForge from source will detect this and skip installing the Python module to avoid conflicts. To switch back to app-installed modules, first run `pip uninstall fontforge`.
 
 **Attention, Designers Who Love TrueType Hinting:** 
 Run `cmake` with `-DENABLE_FREETYPE_DEBUGGER=/path/to/freetype/source`. 
@@ -32,7 +42,7 @@ Note that the version of the FreeType source must *exactly* match the installed 
 ### MacOS
 * Missing packages can be installed with Homebrew, like:
 ```
-brew install cmake glib pango
+brew install cmake glib pango gtk+3
 ```
 * `msgfmt` is not found (when using Homebrew):
 
@@ -54,7 +64,7 @@ If your system comes with a package manager, use it.
 It makes installing these libraries easier.
 
 Most of these are not required for the proper compilation/execution of FontForge, if the libraries are not present they will not be used.
-(If the machine on which your executable was build didn't have them, then you must not only install the libraries, but also **rebuild FontForge from source**. 
+(If the machine on which your executable was built didn't have them, then you must not only install the libraries, but also **rebuild FontForge from source**. 
 If your machine doesn't have them and you want them they are available from:
 
 -   Image Libraries (to allow FontForge to import images in those
@@ -74,10 +84,10 @@ If your machine doesn't have them and you want them they are available from:
     It used to be disabled by default because of some [patents granted to Apple](http://freetype.org/patents.html).
     Now that they have expired, you no longer need to worry about this, unless your setup happens to use an old library version.
     Then you may enable the interpreter by setting the appropriate macro in `*.../include/freetype/config/ftoption.h*` before you build the library (see the README.UNX file on the top level of the freetype distribution).
-    To enable the truetype debugger, FontForge needs to have the freetype source directories available when it is built (there are some include files there which it depends on.)
--   libintl Is standard on most unixes. It is part of the fink package on the mac. Handles UI localization.
+    To enable the truetype debugger, FontForge needs to have the freetype source directories available when it is built (there are some '#include' files there which it depends on).
+-   libintl Is standard on most Unixes. It is part of the fink package on the Mac. Handles UI localization.
 -   [libpython](http://www.python.org/) If present when FontForge is compiled, allows the user to execute python scripts within FontForge (and you can configure FontForge so that FontForge's functionality can be imported into python -- that is FontForge both *extends* and *embeds* python)
 -   [libX](http://x.org/) Normally FontForge depends on the X11 windowing system, but if you are just interested in the scripting engines (with no user interface), it may be built on systems without X (the configure script should figure this out).
--   [libcairo](http://www.cairographics.org/) Cairo handles drawing anti-aliased splines in the outline glyph view. It is dependent on libfontconfig, libXft and perhaps other libraries.
+-   [libcairo](http://www.cairographics.org/) Cairo handles drawing anti-aliased splines in the outline glyph view. It is dependent on libfontconfig, libXft, and perhaps other libraries.
 -   [libpango](http://www.pango.org/) Pango draws text for complex scripts. It depends on glib-2.0, libfontconfig, libfreetype, libXft, and perhaps other libraries.
 -   [Unifont](http://savannah.gnu.org/projects/unifont) includes glyphs for all Unicode codepoints, and FontForge will use it if it is installed.

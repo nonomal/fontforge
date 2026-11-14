@@ -33,7 +33,6 @@
 #include "fontforgeui.h"
 #include "gfile.h"
 #include "gicons.h"
-#include "gio.h"
 #include "gkeysym.h"
 #include "ustring.h"
 #include "utype.h"
@@ -266,7 +265,7 @@ static int AskSizeBits(int *pixelsize,int *bitsperpixel) {
     label[0].text = (unichar_t *) _("Pixel size:");
     label[0].text_is_1byte = true;
     gcd[0].gd.label = &label[0];
-    gcd[0].gd.pos.x = 8; gcd[0].gd.pos.y = 8+6; 
+    gcd[0].gd.pos.x = 8; gcd[0].gd.pos.y = 8+6;
     gcd[0].gd.flags = gg_enabled|gg_visible;
     gcd[0].creator = GLabelCreate;
     hvarray[0][0] = &gcd[0];
@@ -283,7 +282,7 @@ static int AskSizeBits(int *pixelsize,int *bitsperpixel) {
     label[2].text = (unichar_t *) _("Bits/Pixel:");
     label[2].text_is_1byte = true;
     gcd[2].gd.label = &label[2];
-    gcd[2].gd.pos.x = 8; gcd[2].gd.pos.y = 38+6; 
+    gcd[2].gd.pos.x = 8; gcd[2].gd.pos.y = 38+6;
     gcd[2].gd.flags = gg_enabled|gg_visible;
     gcd[2].creator = GLabelCreate;
     hvarray[1][0] = &gcd[2];
@@ -405,7 +404,7 @@ static void DoExport(struct gfc_data *d,unichar_t *path) {
     int format, good = 0;
 
     temp = cu_copy(path);
-    format = (intpt) (GGadgetGetListItemSelected(d->format)->userdata);
+    format = (intptr_t) (GGadgetGetListItemSelected(d->format)->userdata);
     if ( d->bc!=NULL )
         blast_format = format;
     else
@@ -439,44 +438,38 @@ static void DoExport(struct gfc_data *d,unichar_t *path) {
     d->ret = good;
 }
 
-static void GFD_doesnt(GIOControl *gio) {
-    /* The filename the user chose doesn't exist, so everything is happy */
-    struct gfc_data *d = gio->userdata;
-    DoExport(d,gio->path);
-    GFileChooserReplaceIO(d->gfc,NULL);
-}
-
-static void GFD_exists(GIOControl *gio) {
-    /* The filename the user chose exists, ask user if s/he wants to overwrite */
-    struct gfc_data *d = gio->userdata;
-    char *rcb[3], *temp;
-
-    rcb[2]=NULL;
-    rcb[0] =  _("_Replace");
-    rcb[1] =  _("_Cancel");
-
-    if ( gwwv_ask(_("File Exists"),(const char **) rcb,0,1,_("File, %s, exists. Replace it?"),
-	    temp = u2utf8_copy(u_GFileNameTail(gio->path)))==0 ) {
-	DoExport(d,gio->path);
-    }
-    free(temp);
-    GFileChooserReplaceIO(d->gfc,NULL);
-}
-
 static int GFD_SaveOk(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
-	struct gfc_data *d = GDrawGetUserData(GGadgetGetWindow(g));
-	GGadget *tf;
-	GFileChooserGetChildren(d->gfc,NULL,NULL,&tf);
-	if ( *_GGadgetGetTitle(tf)!='\0' ) {
-	    unichar_t *ret = GGadgetGetTitle(d->gfc);
+        struct gfc_data *d = GDrawGetUserData(GGadgetGetWindow(g));
+        GGadget *tf;
+        GFileChooserGetChildren(d->gfc,NULL,NULL,&tf);
+        if ( *_GGadgetGetTitle(tf)!='\0' ) {
+            unichar_t *ret = GGadgetGetTitle(d->gfc);
+            char *path = u2def_copy(ret);
+            bool export = true;
 
-	    GIOfileExists(GFileChooserReplaceIO(d->gfc,
-		    GIOCreate(ret,d,GFD_exists,GFD_doesnt)));
-	    free(ret);
-	}
+            if (GFileExists(path)) {
+                /* The filename the user chose exists, ask user if s/he wants to overwrite */
+                char *rcb[3];
+
+                rcb[2]=NULL;
+                rcb[0] =  _("_Replace");
+                rcb[1] =  _("_Cancel");
+                export = gwwv_ask(
+                    _("File Exists"), (const char **) rcb, 0, 1,
+                    _("File, %s, exists. Replace it?"),
+                    GFileNameTail(path)) == 0;
+            }
+
+            if (export) {
+                DoExport(d, ret);
+            }
+
+            free(path);
+            free(ret);
+        }
     }
-return( true );
+    return true;
 }
 
 static int GFD_Cancel(GGadget *g, GEvent *e) {
@@ -492,7 +485,7 @@ static int GFD_Format(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_listselected ) {
 	struct gfc_data *d = GDrawGetUserData(GGadgetGetWindow(g));
 	unichar_t *pt, *file, *f2;
-	int format = (intpt) (GGadgetGetListItemSelected(d->format)->userdata);
+	int format = (intptr_t) (GGadgetGetListItemSelected(d->format)->userdata);
 	file = GGadgetGetTitle(d->gfc);
 	f2 = malloc(sizeof(unichar_t) * (u_strlen(file)+6));
 	u_strcpy(f2,file);
@@ -523,27 +516,6 @@ static int GFD_Format(GGadget *g, GEvent *e) {
 return( true );
 }
 
-static void GFD_dircreated(GIOControl *gio) {
-    struct gfc_data *d = gio->userdata;
-    unichar_t *dir = u_copy(gio->path);
-
-    GFileChooserReplaceIO(d->gfc,NULL);
-    GFileChooserSetDir(d->gfc,dir);
-    free(dir);
-}
-
-static void GFD_dircreatefailed(GIOControl *gio) {
-    /* We couldn't create the directory */
-    struct gfc_data *d = gio->userdata;
-    char *temp;
-
-    ff_post_notice(_("Couldn't create directory"),_("Couldn't create directory: %s"),
-		temp = u2utf8_copy(u_GFileNameTail(gio->path)));
-    free(temp);
-    GFileChooserReplaceIO(d->gfc,NULL);
-    GFileChooserReplaceIO(d->gfc,NULL);
-}
-
 static int GFD_Options(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
         struct gfc_data *d = GDrawGetUserData(GGadgetGetWindow(g));
@@ -557,8 +529,8 @@ static int GFD_Options(GGadget *g, GEvent *e) {
 static int GFD_NewDir(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
         struct gfc_data *d = GDrawGetUserData(GGadgetGetWindow(g));
+        unichar_t *utemp = NULL;
         char *newdir;
-        unichar_t *utemp;
 
         newdir = gwwv_ask_string(_("Create directory"),NULL,_("Directory name?"));
         if ( newdir==NULL )
@@ -570,9 +542,14 @@ static int GFD_NewDir(GGadget *g, GEvent *e) {
             free(newdir); free(basedir); free(tmp_dir);
             newdir = temp;
         }
-        utemp = utf82u_copy(newdir); free(newdir);
-        GIOmkDir(GFileChooserReplaceIO(d->gfc,
-              GIOCreate(utemp,d,GFD_dircreated,GFD_dircreatefailed)));
+        if (GFileMkDir(newdir, 0755)) {
+             ff_post_notice(_("Couldn't create directory"),
+                _("Couldn't create directory: %s"), newdir);
+        } else {
+            utemp = utf82u_copy(newdir);
+            GFileChooserSetDir(d->gfc, utemp);
+        }
+        free(newdir);
         free(utemp);
     }
     return true;
@@ -650,7 +627,7 @@ static int _Export(SplineChar *sc,BDFChar *bc,int layer) {
 	int cnt, extras;
 	for ( cnt=0; formats[cnt].text!=NULL; ++cnt );
 	for ( i=extras=0; py_ie[i].name!=NULL; ++i )
-	    if ( py_ie[i].export!=NULL )
+	    if ( py_ie[i].py_export!=NULL )
 		++extras;
 	if ( extras!=0 ) {
 	    cur_formats = calloc(extras+cnt+1,sizeof(GTextInfo));
@@ -659,10 +636,10 @@ static int _Export(SplineChar *sc,BDFChar *bc,int layer) {
 		cur_formats[cnt].text = (unichar_t *) copy( (char *) formats[cnt].text );
 	    }
 	    for ( i=extras=0; py_ie[i].name!=NULL; ++i ) {
-		if ( py_ie[i].export!=NULL ) {
+		if ( py_ie[i].py_export!=NULL ) {
 		    cur_formats[cnt+extras].text = (unichar_t *) copy(py_ie[i].name);
 		    cur_formats[cnt+extras].text_is_1byte = true;
-		    cur_formats[cnt+extras].userdata = (void *) (intpt) (fv_pythonbase+i);
+		    cur_formats[cnt+extras].userdata = (void *) (intptr_t) (fv_pythonbase+i);
 		    ++extras;
 		}
 	    }

@@ -195,7 +195,7 @@ The File Menu
    Only available in the font and outline views. Rereads the font from the sfd
    file on the disk searching for a glyph in that file with the same name as the
    current glyph. All changes to this glyph will be lost (but if the glyph has
-   references then any changes made to the glyphs being refered to will still be
+   references then any changes made to the glyphs being referred to will still be
    visible), *this command may be undone.*
 
    So if you have changed the name of the glyph this command will fail.
@@ -347,16 +347,16 @@ The File Menu
    :doc:`dialog allowing you to configure various esoteric bits of fontforge </ui/dialogs/prefs>`.
 
    A number of things, like the colors used in FontForge, that might be
-   controlled from a preference window are controlled by
-   :doc:`X Resources </ui/misc/xres>` below.
+   controlled from a preference window are controlled by the
+   :doc:`Appearance Editor </ui/misc/xres>` below.
 
 .. _filemenu.ResEdit:
 
-.. object:: X Resource Editor...
+.. object:: Appearance Editor...
 
-   :doc:`This dialog </ui/misc/resedit>` allows you to edit FontForge's X Resources, you
-   may either save them to a file for perminant storage, or change the current
-   settings for this use of FontForge.
+   :doc:`This dialog </ui/misc/resedit>` allows you to edit FontForge's appearance.
+   You may either save the changes to a file for perminant storage or change the current
+   settings for this use of FontForge (although the latter does not work for all settings).
 
 .. _filemenu.ConfPlugin:
 
@@ -365,7 +365,7 @@ The File Menu
    :doc:`This dialog </techref/plugins>` allows you to configure which
    FontForge plugins—discovered among python packages installed and available
    to the FontForge application—are loaded, and in what order. Plugins extend
-   the functionalty of FontForge, most often by adding entries in the Font View
+   the functionality of FontForge, most often by adding entries in the Font View
    and Char View :doc:`Tools menu <toolsmenu>`.
 
 .. _filemenu.Quit:

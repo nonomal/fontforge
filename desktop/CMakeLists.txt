@@ -5,13 +5,13 @@ if(UNIX)
   install(FILES fontforge.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/mime/packages)
 
   foreach(_size 16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256 512x512)
-    install(FILES "${THEME}/${_size}/org.fontforge.FontForge.png" DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${_size}/apps)
+    install(FILES "${GUI_THEME}/${_size}/org.fontforge.FontForge.png" DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${_size}/apps)
   endforeach()
-  install(FILES "${THEME}/scalable/org.fontforge.FontForge.svg" DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+  install(FILES "${GUI_THEME}/scalable/org.fontforge.FontForge.svg" DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
 
-  file(STRINGS "${CMAKE_SOURCE_DIR}/po/LINGUAS" _langs)
+  file(STRINGS "${PROJECT_SOURCE_DIR}/po/LINGUAS" _langs)
   foreach(_lang ${_langs})
-    list(APPEND _pofiles "${CMAKE_SOURCE_DIR}/po/${_lang}.po")
+    list(APPEND _pofiles "${PROJECT_SOURCE_DIR}/po/${_lang}.po")
   endforeach()
 
   macro(msgfmt_desktop_file _mode _file _installdir)
@@ -20,7 +20,7 @@ if(UNIX)
     add_custom_command(OUTPUT "${_output}"
       COMMAND "${GETTEXT_MSGFMT_EXECUTABLE}"
         --${_mode} --template "${_input}"
-        -d "${CMAKE_SOURCE_DIR}/po"
+        -d "${PROJECT_SOURCE_DIR}/po"
         -o "${_output}"
       DEPENDS "${_input}" ${_pofiles}
       VERBATIM

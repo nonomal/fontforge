@@ -47,6 +47,10 @@
 #  define PRINTF_FORMAT_ATTRIBUTE(x, y)
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern bool SetupUCharMap(const char* unichar_name, const char* local_name, bool is_local_utf8);
 
 extern char *copy(const char *);
@@ -123,13 +127,13 @@ extern unichar_t *u_strstartmatch(const unichar_t *initial, const unichar_t *ful
 extern unichar_t *cu_strstartmatch(const char *initial, const unichar_t *full);
 
 #define utf82u_strncpy utf82U_strncpy
-extern int32 utf8_ildb(const char **utf8_text);
+extern int32_t utf8_ildb(const char **utf8_text);
 #define UTF8IDPB_NOZERO 1	/* Allow for 0 encoded as a non-zero utf8 0xc0:0x80 char */
 #define UTF8IDPB_OLDLIMIT 2	/* Today's utf8 is agreed to be limited to {0..0x10FFFF} */
 #define UTF8IDPB_UCS2 8		/* Encode {0...0xffff} as 16bit ucs2 type values */
 #define UTF8IDPB_UTF16 16	/* Encode {0...0x10ffff} as 16bit utf16 type values */
 #define UTF8IDPB_UTF32 32	/* Encode {0...0x10ffff} as 32bit utf32 type values */
-extern char *utf8_idpb(char *utf8_text,uint32 ch,int flags);
+extern char *utf8_idpb(char *utf8_text,uint32_t ch,int flags);
 extern char *utf8_db(char *utf8_text);
 extern char *utf8_ib(char *utf8_text);
 extern int utf8_valid(const char *str);
@@ -139,9 +143,10 @@ extern char *latin1_2_utf8_copy(const char *lbuf);
 extern char *utf8_2_latin1_copy(const char *utf8buf);
 extern long utf8_strlen(const char *utf8_str);	 /* Count how many characters in the string NOT bytes */
 extern long utf82u_strlen(const char *utf8_str); /* Count how many shorts needed to represent in UCS2 */
-extern void utf8_strncpy(register char *to, const char *from, int len); /* copy n characters NOT bytes */
+extern void utf8_strncpy(char *to, const char *from, int len); /* copy n characters NOT bytes */
 extern char *def2utf8_copy(const char *from);
 extern char *utf82def_copy(const char *ufrom);
+extern char *utf82def_copy_safe(const char *ufrom);
 extern char *utf8_strchr(const char *utf8_str, int search_char);
 
 extern unichar_t *utf82u_strncpy(unichar_t *ubuf,const char *utf8buf,int len);
@@ -157,6 +162,11 @@ extern unichar_t *def2u_strncpy(unichar_t *uto, const char *from, size_t n);
 extern char *u2def_strncpy(char *to, const unichar_t *ufrom, size_t n);
 extern unichar_t *def2u_copy(const char *from);
 extern char *u2def_copy(const unichar_t *ufrom);
+
+extern uint16_t *u2utf16_strcpy(uint16_t *utf16buf,const unichar_t *ubuf);
+extern unichar_t *utf162u_strcpy(unichar_t*ubuf, const uint16_t *utf16buf);
+
+extern uint16_t *utf82utf16_copy(const char* utf8buf);
 
 extern int uAllAscii(const unichar_t *str);
 extern int AllAscii(const char *);
@@ -206,7 +216,7 @@ extern int u_startswith(const unichar_t *haystack,const unichar_t *needle);
 extern int uc_startswith(const unichar_t *haystack,const char* needle);
 
 /**
- * In the string 's' replace all occurances of 'orig' with 'replacement'.
+ * In the string 's' replace all occurrences of 'orig' with 'replacement'.
  * If you set free_s to true then the string 's' will be freed by this function.
  * Normally you want to set free_s to 0 to avoid that. The case you will want to
  * use free_s to 1 is chaining many calls like:
@@ -227,6 +237,16 @@ extern char* str_replace_all( char* s, char* orig, char* replacement, int free_s
 
 int toint( char* v );
 char* tostr( int v );
+/* Reallocate buffer and adjust its tail and intermediate processor if present.
+   p_tail is expected to point to the last allocated byte in the buffer, unless
+   it's NULL, in which case the buffer is assumed to be empty.
+ */
+void realloc_tail(char** p_buf, size_t size_delta, char** p_tail,
+                  char** p_proc);
+
+#ifdef __cplusplus
+}
+#endif
 
 #pragma pop_macro("PRINTF_FORMAT_ATTRIBUTE")
 

@@ -32,6 +32,7 @@
 #include "fvcomposite.h"
 #include "fvfonts.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "lookups.h"
 #include "psfont.h"
 #include "splinefill.h"
@@ -59,6 +60,8 @@ GTextInfo sortby[] = {
     { (unichar_t *) N_("Kern Size"), NULL, 0, 0, (void *) sb_kern, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     GTEXTINFO_EMPTY
 };
+
+GResFont combinations_font = GRESFONT_INIT("400 12px " SANS_UI_FAMILIES);
 
 void SFShowLigatures(SplineFont *sf,SplineChar *searchfor) {
     int i, cnt;
@@ -458,6 +461,7 @@ static void KP_ExposeKerns(KPData *kpd,GWindow pixmap,GRect *rect) {
     GRect old, subclip, subold, sel;
     struct _GImage base;
     GImage gi;
+    GClut clut;
     int index1, index2;
     BDFChar *bdfc1, *bdfc2;
     int i, as, x, em = kpd->sf->ascent+kpd->sf->descent, yoff;
@@ -484,13 +488,23 @@ static void KP_ExposeKerns(KPData *kpd,GWindow pixmap,GRect *rect) {
     memset(&base,'\0',sizeof(base));
     gi.u.image = &base;
     base.image_type = it_index;
-    base.clut = kpd->bdf->clut;
     GDrawSetDither(NULL, false);
+
+    Color fg = GDrawGetDefaultForeground(NULL);
+    Color bg = GDrawGetDefaultBackground(NULL);
+    memcpy(&clut,kpd->bdf->clut,sizeof(clut));
+    int bgr=COLOR_RED(bg), bgg=COLOR_GREEN(bg), bgb=COLOR_BLUE(bg);
+	int fgr=COLOR_RED(fg), fgg=COLOR_GREEN(fg), fgb=COLOR_BLUE(fg);
+    for ( i=0; i<clut.clut_len; ++i )
+	clut.clut[i] = COLOR_CREATE( bgr + (i*(fgr-bgr))/(clut.clut_len-1),
+	                             bgg + (i*(fgg-bgg))/(clut.clut_len-1),
+	                             bgb + (i*(fgb-bgb))/(clut.clut_len-1));
+    base.clut = &clut;
 
     GDrawPushClip(pixmap,rect,&old);
     GDrawSetFont(pixmap,kpd->font);
     GDrawSetLineWidth(pixmap,0);
-    GDrawFillRect(pixmap,rect,GDrawGetDefaultBackground(NULL));
+    GDrawFillRect(pixmap,rect,bg);
     subclip = *rect;
     for ( i=first; i<=last && i+kpd->off_top<kpd->kcnt; ++i ) {
 	subclip.y = i*kpd->uh; subclip.height = kpd->uh;
@@ -523,7 +537,7 @@ static void KP_ExposeKerns(KPData *kpd,GWindow pixmap,GRect *rect) {
 	yoff = (kern->newyoff*kpd->bdf->pixelsize/em);
 	GDrawDrawImage(pixmap,&gi,NULL, x,subclip.y+as-bdfc2->ymax-yoff);
 	GDrawDrawLine(pixmap,0,subclip.y+kpd->uh-1,
-		subclip.x+subclip.width,subclip.y+kpd->uh-1,0x000000);
+		subclip.x+subclip.width,subclip.y+kpd->uh-1,fg);
 	if ( kern->kp!=NULL )
 	    sprintf( buffer, "%d ", kern->newoff);
 	else
@@ -531,11 +545,11 @@ static void KP_ExposeKerns(KPData *kpd,GWindow pixmap,GRect *rect) {
 	if ( kern->ac!=NULL )
 	    strncat(buffer,kern->ac->name,sizeof(buffer)-strlen(buffer)-1);
 	GDrawDrawText8(pixmap,15,subclip.y+kpd->uh-kpd->fh+kpd->as,buffer,-1,
-		kern->kp!=NULL && kern->newoff!=kern->kp->off ? 0xff0000 : 0x000000 );
+		kern->kp!=NULL && kern->newoff!=kern->kp->off ? GDrawGetWarningForeground(NULL) : fg );
 	if ( i+kpd->off_top==kpd->selected ) {
 	    sel.x = 0; sel.width = kpd->vwidth-1;
 	    sel.y = subclip.y; sel.height = kpd->uh-2;
-	    GDrawDrawRect(pixmap,&sel,0x000000);
+	    GDrawDrawRect(pixmap,&sel,fg);
 	}
 	GDrawPopClip(pixmap,&subold);
     }
@@ -544,18 +558,6 @@ static void KP_ExposeKerns(KPData *kpd,GWindow pixmap,GRect *rect) {
 #endif
     GDrawPopClip(pixmap,&old);
     GDrawSetDither(NULL, true);
-}
-
-static void KP_RefreshSel(KPData *kpd,int index) {
-    Color col = index==kpd->selected ? 0x000000 : GDrawGetDefaultBackground(NULL);
-    GRect sel;
-
-    if ( index==-1 )
-return;
-    sel.x = 0; sel.width = kpd->vwidth-1;
-    sel.y = (index-kpd->off_top)*kpd->uh; sel.height = kpd->uh-2;
-    GDrawSetLineWidth(kpd->v,0);
-    GDrawDrawRect(kpd->v,&sel,col);
 }
 
 static void KP_RefreshKP(KPData *kpd,int index) {
@@ -663,7 +665,7 @@ static void KPRemove(KPData *kpd) {
 }
 
 static void KP_Commands(KPData *kpd, GEvent *e) {
-    int old_sel, amount;
+    int amount;
 
     switch( e->u.chr.keysym ) {
       case '\177':
@@ -689,23 +691,19 @@ static void KP_Commands(KPData *kpd, GEvent *e) {
 	}
       break;
       case GK_Up: case GK_KP_Up:
-	old_sel = kpd->selected;
 	if ( kpd->selected<=0 )
 	    kpd->selected = kpd->kcnt-1;
 	else
 	    --kpd->selected;
-	KP_RefreshSel(kpd,old_sel);
-	KP_RefreshSel(kpd,kpd->selected);
+	GDrawRequestExpose(kpd->v,NULL,false);
 	KP_ScrollTo(kpd,kpd->selected);
       break;
       case GK_Down: case GK_KP_Down:
-	old_sel = kpd->selected;
 	if ( kpd->selected==-1 || kpd->selected==kpd->kcnt-1 )
 	    kpd->selected = 0;
 	else
 	    ++kpd->selected;
-	KP_RefreshSel(kpd,old_sel);
-	KP_RefreshSel(kpd,kpd->selected);
+	GDrawRequestExpose(kpd->v,NULL,false);
 	KP_ScrollTo(kpd,kpd->selected);
       break;
       case GK_Left: case GK_KP_Left: case GK_Right: case GK_KP_Right:
@@ -752,7 +750,7 @@ static void KP_Resize(KPData *kpd) {
 static int KP_ChangeSize(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_listselected ) {
 	KPData *kpd = GDrawGetUserData(GGadgetGetWindow(g));
-	int newsize = (intpt) (GGadgetGetListItemSelected(g)->userdata);
+	int newsize = (intptr_t) (GGadgetGetListItemSelected(g)->userdata);
 	BDFFont *temp;
 	if ( newsize==kpd->bdf->pixelsize )
 return( true );
@@ -922,7 +920,7 @@ static unichar_t upopupbuf[100];
 
 static int kpdv_e_h(GWindow gw, GEvent *event) {
     KPData *kpd = GDrawGetUserData(gw);
-    int index, old_sel, temp;
+    int index, temp;
     char buffer[100];
     static int done=false;
 
@@ -944,10 +942,8 @@ return( true );
 	if ( index>=kpd->kcnt )
 	    index = -1;
 	if ( index!=kpd->selected ) {
-	    old_sel = kpd->selected;
 	    kpd->selected = index;
-	    KP_RefreshSel(kpd,old_sel);
-	    KP_RefreshSel(kpd,index);
+	    GDrawRequestExpose(kpd->v,NULL,false);
 	}
 	if ( event->u.mouse.button==3 && index>=0 ) {
 	    if ( !done ) {
@@ -1028,6 +1024,7 @@ return( true );
       case et_resize:
 	KPV_Resize(kpd);
       break;
+      default: break;
     }
 return( true );
 }
@@ -1058,9 +1055,10 @@ static int kpd_e_h(GWindow gw, GEvent *event) {
 	GDrawGetSize(kpd->v,&size);
 	GGadgetGetSize(GWidgetGetControl(kpd->gw,CID_ScrollBar),&sbsize);
 	GDrawSetLineWidth(gw,0);
-	GDrawDrawLine(gw,size.x,size.y-1,sbsize.x+sbsize.width-1,size.y-1,0x000000);
-	GDrawDrawLine(gw,size.x,size.y+size.height,sbsize.x+sbsize.width-1,size.y+size.height,0x000000);
-	GDrawDrawLine(gw,size.x-1,size.y-1,size.x-1,size.y+size.height,0x000000);
+	Color fg = GDrawGetDefaultForeground(NULL);
+	GDrawDrawLine(gw,size.x,size.y-1,sbsize.x+sbsize.width-1,size.y-1,fg);
+	GDrawDrawLine(gw,size.x,size.y+size.height,sbsize.x+sbsize.width-1,size.y+size.height,fg);
+	GDrawDrawLine(gw,size.x-1,size.y-1,size.x-1,size.y+size.height,fg);
     } else if ( event->type == et_char ) {
 	if ( event->u.chr.keysym == GK_F1 || event->u.chr.keysym == GK_Help ) {
 	    help("ui/dialogs/kernpairs.html", NULL);
@@ -1089,10 +1087,8 @@ void SFShowKernPairs(SplineFont *sf,SplineChar *sc,AnchorClass *ac,int layer) {
     GWindowAttrs wattrs;
     GGadgetCreateData gcd[9], boxes[6], *hvarray[3][3], *harray[3], *barray[10], *varray[5];
     GTextInfo label[9];
-    FontRequest rq;
     int as, ds, ld,i;
     static int done=false;
-    static GFont *font=NULL;
 
     memset(&kpd,0,sizeof(kpd));
     kpd.sf = sf;
@@ -1230,24 +1226,16 @@ return;
     GHVBoxSetExpandableCol(boxes[4].ret,gb_expandgluesame);
     GHVBoxSetPadding(boxes[0].ret,0,2);
     GHVBoxSetPadding(boxes[3].ret,0,0);
-    kpd.v = GDrawableGetWindow(gcd[4].ret);;
+    kpd.v = GDrawableGetWindow(gcd[4].ret);
 
     GGadgetGetSize(gcd[4].ret,&pos);
     kpd.sb_width = pos.width;
     GGadgetGetSize(gcd[3].ret,&pos);
     kpd.header_height = pos.y+pos.height+4;
 
-    kpd.bdf = SplineFontPieceMeal(kpd.sf,kpd.layer,(intpt) (gcd[1].gd.label->userdata),72,true,NULL);
+    kpd.bdf = SplineFontPieceMeal(kpd.sf,kpd.layer,(intptr_t) (gcd[1].gd.label->userdata),72,true,NULL);
 
-    if ( font==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = -12;
-	rq.weight = 400;
-	font = GDrawInstanciateFont(gw,&rq);
-	font = GResourceFindFont("Combinations.Font",font);
-    }
-    kpd.font = font;
+    kpd.font = combinations_font.fi;
     GDrawWindowFontMetrics(gw,kpd.font,&as,&ds,&ld);
     kpd.fh = as+ds; kpd.as = as;
 

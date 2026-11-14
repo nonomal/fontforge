@@ -59,7 +59,11 @@ the components of each standard ligature.
 FontForge cannot create a nice ligature for you, but what it can do is put all
 the components of the ligature into the glyph with
 :ref:`Element->Build->Build Composite <elementmenu.Accented>`. This makes it
-slightly easier (at least in latin) to design a ligature.
+slightly easier (at least in latin) to design a ligature. For this to work the
+original glyph and the combining glyph (identified by circles plus the glyph)
+must be present in the overview. If either of them is not, the menuitem is
+disabled. To find of which components the glyph consists review Glyph Info
+and then the Components section.
 
 .. rubric:: Steps to building a ligature
 
@@ -148,7 +152,7 @@ So the first time you create a ligature glyph you will need to create a lookup
 (and a lookup subtable) in which the information for that glyph will reside. Any
 subsequent ligatures can probably share the same lookup and subtable.
 
-(This may seem like overkill for latin ligatures, and perhaps it is, bt the
+(This may seem like overkill for latin ligatures, and perhaps it is, but the
 complexity is needed for more complex writing systems).
 
 You would open the Lookups pane of the

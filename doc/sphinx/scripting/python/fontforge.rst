@@ -123,7 +123,7 @@ Module functions
 .. function:: loadEncodingFile(filename[, encname])
 
    Loads an encoding file, returns the name of the encoding or ``None``. When
-   loading encodings in Unicode consortium format, an encname has to be specefied
+   loading encodings in Unicode consortium format, an encname has to be specified
    or the encoding will be ignored and ``None`` will be returned.
 
 .. function:: loadNamelist(filename)
@@ -252,7 +252,7 @@ Module functions
    do not have a method to indicate version numbers, but there is a limited
    method to estimate versions {'0.0'..'0.5'}. '0.0' if FontForge has no LibSpiro
    available. '0.1' if LibSpiro 20071029 is available. '0.2' if LibSpiro 0.2 to
-   0.5 is available. LibSpiro 0.6 and higher reports back it's version available.
+   0.5 is available. LibSpiro 0.6 and higher reports back its version available.
 
 .. function:: version()
 
@@ -345,6 +345,11 @@ Module functions
    Returns a tuple listing the directory paths which are searched for python
    scripts during FontForge initialization.
 
+.. function:: userConfigPath()
+
+   Returns the path to the user's FontForge configuration directory, which should
+   be writable.
+
 .. function:: fonts()
 
    Returns a tuple of all fonts currently loaded into FontForge for editing
@@ -409,6 +414,15 @@ Module functions
 
       Retain all recognized font tables that do not have a native format.
 
+   This function can also be used with the ``with`` statement, in which case
+   there is no need to call :meth:`font.close()` explicitly:
+
+   ::
+
+      with fontforge.open('somefont.sfd') as fnt:
+          # do something
+          fnt.generate('somefont.ttf')
+
 .. function:: parseTTInstrs(string)
 
    Returns a binary string each byte of which corresponds to a truetype
@@ -439,6 +453,9 @@ Module functions
    and computing the optical left and right side bearings (for 'lfbd' and 'rtbd'
    features). For more information see its own section.
 
+.. function:: onAppClosing(hook)
+
+   Add a python function which is called when FontForge is closing down.
 
 .. _fontforge.ui_functions:
 
@@ -454,7 +471,7 @@ example they might want to ask more than one question in a dialog, and I don't
 support that).
 
 When FontForge starts (if it's a FontForge with python) it will look at the
-directories ``$(PREFIX)/share/fontforge/python`` and ``~/.FontForge/python``
+directories ``$(PREFIX)/share/fontforge/python`` and ``~/.config/fontforge/python``
 and attempt to run all files in those directories which end in ``".py"``.
 Presumably these files will allow people to customize the user interface to
 suit their needs.
@@ -472,12 +489,15 @@ before the user directory.
    def nameGlyph(junk, glyph):
       print(glyph.glyphname)
 
-   fontforge.registerMenuItem(nameGlyph, None, None, "Glyph", None, "Print Glyph Name")
+   fontforge.registerMenuItem(callback=nameGlyph, context="Glyph",
+                              name=("Print Glyph Name", "MyExt_PrintGlyphName"))
 
    def neverEnableMe(junk, glyph):
       return False
 
-   fontforge.registerMenuItem(nameGlyph, neverEnableMe, None, "Glyph", None, "SubMenu", "Print Glyph Name")
+   fontforge.registerMenuItem(callback=nameGlyph, enable=neverEnableMe, context="Glyph",
+                              submenu=("SubMenu", "MyExt_SubMenu"),
+                              name=("Print Glyph Name", "MyExt_PrintGlyphName"))
 
    def importGlyph(junk, glyph, filename, toback):
       print("Import")
@@ -511,65 +531,137 @@ Not a very useful example.
 
    Returns ``True`` if this session of FontForge has a user interface
 
-.. function:: registerMenuItem(menu_function, enable_function, data, which_window, shortcut_string, {submenu_names, } menu_name_string)
+.. function:: registerMenuItem(callback, enable, data, context, hotkey, {submenu_names, } name)
+   (Positional interface)
 
-   If FontForge has a user interface this will add this menu item to FontForge's :ref:`Tool <toolsmenu.tools>`
-   menu, either in the font or the outline glyph view (or both).
+.. function:: registerMenuItem(callback=, enable=None, data=None, context=, hotkey=None, name=, submenu=None, keyword_only=False)
+   (Keyword interface)
+   :noindex:
+.. function:: registerMenuItem(context=, divider=, submenu=None)
+   (Divider interface)
+   :noindex:
 
-   .. object:: menu-function
+   If FontForge has a user interface this will add this menu item to the
+   FontForge menu(s) specified by the ``context`` parameter. This second
+   keyword interface is explained in the ``divider`` section.
+
+   We also recommend reading the :ref:`Menu <fontforge.plugin_menu>` section
+   of :doc:`Extending FontForge with Python </techref/pyextend>`
+
+   **Note:** The positional interface is forward-compatible with earlier
+   versions of FontForge.
+
+   .. object:: callback
 
       This is the function that will be called when the menu item is activated.
-      It will be passed two arguments, the first is the data value specified here
-      (which may be ``None``, indeed will probably usually be ``None``), and the
-      second is the glyph or font (depending on the window type) from which the
-      menu item was activated. Its return value is ignored.
+      It will be passed two arguments, the first is the data value specified
+      here (which defaults to ``None``) and the second is a :class:`fontforge.glyph`
+      or :class:`fontforge.font` object (depending on the ``context``).
+      The callback's return value is ignored.
 
-   .. object:: enable_function
+   .. object:: enable
 
-      This may be ``None`` -- in which case the menu item will always be enabled.
-      Otherwise it will be called before the menu pops up on the screen to
-      determine whether this item should be enabled. It will be passed the same
-      arguments as above. It should return ``True`` if the item should be
-      enabled and ``False`` otherwise.
+      When specified this function is called with the same arguments as ``callback``
+      right before the menu or submenu is displayed. When it returns ``True``
+      the menu item will be enabled and when it returns ``False`` it will be
+      disabled. (When ``enable`` is ``None`` the menu item is always enabled.)
 
    .. object:: data
 
-      This can be whatever you want (including ``None``). FontForge keeps track
-      of it and passes it to both of the above functions. Use it if you need to
-      provide some context for the menu item.
+      ``data`` can be whatever you want; it defaults to ``None``. FontForge
+      passes it to both of the above functions. It can be used to provide
+      context or default arguments for the function (so that one function can
+      be used for multiple menu items.)
 
-   .. object:: which_window
+   .. object:: context
 
-      May be either of the strings ``"Font"`` or ``"Glyph"`` (or the tuple
-      ``("Font", "Glyph")``) and it determines which type of window will have
-      this menu item in its "Tools" menu.
+      Currently this can the string ``"Font"``, the string ``"Glyph"``
+      or the tuple ``("Font", "Glyph")``). ``"Font"`` will add the menu item
+      to the FontView "Tools" menu or its submenu, while ``"Glyph"`` will
+      add it to the CharView tools menu or its submenu.
 
-   .. object:: shortcut-string
+   .. object:: hotkey
 
-      .. warning:: Deprecated?
+      ``hotkey`` must be either ``None`` or a string in hotkey format,
+      which is the same as the second part of a
+      :ref:`HotKey assignment <HotKeys.hotkeyassign>`.
+      Because hotkeys are a "limited
+      resource" this string is only a `suggestion`; it has no effect
+      when the specified HotKey is already taken. Therefore, before picking
+      a candidate HotKey you should at least verify that it is not already
+      used by the relevant window in FontForge.
 
-      May be ``None`` if you do not wish to supply a shortcut. Otherwise should
-      be a string like "Menu Name|Cntl-H" (the syntax is defined in the
-      translation section).
+      Even when the specified HotKey is taken a user can still specify their
+      own in the HotKeys file. You can make this easier to do, now and in the
+      future, by providing the full triplet of names for each "level" using
+      the current interface.
 
-   .. object:: submenu-names
+   .. object:: name
 
-      You may specify as many of these as you wish (including leaving them out
-      altogether), this allows you to organize the Tools menu into submenus. (If
-      a submenu of this name does not currently exist, FontForge will create it).
+      ``name`` can be a string but ideally it is a tuple of three strings
+      ``(localized_name, english_name, identifier_string)`` or of two strings
+      ``(english_name, identifier_string)``. Use the three-tuple version when
+      your plugin or other extension is localized and the two-tuple version
+      when it is not localized or the user has configured the base locale.
 
-   .. object:: menu-name
+      **Note:** The ``english_name`` and ``localized_name`` can and should
+      include a *mnemonic*, picked out by a leading underscore. However,
+      mnemonics at the top level (so the first ``submenu`` name or the ``name``
+      if ``submenu`` is ``None``) are taken as a suggestion, similar to the
+      ``hotkey`` argument. Please read the sections on Internationalization and
+      Localization and on Mnemonics in Extending FontForge with Python.
 
-      The name that will appear in the menu for this item. This will only affect
-      windows created after this command is executed. Normally the command will
-      be executed at startup and so it will affect all windows.
+      The ``identifier_string`` should be a single alphanumeric (plus
+      underscores, but no spaces) string to identify this menu item. In the
+      future this will serve as the representation of the menu item in menu
+      configuration files, allowing a user or administrator to put the item
+      where they like. It should include the name of your plugin or an
+      abbreviation of it. For a plugin called "Feature File Helpers" and an
+      item with (English) name "Save Fragment" a reasonable option would be
+      "FeatFileHelp_SaveFragment". (This is for the future, as configurable
+      menus are not yet supported by FontForge.)
+
+   .. object:: submenu
+
+      **Note:** ``submenu`` is a keyword-only argument.
+
+      ``submenu`` can be any of: ``None``, a string, a two-tuple or three-tuple
+      as with ``name``, or a Python *list* of any of these, with each
+      specifying a level of sub-menu. (You cannot specify muitple levels of
+      submenu with a tuple, as this would be ambiguous.) The tuple elements are
+      analogous to ``name``: a three-tuple of ``(localized_name, english_name,
+      identifier_string)``, a two-tuple of ``(english_name,
+      identifier_string)``, or a string which is treated as the
+      ``localized_name``. Submenus can and should also specify a *mnemonic*.
+
+      In the future the ``identifier_string`` will allow a whole submenu to be
+      moved to a different location in the menu hierarchy.
+
+   .. object:: submenu_names
+
+      When using the positional interface, each of these "intermediate" entries
+      can be a three-tuple, two-tuple, or string, corresponding to an entry
+      in the ``submenu`` list.
+
+   .. object:: keyword_only
+
+      When ``keyword_only`` is ``False`` (the default) the function will attempt
+      to fall back to the positional interface and any reported errors will be
+      relative to that interface. If you're having trouble with keyword parameters
+      set ``keyword_only`` to ``True`` to see a more specific error message.
+
+   .. object:: divider
+
+      This special form of the function adds a horizontal line to the menu.
+      The ``context`` keyword is required and ``divider`` must be set to ``True``.
+      If the ``submenu`` keyword is omitted the divider is added to the top level.
 
 .. function:: registerImportExport(import_function, export_function, data, name, extension, [extension_list])
 
    This will add the capability to import or export files of a given type,
    presumably a way of specifying the splines in a given glyph.
 
-   .. object:: import-function
+   .. object:: import_function
 
       The function to call to import a file into a glyph. It will be called
       with: The data argument (specified below), A pointer to the glyph into
@@ -577,7 +669,7 @@ Not a very useful example.
       import should go to the background layer or foreground. This function may
       be ``None``. In which case there is no import method for this file type.
 
-   .. object:: export-function
+   .. object:: export_function
 
       The function to call to export a glyph into a file. It will be called
       with: The data argument (see below), a pointer to the glyph, and a
@@ -588,7 +680,10 @@ Not a very useful example.
 
       Anything you like (including ``None``). It will be passed to the
       import/export routines and can provide them with context if they need that.
-      name The name to be displayed in the user interface for this file type.
+
+   .. object:: name
+
+      The name to be displayed in the user interface for this file type.
       This may just be the extension, or it might be something more informative.
 
    .. object:: extension
@@ -596,13 +691,23 @@ Not a very useful example.
       This is the default extension for this file type. It is used by the
       export dialog to pick an extension for the generated filename.
 
-   .. object:: extension-list
+   .. object:: extension_list
 
       Some file types have more than one common extension (eps files are usually
       named "eps", but I have also seen "ps" and "art" used). The import dialog
       needs to filter all possible filenames of this file type. This argument
       should be a comma separated list of extensions. It may be omitted, in
       which case it defaults to being the same as the "extension" argument above.
+
+.. function:: getConvexNib(context)
+
+   Returns the specified 'Convex' nib as a layer. ``context`` may be
+   ``"default"``, ``"freehand"``, or ``"ui"``.
+
+.. function:: setConvexNib(nib, context)
+
+   Sets the specified 'Convex' to a layer/contour. ``context`` may be
+   ``"default"``, ``"freehand"``, or ``"ui"``.
 
 .. function:: logWarning(msg)
 
@@ -653,7 +758,7 @@ Not a very useful example.
 
    The first argument is the dialog's title, the second is the question to be
    asked, the third is a tuple of strings -- each string will become a button,
-   the fourth and fifth arguments are option, the fourth is the index in the
+   the fourth and fifth arguments are optional, the fourth is the index in the
    answer array that will be the default answer (the one invoked if the user
    presses the [Return] key), and the fifth is the answer invoked if the user
    presses the [Escape] key. If omitted the default answer will be the first,
@@ -672,7 +777,7 @@ Not a very useful example.
 
    The first argument is the dialog's title, the second is the question to be
    asked, the third is a tuple of strings -- each string will become a button,
-   the fourth and fifth arguments are option, the fourth is the index in the
+   the fourth and fifth arguments are optional, the fourth is the index in the
    answer array that will be the default answer (the one invoked if the user
    presses the [Return] key). If omitted the default answer will be the first.
 
@@ -691,7 +796,7 @@ Not a very useful example.
 
 .. function:: askString(title, question, [def_string])
 
-   Allows you to as the user a question for which a string is the answer.
+   Allows you to ask the user a question for which a string is the answer.
 
    The first argument is the dialog's title, the second is the question to be
    asked, the third is optional and specified a default answer.
@@ -701,7 +806,21 @@ Not a very useful example.
 
    Throws an exception if there is no user interface.
 
+.. function:: askMulti(title, specification)
 
+   This method raises a dialog with multiple questions for the user, optionally
+   organized into separate tabs.  The answers can be choices (similar to
+   :func:`fontforge.askChoices()`) a string (similar to
+   :func:`fontforge.askString()`) an existing filename (similar to
+   :func:`fontforge.openFilename()`) or a save filename (similar to
+   :func:`fontforge.saveFilename()`.
+
+   Due to the variety of potential ``specification`` parameters this facility is
+   explained in a separate :doc:`document </techref/askmulti>`.
+
+   The method throws an exception if there is no user interface or the
+   specification is not valid. Otherwise it either returns a dictionary of answers
+   or ``None`` if the user chose "Cancel" or closed the dialog without choosing "OK".
 
 Point
 -----
@@ -824,7 +943,7 @@ Two contours may be compared to see if they describe similar paths.
 
 .. attribute:: contour.is_quadratic
 
-   Whether the contour should be interpretted as a set of quadratic or cubic
+   Whether the contour should be interpreted as a set of quadratic or cubic
    splines. Setting this value has the side effect of converting the point list
    to the appropriate format.
 
@@ -857,7 +976,7 @@ Two contours may be compared to see if they describe similar paths.
    For more information on what these point types mean see
    `Raph Levien's work <https://www.levien.com/spiro/>`_.
 
-   The flags argument is treated as a bitmap of which currently on one bit (0x1)
+   The flags argument is treated as a bitset of which currently only one bit (0x1)
    is defined. This indicates that this point is selected in the UI.
 
    When you assign a tuple of spiro control points to this member, the point
@@ -914,13 +1033,13 @@ Does not support the repeat concept.
 
 .. object:: c[i:j]
 
-   The contour containing points between i and j; i must be >= j.
+   The contour containing points between i and j; j must be >= i.
    Alternatively, ``c[j:i:-1]`` returns those points in reverse order (larger
    strides are not supported).
 
 .. object:: c[i:j] = d
 
-   The points between i and j are replaced by those in d; i must be >= j.
+   The points between i and j are replaced by those in d; j must be >= i.
    d can be a contour or a sequence of point initializer tuples, as in
    ``[(1,1,False),(2,1)]``. If ``c[j:i:-1]`` is used instead the points of d
    are assigned in reverse order.
@@ -948,25 +1067,25 @@ Does not support the repeat concept.
 
 .. method:: contour.lineTo(x, y[, pos])
 
-   Adds an line to the contour. If the optional third argument is give, the
+   Adds a line to the contour. If the optional third argument is given, the
    line will be added after the pos'th point, otherwise it will be at the end
    of the contour.
 
 .. method:: contour.cubicTo((cp1x, cp1y)(cp2x, cp2y)(x, y)[, pos])
 
-   Adds a cubic curve to the contour. If the optional third argument is give,
-   the line will be added after the pos'th point, otherwise it will be at the
+   Adds a cubic curve to the contour. If the optional fourth argument is given,
+   the curve will be added after the pos'th point, otherwise it will be at the
    end of the contour.
 
 .. method:: contour.quadraticTo((cpx, cpy)(x, y)[, pos])
 
    Adds a quadratic curve to the contour. If the optional third argument is
-   give, the line will be added after the pos'th point, otherwise it will be at
+   given, the curve will be added after the pos'th point, otherwise it will be at
    the end of the contour.
 
 .. method:: contour.insertPoint(point[, pos])
 
-   Adds point to the contour. If the optional third argument is give, the line
+   Adds a point to the contour. If the optional second argument is given, the point
    will be added after the pos'th point, otherwise it will be at the end of the
    contour. The point may be either a point or a point initializer tuple.
 
@@ -977,7 +1096,7 @@ Does not support the repeat concept.
 .. method:: contour.isClockwise()
 
    Returns whether the contour is drawn in a clockwise direction. A return
-   value of -1 indicates that no consistant direction could be found (the
+   value of -1 indicates that no consistent direction could be found (the
    contour self-intersects).
 
 .. method:: contour.reverseDirection()
@@ -1036,7 +1155,7 @@ Does not support the repeat concept.
 
 .. method:: contour.merge(pos)
 
-   Removes the on-curve point a the given position and rearranges the other
+   Removes the on-curve point at the given position and rearranges the other
    points to make the curve as similar to the original as possible. (pos may
    also be a tuple of positions, all of which will be removed)
 
@@ -1100,6 +1219,27 @@ Does not support the repeat concept.
 .. method:: contour.transform(matrix)
 
    Transforms the contour by the matrix
+   
+.. seealso::
+
+   `Curvatura documentation <https://github.com/linusromer/curvatura/blob/master/curvatura-doc.pdf>`_
+      Documentation for adding points of inflection, balancing and harmonizing.
+   
+.. method:: contour.addInflections()
+
+   If the curvature of a spline in the contour changes sign then break the 
+   spline so that there will be a point at all points of inflection. 
+   
+.. method:: contour.balance()
+
+   For all cubic bezier splines of the contour make the line between the control 
+   points parallel to the chord such that the area is preserved. This is an
+   improved version of the algorithm known as "tunnify".
+   
+.. method:: contour.harmonize()
+
+   For all bezier splines of the contour move the smooth on-curve points between 
+   its adjacent control points such that the adjacent curvatures become equal.
 
 
 Layer
@@ -1110,13 +1250,13 @@ A layer is a collection of contours. All the contours must be the same order
 
 Layers may be compared to see if their contours are similar.
 
-.. class:: layer()
+.. class:: layer(is_quadratic=False)
 
    Creates a new layer
 
-.. method:: layer.is_quadratic()
+.. attribute:: layer.is_quadratic
 
-   Whether the contours should be interpretted as a set of quadratic cubic
+   Whether the contours should be interpreted as a set of quadratic cubic
    splines. Setting this value has the side effect of converting the contour
    list to the appropriate format.
 
@@ -1155,7 +1295,7 @@ Layers may be compared to see if their contours are similar.
 
       As above but also merge away on-curve points which are very close to, but
       not on, an added extremum
-
+      
 .. method:: layer.cluster([within, max])
 
    Moves clustered coordinates to a standard central value.
@@ -1193,7 +1333,7 @@ Layers may be compared to see if their contours are similar.
 
    Removes the excluded area from the current contours. See also
    :meth:`layer.removeOverlap()` and :meth:`layer.intersect()`.
-
+   
 .. method:: layer.intersect()
 
    Leaves only areas in the intersection of contours. See also
@@ -1209,6 +1349,10 @@ Layers may be compared to see if their contours are similar.
    Creates (and returns) a new layer which contains splines interpolated from
    the current layer and the first argument. If amount is 0 the result will
    look like the current layer, if 1 then like the first argument.
+
+.. method:: layer.reverseDirection()
+
+   Reverse the orientation of each contour in the layer.
 
 .. method:: layer.round([factor])
 
@@ -1327,14 +1471,14 @@ Layers may be compared to see if their contours are similar.
 
 .. method:: layer.xBoundsAtY(ybottom[, ytop])
 
-   Finds the minimum and maximum x positions attained by the contour when y is
+   Finds the minimum and maximum x positions attained by the layer when y is
    between ybottom and ytop (if ytop is not specified it is assumed the same as
    ybottom). If the layer does not have any y values in the specified range
    then FontForge will return ``None``.
 
 .. method:: layer.yBoundsAtX(xleft[, xright])
 
-   Finds the minimum and maximum y positions attained by the contour when x is
+   Finds the minimum and maximum y positions attained by the layer when x is
    between xleft and xright (if xright is not specified it is assumed the same
    as xleft). If the layer does not have any x values in the specified range
    then FontForge will return ``None``.
@@ -1342,6 +1486,18 @@ Layers may be compared to see if their contours are similar.
 .. method:: layer.draw(pen)
 
    Draw the layer to the :class:`pen <glyphPen>` argument.
+   
+.. method:: layer.addInflections()
+
+   Please see :meth:`contour.addInflections()`.
+   
+.. method:: layer.balance()
+
+   Please see :meth:`contour.balance()`.
+   
+.. method:: layer.harmonize()
+
+   Please see :meth:`contour.harmonize()`.
 
 
 .. rubric:: Sequence Protocol
@@ -1400,7 +1556,7 @@ This type may not be pickled.
 
 .. method:: glyphPen.moveTo((x, y))
 
-   With one exception this call begins every contor and creates an on curve
+   With one exception this call begins every contour and creates an on curve
    point at ``(x,y)`` as the start point of that contour. This should be the
    first call after a pen has been created and the call that follows a
    :meth:`glyphPen.closePath()`, :meth:`glyphPen.endPath()`.
@@ -1428,7 +1584,7 @@ This type may not be pickled.
    point mid-way between its control points may be omitted, leading to a run of
    off-curve points (with implied but unspecified on-curve points between them).
 
-   The first format allows an arbetary number of off-curve points followed by
+   The first format allows an arbitrary number of off-curve points followed by
    one on-curve point.
 
    It is possible to have a contour which consists solely of off-curve points.
@@ -1483,14 +1639,14 @@ must be created through the font.
 .. attribute:: glyph.altuni
 
    Returns additional unicode code points for this glyph. For a primary code
-   point, see :attr:`glyph.unicode` .
+   point, see :attr:`glyph.unicode`.
 
    Returns either None or a tuple of alternate encodings. Each alternate
    encoding is a tuple of ::
 
    (unicode-value, variation-selector, reserved-field)
 
-   The first is an unicode value of this alternate code point. The second is an
+   The first is a unicode value of this alternate code point. The second is an
    integer for variation selector and can be set to -1 if not used. The third
    is an empty field reserved for future use and currently must be set to zero.
 
@@ -1545,6 +1701,11 @@ must be created through the font.
    Whether this glyph has been modified. This is (should be) maintained
    automatically, but you may set it if you wish.
 
+.. attribute:: glyph.codepoint
+
+   Unicode code point for this glyph in U+XXXX format for the Basic Multilingual
+   Plane, and up to U+XXXXXX for the supplementary planes, or ``None``. (readonly)
+
 .. attribute:: glyph.color
 
    The color of the glyph in the fontview. A 6 hex-digit RGB number or -1 for
@@ -1598,7 +1759,7 @@ must be created through the font.
    A tuple of tuples.
 
    This allows :ref:`constructing <math.GlyphConstruction>` very large versions
-   of the glyph by stacking the componants together. Some components may be
+   of the glyph by stacking the components together. Some components may be
    repeated so there is no bound on the size.
 
    This is different from horizontalVariants which expects prebuilt glyphs of
@@ -1640,7 +1801,7 @@ must be created through the font.
 .. attribute:: glyph.layers
 
    A dictionary like object containing the layers of the glyph. It may be
-   indexed by either a layer name, or an integer between 0 and
+   indexed by either a layer name or an integer between 0 and
    ``glyph.layer_cnt-1`` to produce a :class:`layer` object. Layer 0 is the
    background layer. Layer 1 is the foreground layer.
 
@@ -1703,7 +1864,7 @@ must be created through the font.
 .. attribute:: glyph.persistent
 
    Whatever you want (these data will be saved as a pickled object in the
-   sfd file. It is your job to insure that whatever you put here can be pickled).
+   sfd file. It is your job to ensure that whatever you put here can be pickled).
    See also the :attr:`glyph.temporary` field.
 
 .. attribute:: glyph.references
@@ -1906,7 +2067,7 @@ must be created through the font.
    A tuple of tuples.
 
    This allows :ref:`constructing <math.GlyphConstruction>` very large versions
-   of the glyph by stacking the componants together. Some components may be
+   of the glyph by stacking the components together. Some components may be
    repeated so there is no bound on the size.
 
    This is different from verticalVariants which expects prebuilt glyphs of
@@ -1994,7 +2155,7 @@ must be created through the font.
             glyph.addPosSub(subtable_name, other_glyph_name, xoff1, yoff1, xadv1, yadv1, xoff2, yoff2, xadv2, yadv2)
 
    Adds position/substitution data to the glyph. The number and type of the
-   arguments vary acording to the type of the lookup containing the subtable.
+   arguments vary according to the type of the lookup containing the subtable.
 
    The first argument should always be a lookup subtable name.
 
@@ -2113,6 +2274,18 @@ must be created through the font.
    Orients all contours so that external ones are clockwise and internal
    counter-clockwise.
 
+.. method:: glyph.doUndoLayer([layer, redo])
+
+   When ``redo`` is False this method is equivalent to the "Undo" UI menu item.
+   It restores the last preserved layer state discarding the current state.
+   When ``redo`` is True it is equivalent to "Redo".  You may omit the
+   ``layer`` parameter, in which case the currently active layer will be used.
+   Otherwise it must either be a layer name or an integer between 0 and
+   ``glyph.layer_cnt-1``.
+
+   ``doUndoLayer`` is normally used in conjunction with
+   :meth:`glyph.preserveLayerAsUndo()`
+
 .. method:: glyph.exclude(excluded_layer)
 
    Removes the excluded area from the current glyph. Takes an argument which is
@@ -2191,7 +2364,7 @@ must be created through the font.
 .. method:: glyph.importOutlines(filename, [KEYWORD])
 
    Uses the file's extension to determine behavior. Imports outline descriptions
-   (eps, svg, glif files) into the forground layer. Imports image descriptions
+   (eps, svg, glif files) into the foreground layer. Imports image descriptions
    (bmp, png, xbm, etc.) into the background layer. The following optional keywords modify the import process for various formats:
 
    .. object:: scale (boolean, default=True)
@@ -2247,11 +2420,12 @@ must be created through the font.
 
 .. method:: glyph.preserveLayerAsUndo([layer, dohints])
 
-   Normally undo handling is turned off during python scripting. If you wish
-   you may tell fontforge to preserve the current state of a layer so that
-   whatever you do later can be undone by the user. You may omit the layer
-   parameter (in which case the currently active layer will be used). You may
-   also request that hints be preserved (they are not, by default).
+   Normally undo handling is turned off during python scripting. This method
+   preserves the current state of a layer so that whatever you do after can be
+   undone by the user. You may omit the ``layer`` parameter, in which case the
+   currently active layer will be used. Otherwise it must either be a layer name
+   or an integer between 0 and ``glyph.layer_cnt-1``. When ``dohints`` is True
+   then hints will also be preserved (they are not by default).
 
 .. method:: glyph.removeOverlap()
 
@@ -2522,7 +2696,7 @@ must be created through the font.
    .. object:: partialRefs
 
       Don't transform any references in the glyph, but do transform their offsets.
-      This is useful if the refered glyph will be (or has been) transformed.
+      This is useful if the referred glyph will be (or has been) transformed.
 
    .. object:: round
 
@@ -2564,15 +2738,44 @@ must be created through the font.
    validated, if force is unspecified (or specified as false) then it will
    return the cached value if it is known, otherwise will validate it.
 
+.. method:: glyph.xBoundsAtY(ybottom[, ytop, layer=])
+
+   Finds the minimum and maximum x positions attained by the glyph when y is
+   between ybottom and ytop (if ytop is not specified it is assumed the same as
+   ybottom). If the glyph does not have any y values in the specified range
+   then FontForge will return ``None``. A layer name or index may be provided
+   to only find bounds for a particular layer.
+
+.. method:: glyph.yBoundsAtX(xleft[, xright, layer=])
+
+   Finds the minimum and maximum y positions attained by the glyph when x is
+   between xleft and xright (if xright is not specified it is assumed the same
+   as xleft). If the glyph does not have any x values in the specified range
+   then FontForge will return ``None``. A layer name or index may be provided
+   to only find bounds for a particular layer.
+
 .. method:: glyph.draw(pen)
 
    Draw the glyph's outline to the `pen argument. <http://robofab.org/objects/pens.html>`_
 
-.. method:: glyph.glyphPen([replace=False])
+.. method:: glyph.glyphPen([replace=True])
 
    Creates a new glyphPen which will draw into the current glyph. By default
    the pen will replace any existing contours and references, but setting the
    optional keyword argument, ``replace`` to false will retain the old contents.
+   Replacing the foreground layer will also reset the advance.
+
+.. method:: glyph.addInflections()
+
+   Please see :meth:`contour.addInflections()`.
+
+.. method:: glyph.balance()
+
+   Please see :meth:`contour.balance()`.
+   
+.. method:: glyph.harmonize()
+
+   Please see :meth:`contour.harmonize()`.
 
 
 Selection
@@ -2599,6 +2802,10 @@ This type may not be pickled.
    those entries for which glyphs exist.
 
    This is read-only.
+
+.. attribute:: selection.font
+
+   Returns the font for which this is a selection.
 
 .. method:: selection.__iter__()
 
@@ -2646,7 +2853,7 @@ This type may not be pickled.
 
      .. object:: encoding
 
-        Interpret integer arguments as encoding indeces.
+        Interpret integer arguments as encoding indices.
 
      .. object:: more
 
@@ -2687,11 +2894,11 @@ This type may not be pickled.
 
 .. method:: private.__iter__()
 
-   Returns an iterator for the dictionary which will return all entres.
+   Returns an iterator for the dictionary which will return all entries.
 
 .. method:: private.guess(name)
 
-   Guess a value for this this entry in the private dictionary. If FontForge
+   Guess a value for this entry in the private dictionary. If FontForge
    can't make a guess it will simply ignore the request.
 
 
@@ -2712,8 +2919,14 @@ Any of the math constant names may be used as member names.
 
 These all take (16 bit) integer values.
 
-I do not currently provide python access to any associated device tables.
+Each ``DeviceTable`` property takes a dictionary with keys representing a font size
+in pixels and values representing the corresponding adjustment, e.g. ``{9: -1, 10: -1, 12: -1}``.
+Setting ``DeviceTable`` property to ``None`` will delete it.
 
+Device table entries can also be queried and assigned by font size ::
+
+   font.math.MathLeadingDeviceTable[12] = 2
+   adj = font.math.MathLeadingDeviceTable[12]
 
 .. attribute:: math.ScriptPercentScaleDown
 
@@ -2732,235 +2945,286 @@ I do not currently provide python access to any associated device tables.
    Minimum height of n-ary operators (integration, summation, etc.)
 
 .. attribute:: math.MathLeading
+.. attribute:: math.MathLeadingDeviceTable
 
    White space to be left between math formulae to ensure proper line spacing.
 
 .. attribute:: math.AxisHeight
+.. attribute:: math.AxisHeightDeviceTable
 
    Axis height of the font
 
 .. attribute:: math.AccentBaseHeight
+.. attribute:: math.AccentBaseHeightDeviceTable
 
    Maximum (ink) height of accent base that does not require raising the accents.
 
 .. attribute:: math.FlattenedAccentBaseHeight
+.. attribute:: math.FlattenedAccentBaseHeightDeviceTable
 
    Maximum (ink) height of accent base that does not require flattening the accents.
 
 .. attribute:: math.SubscriptShiftDown
+.. attribute:: math.SubscriptShiftDownDeviceTable
 
    The standard shift down applied to subscript elements. Positive for
    moving downward.
 
 .. attribute:: math.SubscriptTopMax
+.. attribute:: math.SubscriptTopMaxDeviceTable
 
    Maximum height of the (ink) top of subscripts that does not require moving
    subscripts further down.
 
 .. attribute:: math.SubscriptBaselineDropMin
+.. attribute:: math.SubscriptBaselineDropMinDeviceTable
 
    Maximum allowed drop of the baseline of subscripts relative to the bottom of
    the base. Used for bases that are treated as a box or extended shape.
    Positive for subscript baseline dropped below base bottom.
 
 .. attribute:: math.SuperscriptShiftUp
+.. attribute:: math.SuperscriptShiftUpDeviceTable
 
    Standard shift up applied to superscript elements.
 
 .. attribute:: math.SuperscriptShiftUpCramped
+.. attribute:: math.SuperscriptShiftUpCrampedDeviceTable
 
    Standard shift of superscript relative to base in cramped mode.
 
 .. attribute:: math.SuperscriptBottomMin
+.. attribute:: math.SuperscriptBottomMinDeviceTable
 
    Minimum allowed height of the bottom of superscripts that does not require
    moving them further up.
 
 .. attribute:: math.SuperscriptBaselineDropMax
+.. attribute:: math.SuperscriptBaselineDropMaxDeviceTable
 
    Maximum allowed drop of the baseline of superscripts relative to the top of
    the base. Used for bases that are treated as a box or extended shape.
    Positive for superscript baseline below base top.
 
 .. attribute:: math.SubSuperscriptGapMin
+.. attribute:: math.SubSuperscriptGapMinDeviceTable
 
    Minimum gap between the superscript and subscript ink.
 
 .. attribute:: math.SuperscriptBottomMaxWithSubscript
+.. attribute:: math.SuperscriptBottomMaxWithSubscriptDeviceTable
 
    The maximum level to which the (ink) bottom of superscript can be pushed to
    increase the gap between superscript and subscript, before subscript starts
    being moved down.
 
 .. attribute:: math.SpaceAfterScript
+.. attribute:: math.SpaceAfterScriptDeviceTable
 
    Extra white space to be added after each sub/superscript.
 
 .. attribute:: math.UpperLimitGapMin
+.. attribute:: math.UpperLimitGapMinDeviceTable
 
    Minimum gap between the bottom of the upper limit, and the top of the base
    operator.
 
 .. attribute:: math.UpperLimitBaselineRiseMin
+.. attribute:: math.UpperLimitBaselineRiseMinDeviceTable
 
    Minimum distance between the baseline of an upper limit and the bottom of
    the base operator.
 
 .. attribute:: math.LowerLimitGapMin
+.. attribute:: math.LowerLimitGapMinDeviceTable
 
    Minimum gap between (ink) top of the lower limit, and (ink) bottom of the
    base operator.
 
 .. attribute:: math.LowerLimitBaselineDropMin
+.. attribute:: math.LowerLimitBaselineDropMinDeviceTable
 
    Minimum distance between the baseline of the lower limit and bottom of the
    base operator.
 
 .. attribute:: math.StackTopShiftUp
+.. attribute:: math.StackTopShiftUpDeviceTable
 
    Standard shift up applied to the top element of a stack.
 
 .. attribute:: math.StackTopDisplayStyleShiftUp
+.. attribute:: math.StackTopDisplayStyleShiftUpDeviceTable
 
    Standard shift up applied to the top element of a stack in display style.
 
 .. attribute:: math.StackBottomShiftDown
+.. attribute:: math.StackBottomShiftDownDeviceTable
 
    Standard shift down applied to the bottom element of a stack. Positive
    values indicate downward motion.
 
 .. attribute:: math.StackBottomDisplayStyleShiftDown
+.. attribute:: math.StackBottomDisplayStyleShiftDownDeviceTable
 
    Standard shift down applied to the bottom element of a stack in display
    style. Positive values indicate downward motion.
 
 .. attribute:: math.StackGapMin
+.. attribute:: math.StackGapMinDeviceTable
 
    Minimum gap between bottom of the top element of a stack, and the top of
    the bottom element.
 
 .. attribute:: math.StackDisplayStyleGapMin
+.. attribute:: math.StackDisplayStyleGapMinDeviceTable
 
    Minimum gap between bottom of the top element of a stack and the top of the
    bottom element in display style.
 
 .. attribute:: math.StretchStackTopShiftUp
+.. attribute:: math.StretchStackTopShiftUpDeviceTable
 
    Standard shift up applied to the top element of the stretch stack.
 
 .. attribute:: math.StretchStackBottomShiftDown
+.. attribute:: math.StretchStackBottomShiftDownDeviceTable
 
    Standard shift down applied to the bottom element of the stretch stack.
    Positive values indicate
    downward motion.
 
 .. attribute:: math.StretchStackGapAboveMin
+.. attribute:: math.StretchStackGapAboveMinDeviceTable
 
    Minimum gap between the ink of the stretched element and the ink bottom of
    the element above.
 
 .. attribute:: math.StretchStackGapBelowMin
+.. attribute:: math.StretchStackGapBelowMinDeviceTable
 
    Minimum gap between the ink of the stretched element and the ink top of
    the element below.
 
 .. attribute:: math.FractionNumeratorShiftUp
+.. attribute:: math.FractionNumeratorShiftUpDeviceTable
 
    Standard shift up applied to the numerator.
 
 .. attribute:: math.FractionNumeratorDisplayStyleShiftUp
+.. attribute:: math.FractionNumeratorDisplayStyleShiftUpDeviceTable
 
    Standard shift up applied to the numerator in display style.
 
 .. attribute:: math.FractionDenominatorShiftDown
+.. attribute:: math.FractionDenominatorShiftDownDeviceTable
 
    Standard shift down applied to the denominator. Positive values indicate
    downward motion.
 
 .. attribute:: math.FractionDenominatorDisplayStyleShiftDown
+.. attribute:: math.FractionDenominatorDisplayStyleShiftDownDeviceTable
 
    Standard shift down applied to the denominator in display style. Positive
    values indicate downward motion.
 
 .. attribute:: math.FractionNumeratorGapMin
+.. attribute:: math.FractionNumeratorGapMinDeviceTable
 
    Minimum tolerated gap between the ink bottom of the numerator and the ink of
    the fraction bar.
 
 .. attribute:: math.FractionNumeratorDisplayStyleGapMin
+.. attribute:: math.FractionNumeratorDisplayStyleGapMinDeviceTable
 
    Minimum tolerated gap between the ink bottom of the numerator and the ink of
    the fraction bar in display style.
 
 .. attribute:: math.FractionRuleThickness
+.. attribute:: math.FractionRuleThicknessDeviceTable
 
    Thickness of the fraction bar.
 
 .. attribute:: math.FractionDenominatorGapMin
+.. attribute:: math.FractionDenominatorGapMinDeviceTable
 
    Minimum tolerated gap between the ink top of the denominator and the ink of
    the fraction bar.
 
 .. attribute:: math.FractionDenominatorDisplayStyleGapMin
+.. attribute:: math.FractionDenominatorDisplayStyleGapMinDeviceTable
 
    Minimum tolerated gap between the ink top of the denominator and the ink of
    the fraction bar in display style.
 
 .. attribute:: math.SkewedFractionHorizontalGap
+.. attribute:: math.SkewedFractionHorizontalGapDeviceTable
 
    Horizontal distance between the top and bottom elements of a skewed fraction.
 
 .. attribute:: math.SkewedFractionVerticalGap
+.. attribute:: math.SkewedFractionVerticalGapDeviceTable
 
    Vertical distance between the ink of the top and bottom elements of a skewed
    fraction.
 
 .. attribute:: math.OverbarVerticalGap
+.. attribute:: math.OverbarVerticalGapDeviceTable
 
    Distance between the overbar and the ink top of the base.
 
 .. attribute:: math.OverbarRuleThickness
+.. attribute:: math.OverbarRuleThicknessDeviceTable
 
    Thickness of the overbar.
 
 .. attribute:: math.OverbarExtraAscender
+.. attribute:: math.OverbarExtraAscenderDeviceTable
 
    Extra white space reserved above the overbar.
 
 .. attribute:: math.UnderbarVerticalGap
+.. attribute:: math.UnderbarVerticalGapDeviceTable
 
    Distance between underbar and the (ink) bottom of the base.
 
 .. attribute:: math.UnderbarRuleThickness
+.. attribute:: math.UnderbarRuleThicknessDeviceTable
 
    Thickness of the underbar.
 
 .. attribute:: math.UnderbarExtraDescender
+.. attribute:: math.UnderbarExtraDescenderDeviceTable
 
    Extra white space reserved below the underbar.
 
 .. attribute:: math.RadicalVerticalGap
+.. attribute:: math.RadicalVerticalGapDeviceTable
 
    Space between the ink to of the expression and the bar over it.
 
 .. attribute:: math.RadicalDisplayStyleVerticalGap
+.. attribute:: math.RadicalDisplayStyleVerticalGapDeviceTable
 
    Space between the ink top of the expression and the bar over it in display
    style.
 
 .. attribute:: math.RadicalRuleThickness
+.. attribute:: math.RadicalRuleThicknessDeviceTable
 
    Thickness of the radical rule in designed or constructed radical signs.
 
 .. attribute:: math.RadicalExtraAscender
+.. attribute:: math.RadicalExtraAscenderDeviceTable
 
    Extra white space reserved above the radical.
 
 .. attribute:: math.RadicalKernBeforeDegree
+.. attribute:: math.RadicalKernBeforeDegreeDeviceTable
 
    Extra horizontal kern before the degree of a radical if such be present.
 
 .. attribute:: math.RadicalKernAfterDegree
+.. attribute:: math.RadicalKernAfterDegreeDeviceTable
 
    Negative horizontal kern after the degree of a radical if such be present.
 
@@ -3085,6 +3349,10 @@ This type may not be pickled.
 .. attribute:: font.copyright
 
    PostScript copyright notice
+
+.. attribute:: font.creationtime
+
+   Font creation time. (readonly)
 
 .. attribute:: font.cvt
 
@@ -3265,7 +3533,7 @@ This type may not be pickled.
 
 .. attribute:: font.is_quadratic
 
-   Deprecated. Whether the contours should be interpretted as a set of quadratic
+   Deprecated. Whether the contours should be interpreted as a set of quadratic
    or cubic splines. Setting this value has the side effect of converting the
    entire font into the other format
 
@@ -3314,6 +3582,16 @@ This type may not be pickled.
       Reserved (set to 0).
 
    (`source <https://docs.microsoft.com/en-us/typography/opentype/spec/head>`_)
+
+.. attribute:: font.markClasses
+
+   A tuple each entry of which is itself a tuple containing a mark-class-name
+   and a tuple of glyph-names.
+
+.. attribute:: font.markSets
+
+   A tuple each entry of which is itself a tuple containing a mark-set-name
+   and a tuple of glyph-names.
 
 .. attribute:: font.layer_cnt
 
@@ -3423,6 +3701,9 @@ This type may not be pickled.
 
    A flag indicating that this font only contains bitmaps. No outlines.
 
+.. attribute:: font.os2_capheight
+
+
 .. attribute:: font.os2_codepages
 
    A 2 element tuple containing the OS/2 Codepages field
@@ -3441,6 +3722,10 @@ This type may not be pickled.
 
 .. attribute:: font.os2_strikeysize
 
+
+.. attribute:: font.os2_stylemap
+
+   Write access to fsSelection, keep in sync with :attr:`font.macstyle`
 
 .. attribute:: font.os2_subxoff
 
@@ -3481,12 +3766,12 @@ This type may not be pickled.
 .. attribute:: font.os2_typolinegap
 
 
-.. attribute:: font.os2_use_typo_metrics
-
-
 .. attribute:: font.os2_unicoderanges
 
    A 4 element tuple containing the OS/2 Unicode Ranges field
+
+.. attribute:: font.os2_use_typo_metrics
+
 
 .. attribute:: font.os2_vendor
 
@@ -3513,6 +3798,9 @@ This type may not be pickled.
 
 
 .. attribute:: font.os2_windescent_add
+
+
+.. attribute:: font.os2_xheight
 
 
 .. attribute:: font.path
@@ -3695,7 +3983,7 @@ This type may not be pickled.
    The field may be unset (in which case when the font is generated, FontForge
    will guess a default value from one of the version strings).
 
-   The value returned with be ``None`` if the field is unset or a double.
+   The value returned will be ``None`` if the field is unset or a double.
 
    You may set it to ``None`` which "unsets" it, or to a double value, or to an
    integer. The integer will be treated as a 32 bit integer and right shifted
@@ -3718,7 +4006,7 @@ This type may not be pickled.
    Otherwise FontForge returns a tuple containing five elements, the design
    size, the bottom of the design range, the top, the style id and a tuple of
    tuples. Each sub-tuple is a language/string pair. Language may be either
-   the (english) name of the language/locale, or The string itself is in UTF-8.
+   the (english) name of the language/locale, or the string itself in UTF-8.
 
 .. attribute:: font.strokedfont
 
@@ -3727,6 +4015,16 @@ This type may not be pickled.
 .. attribute:: font.strokewidth
 
    the stroke width of a stroked font
+
+.. attribute:: font.style_set_names
+
+   A tuple, each entry of which is a 3-element tuple containing:
+     * For style sets, the language name (e.g. ``"English (US)"``), the style set
+       tag (e.g. ``"ss01"``) and the style set name.
+     * For character variants, the language name, the character variant tag (e.g.
+       ``"cv01"``) and a 5-element tuple containing the feature name, the tooltip text,
+       the sample text (these three can be ``None``), a tuple containing parameter
+       names (can be empty) and ``None`` (reserved for the character list).
 
 .. attribute:: font.temporary
 
@@ -3801,7 +4099,7 @@ This type may not be pickled.
    The field may be unset (in which case when the font is generated, FontForge
    will guess a default value from one of the version strings).
 
-   The value returned with be ``None`` if the field is unset or an integer.
+   The value returned will be ``None`` if the field is unset or an integer.
 
    You may set it to ``None`` which "unsets" it, or to an integer.
 
@@ -3812,7 +4110,7 @@ This type may not be pickled.
    The field may be unset (in which case when the font is generated, FontForge
    will guess a default value from one of the version strings).
 
-   The value returned with be ``None`` if the field is unset or an integer.
+   The value returned will be ``None`` if the field is unset or an integer.
 
    You may set it to ``None`` which "unsets" it, or to an integer.
 
@@ -3828,6 +4126,9 @@ This type may not be pickled.
    might have no lower case letters because it was upper case only, or didn't
    include glyphs for a script with lower case letters).
 
+.. attribute:: font.xuid
+
+   PostScript eXtended Unique ID.
 
 .. method:: font.__iter__()
 
@@ -3857,7 +4158,7 @@ This type may not be pickled.
             font.addKerningClass(lookup_name, new_subtable_name, separation, class_distance, [, onlyCloser, autokern, after])
 
    Creates a new subtable and a new kerning class in the named lookup. The
-   classes arguments are tuples of tuples of glyph names (each sub-tuble of
+   classes arguments are tuples of tuples of glyph names (each sub-tuple of
    glyph names is a kerning class). The offsets argument is a tuple of kerning
    offsets. There must be as many entries as ::
 
@@ -3885,7 +4186,7 @@ This type may not be pickled.
 .. method:: font.addLookup(new_lookup_name, type, flags, feature_script_lang_tuple[, after_lookup_name)
 
    Creates a new lookup with the given name, type and flags. It will tag it
-   with any indicated features. The type of one of
+   with any indicated features. The type is one of
 
    * ``gsub_single``
    * ``gsub_multiple``
@@ -3893,7 +4194,7 @@ This type may not be pickled.
    * ``gsub_ligature``
    * ``gsub_context``
    * ``gsub_contextchain``
-   * ``gsub_revesechain``
+   * ``gsub_reversecchain``
    * ``morx_indic``
    * ``morx_context``
    * ``morx_insert``
@@ -3908,7 +4209,7 @@ This type may not be pickled.
    * ``kern_statemachine``
 
    The flags argument is a tuple of strings, or ``None``. At most one of these
-   strings may be the name of a mark class. The others are:
+   strings may be the name of a mark class or a mark set. The others are:
 
    * ``right_to_left``
    * ``ignore_bases``
@@ -3925,7 +4226,7 @@ This type may not be pickled.
    language. Example: ``(("liga",(("latn",("dflt")),)),)``
 
    The optional final argument allows you to specify the ordering of the lookup.
-   If not specified the lookup will be come the first lookup in its table.
+   If not specified the lookup will become the first lookup in its table.
 
 .. method:: font.addLookupSubtable(lookup_name, new_subtable_name[, after_subtable_name])
 
@@ -3948,8 +4249,10 @@ This type may not be pickled.
 
    The ``type`` should be one of the strings "glyph", "class", "coverage" or
    "reversecoverage". The ``rule`` should be a string specifying a string to
-   match and a set of lookups to apply once the match has been made. (See
-   below for more details).
+   match and a set of lookups to apply once the match has been made. For
+   "glyph" and "class" subtables, ``rule`` may also be a sequence of strings;
+   passing a sequence creates one subtable containing multiple contextual rules.
+   (See below for more details).
 
    The remaining arguments are optional, keyword arguments.
 
@@ -3974,10 +4277,10 @@ This type may not be pickled.
          glyph-name1 glyph-name2 | glyph-name3 @<lookup-name> | glyph-name4
 
       The ``|`` s divide between backtrack, match and lookahead sections. So
-      this example would match it the current glyph were named ``glyph-name3``
+      this example would match if the current glyph were named ``glyph-name3``
       and it were preceded by ``glyph-name2`` and that by ``glyph-name1`` and
       followed by ``glyph-name4``. If the match were successful then the lookup
-      named ``lookup-name`` would be applied. The ``@<>`` are litteral
+      named ``lookup-name`` would be applied. The ``@<>`` are literal
       characters and should be present in the rule.
 
       If the invoked lookup is a ligature lookup then it should be invoked
@@ -3987,7 +4290,7 @@ This type may not be pickled.
 
         e | f @<ff-lig> f l | o
 
-      would only apply the ``ff-lig`` lookup if the ``ffl`` were preceeded by
+      would only apply the ``ff-lig`` lookup if the ``ffl`` were preceded by
       ``e`` and followed by ``o``.
 
    .. object:: When type="class"
@@ -4000,7 +4303,7 @@ This type may not be pickled.
       we have class names here. It is possible to have different sets of class
       names in the three different sections (backtrack, match and lookahead).
       If you don't specify any class names then you must use numbers instead,
-      each number refering to the class at that position in the tuple (the first
+      each number referring to the class at that position in the tuple (the first
       class will be class 0, the second class 1, and so on).
 
    .. object:: When type="coverage"
@@ -4037,7 +4340,7 @@ This type may not be pickled.
    default value will be used (generally found by analyzing the font).
 
    For each selected letter, this function will create a corresponding small
-   caps glyph. If you set the ``symbol`` keyword to ``True`` it will also
+   caps glyph. If you set the ``symbols`` keyword to ``True`` it will also
    create small caps variants of digits and symbols.
 
    The outlines of the new glyph will be based on the outlines of the
@@ -4049,7 +4352,7 @@ This type may not be pickled.
 
    When it creates a new glyph it will name that glyph by appending ".sc" to
    the original lower case letter name (so "a" would become "a.sc") you may
-   change the extension used with ``letter_extension``. Similary symbols and
+   change the extension used with ``letter_extension``. Similarly symbols and
    digits will use the extension "taboldstyle", but you may change that with
    ``symbol_extension``.
 
@@ -4062,10 +4365,9 @@ This type may not be pickled.
 .. method:: font.alterKerningClass(subtable_name, first_classes, second_classes, offsets)
 
    Changes the kerning class in the named subtable. The classes arguments are
-   tuples of tuples of glyph names (each sub-tuble of glyph names is a kerning
+   tuples of tuples of glyph names (each sub-tuple of glyph names is a kerning
    class). The offsets argument is a tuple of kerning offsets. There must be as
-   many entries as ``len(first-class)*len(second-class)``. The optional after
-   argument is used to specify the order of the subtable within the lookup.
+   many entries as ``len(first-class)*len(second-class)``.
 
 .. method:: font.autoKern(subtable_name, separation[, minKern=, onlyCloser=, touch=])
             font.autoKern(subtable_name, separation, glyph_list1, glyph_list2[, minKern=, onlyCloser=, touch=])
@@ -4080,12 +4382,12 @@ This type may not be pickled.
 
    It will attempt to guess a good kerning value between the two glyphs -- a
    value which will make the optical separation between the two appear to be
-   ``separation`` em-units. If ``minkern`` is specified then and the (absolute
+   ``separation`` em-units. If ``minKern`` is specified and the (absolute
    value of the) kerning correction is less than this number then no kerning
-   pair will be generated. If ``onlyCloser`` is set true then only negative
-   kerning offsets will be generated (only thing which move two glyphs closer
+   pair will be generated. If ``onlyCloser`` is set to true then only negative
+   kerning offsets will be generated (only thing which moves two glyphs closer
    together). If touch is set to 1 then the kerning offset will not be based on
-   optical distance but on the closest approach between two the two glyphs.
+   optical distance but on the closest approach between the two glyphs.
 
 .. method:: font.appendSFNTName(language, strid, string)
 
@@ -4097,14 +4399,13 @@ This type may not be pickled.
 
 .. method:: font.buildOrReplaceAALTFeatures()
 
-   Removes any existing AALT features (and any lookups solely controled by such
+   Removes any existing AALT features (and any lookups solely controlled by such
    features) and creates new ones containing all possible single and alternate
-   substutions available for each glyph.
+   substitutions available for each glyph.
 
-.. method:: font.cidConvertByCMap(cmap_filename)
+.. method:: font.cidConvertByCmap(cmap_filename)
 
    Converts a normal font into a CID-keyed font with one subfont using
-
    the CMAP to determine the mapping.
 
 .. method:: font.cidConvertTo(registry, ordering, supplement)
@@ -4129,6 +4430,10 @@ This type may not be pickled.
 
    Removes the current subfont from a cid-keyed font.
 
+.. method:: font.clearSpecialData()
+
+   Clear special data not accessible in FontForge.
+
 .. method:: font.close()
 
    Frees memory for the current font.
@@ -4137,7 +4442,7 @@ This type may not be pickled.
 
 .. method:: font.compareFonts(other_font, filename, flags_tuple)
 
-   This will compare the current font with the font in ``other-font`` (which
+   This will compare the current font with the font in ``other_font`` (which
    must already have been opened). It will write the results to the
    ``filename``, you may use "-" to send the output to stdout. The ``flags``
    argument is a tuple of strings and controls what will be compared.
@@ -4188,7 +4493,7 @@ This type may not be pickled.
 
       if a glyph exists in the second font but not the first, create that
       glyph in the first and add the outlines from the second into the
-      backgroun layer
+      background layer
 
 
 .. method:: font.createChar(uni[, name])
@@ -4240,7 +4545,7 @@ This type may not be pickled.
    and returns the encoding slot. If the glyph is not present it returns -1.
 
    (If a glyph with that name/unicode is in the font, but is not in the
-   encoding, then an value beyond the end of the encoding will be returned).
+   encoding, then a value beyond the end of the encoding will be returned).
 
 .. method:: font.glyphs([type])
 
@@ -4316,6 +4621,17 @@ This type may not be pickled.
    .. object:: TeX-table
 
       Include a 'TeX ' table in an ttf/otf file
+
+   .. object:: no-mac-names
+
+      Do not include Mac names used on Classic Mac OS. This option does not
+      affect native macOS (formerly known as Mac OS X) applications.
+
+   .. object:: no-special-null-cr
+
+      Do not specially treat glyphs named '.null' and 'nonmarkingreturn'.
+      That is, those glyphs will be neither automatically added nor reordered.
+      Starting OpenType 1.8 they are no longer mandatory.
 
    .. object:: round
 
@@ -4435,11 +4751,11 @@ This type may not be pickled.
    x-height and another for the top of capitals and ascenders (and perhaps a
    fourth for descenders). Each such zone is specified by the ``vMap`` argument
    which is a tuple of 3-tuples, each 3-tuple specifying a zone with: Original
-   location, original width, and final location.
+   location, final location, and original width.
 
    .. note::
 
-      No default value is providedfor this argument you must figure out all the
+      No default value is provided for this argument you must figure out all the
       values yourself.
 
    If ``vCounterType`` is the string "scaled", then vertical counters, and the
@@ -4451,10 +4767,7 @@ This type may not be pickled.
 
    Returns a tuple whose entries are: (first-classes, second-classes, offsets).
    The classes are themselves tuples of tuples of glyph names. The offsets will
-   be a tuple of numeric kerning offsetss a tuple whose entries are:
-   (first-classes, second-classes, offsets). The classes are themselves tuples
-   of tuples of glyph names. The offsets will be a tuple of numeric kerning
-   offsets.
+   be a tuple of numeric kerning offsets.
 
 .. method:: font.getLookupInfo(lookup_name)
 
@@ -4509,7 +4822,7 @@ This type may not be pickled.
 
    Returns whether the named subtable contains a vertical kerning data
 
-.. method:: font.italicize(italic_angle=, ia=lc_condense=, lc=uc_condense=, uc=symbol_condense=, symbol=deserif_flat=, deserif_slant=, deserif_pen=, baseline_serifs=, xheight_serifs=, ascent_serifs=, descent_serifs=, diagonal_serifs=, a=, f=, u0438=, u043f=, u0442=, u0444=, u0448=, u0452=, u045f=)
+.. method:: font.italicize(italic_angle=, ia=lc_condense=, lc=uc_condense=, uc=symbol_condense=, symbol=deserif_flat=, deserif_slant=, deserif_pen=, baseline_serifs=, xheight_serifs=, ascent_serifs=, descent_serifs=, diagonal_serifs=, a=, f=, u0438=, u043f=, u0442=, u0444=, u0448=, u0452=, u045f=, xheight_percent=)
 
    This function uses keyword parameters. None are required, if omitted a
    default value will be used. Some keywords have abbreviations ("ia" for
@@ -4536,6 +4849,10 @@ This type may not be pickled.
    which looks like a rotated version of its head, and setting it to 2 will
    simply extend the main stem of "f" below the baseline.
 
+   The ``xheight_percent`` keyword specifies how much the x-height should be
+   changed by the transformation. The default value is 0.95, which reduces the
+   x-height to 95% of its original size; a value of 1.0 means no change.
+
 .. method:: font.lookupSetFeatureList(lookup_name, feature_script_lang_tuple)
 
    Sets the feature list of indicated lookup. The feature-script-lang tuple is
@@ -4553,10 +4870,13 @@ This type may not be pickled.
 
    Merges the font in the file into the current font.
 
-.. method:: font.mergeFeature(filename)
+.. method:: font.mergeFeature(filename, boolean)
 
    Merge feature and lookup information from an adobe feature file, or metrics
-   information from the (afm,tfm,etc) file into the current font.
+   information from the (afm, tfm, etc) file into the current font. The
+   optional boolean will try to skip invalid feature lookups containing
+   replacement glyphs which do not exist in the font, which can help in reusing
+   large feature files.
 
 .. method:: font.mergeKern(filename)
 
@@ -4597,13 +4917,13 @@ This type may not be pickled.
 
    .. object:: fontsample
 
-      The third argument should contain a string which will be layed out
+      The third argument should contain a string which will be laid out
       and displayed as well as FontForge can.
 
    .. object:: fontsampleinfile
 
       The third argument should contain the name of a file which contains
-      text to be layed out and displayed.
+      text to be laid out and displayed.
 
    If output is to a file (see :func:`fontforge.printSetup()`) then the last
    argument specifies a file name in which to store output.
@@ -4616,6 +4936,11 @@ This type may not be pickled.
    a reasonable language tag. If the language is not specified, one will be
    chosen at random. If ff has no frequency information for the script/language
    specified it will use the letters in the script with equal frequencies.
+
+.. method:: font.reencode(encoding[, force])
+
+   Reencodes the current font into the given encoding. Optionally force
+   reencoding.
 
 .. method:: font.regenBitmaps(tuple_of_sizes)
 
@@ -4653,7 +4978,7 @@ This type may not be pickled.
 
 .. method:: font.replaceAll(srch, rpl[, error_bound])
 
-   Searches the font for all occurences of the srch contour (or layer) and
+   Searches the font for all occurrences of the srch contour (or layer) and
    replaces them with the replace contour (or layer).
 
 .. method:: font.revert()
@@ -4727,6 +5052,10 @@ See the :class:`selection` type for how to alter the selection.
 
    Extrema should be marked by on-curve points. If a curve in any selected
    glyph lacks a point at a significant extremum this command will add one.
+
+.. method:: font.addInflections()
+
+   Please see :meth:`contour.addInflections()`.
 
 .. method:: font.autoHint()
 
@@ -4825,7 +5154,7 @@ See the :class:`selection` type for how to alter the selection.
 .. method:: font.correctReferences()
 
    Checks a font for glyphs with mixed contours and references (or references
-   with transformation matrices which cannot be represented truetype (ie.
+   with transformation matrices which cannot be represented in truetype (ie.
    scaling by 2 or more)). If a mixed case is discovered FontForge will take
    the contours out of the glyph, put them in a new glyph, and make a reference
    to the new glyph.
@@ -4933,9 +5262,35 @@ See the :class:`selection` type for how to alter the selection.
    syntax and the :doc:`stroke </techref/stroke>` documentation for more general
    information.
 
-.. method:: font.transform(matrix)
+.. method:: font.transform(matrix[, flags])
 
-   Transforms all selected glyphs by the matrix.
+   Transforms all selected glyphs by the matrix. The optional flags argument
+   should be a tuple containing any of the following strings:
+
+   .. object:: activeLayer
+
+      Transform :attr:`font.activeLayer` only. (By default all layers are
+      transformed.)
+
+   .. object:: guide
+
+      Also transform :attr:`font.guide` layer.
+
+   .. object:: noWidth
+
+      Do not change :attr:`glyph.width`.
+
+   .. object:: round
+
+      Round to int after the transformation is done.
+
+   .. object:: simplePos
+
+      Also transform simple positioning features and kern pairs.
+
+   .. object:: kernClasses
+
+      Also transform kerning classes.
 
 .. method:: font.nltransform(xexpr, yexpr)
 

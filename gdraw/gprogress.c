@@ -30,7 +30,6 @@
 #include "ggadget.h"
 #include "ggadgetP.h"		/* For the font family names */
 #include "gprogress.h"
-#include "gresource.h"
 #include "gwidget.h"
 #include "ustring.h"
 
@@ -43,11 +42,11 @@ typedef struct gprogress {
     unichar_t *line2;
     int sofar;
     int tot;
-    int16 stage, stages;
-    int16 width;
-    int16 l1width, l2width;
-    int16 l1y, l2y, boxy;
-    int16 last_amount;
+    int16_t stage, stages;
+    int16_t width;
+    int16_t l1width, l2width;
+    int16_t l1y, l2y, boxy;
+    int16_t last_amount;
     unsigned int aborted: 1;
     unsigned int visible: 1;
     unsigned int dying: 1;
@@ -58,10 +57,9 @@ typedef struct gprogress {
     struct gprogress *prev;
 } GProgress;
 
-static Color progress_background, progress_foreground;
+static Color progress_background = 0xffffff, progress_foreground;
 static Color progress_fillcol = 0xc0c0ff;
-static GFont *progress_font = NULL;
-static int progress_init = false;
+static GResFont progress_font = GRESFONT_INIT("400 12pt " MONO_UI_FAMILIES);
 
 static GProgress *current;
 
@@ -144,10 +142,10 @@ static int GProgressProcess(GProgress *p) {
 	else {
 	    GRect r;
 	    r.height = tenpt-1;
-	    r.width = amount - p->last_amount;
-	    r.x = tenpt + p->last_amount;
+	    r.width = width;
+	    r.x = tenpt;
 	    r.y = p->boxy+1;
-	    GDrawFillRect(p->gw,&r,progress_fillcol);
+	    GDrawRequestExpose(p->gw,&r,false);
 	}
 	p->last_amount = amount;
     }
@@ -182,6 +180,7 @@ static int progress_eh(GWindow gw, GEvent *event) {
       case et_map:
 	p->sawmap = true;
       break;
+      default: break;
     }
 return( true );
 }
@@ -193,8 +192,9 @@ static struct resed progress_re[] = {
     {N_("Color|Background"), "Background", rt_color, &progress_background, N_("Background color for progress windows"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
-static GResInfo progress_ri = {
-    NULL, NULL, NULL,NULL,
+extern GResInfo ggadget_ri;
+GResInfo gprogress_ri = {
+    &ggadget_ri, NULL, NULL,NULL,
     NULL,	/* No box */
     &progress_font,
     NULL,
@@ -204,26 +204,14 @@ static GResInfo progress_ri = {
     "GProgress",
     "Gdraw",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
     NULL
 };
-
-static void GProgressResInit(void) {
-    if ( !progress_init ) {
-	progress_foreground = GResourceFindColor("GProgress.Foreground",
-		    GDrawGetDefaultForeground(NULL));
-	progress_background = GResourceFindColor("GProgress.Background",
-		    GDrawGetDefaultBackground(NULL));
-	progress_fillcol = GResourceFindColor("GProgress.FillColor",
-		    progress_fillcol);
-	progress_font = GResourceFindFont("GProgress.Font",NULL);
-	progress_init = true;
-    }
-}
 
 void GProgressStartIndicator(
     int delay,			/* in tenths of seconds */
@@ -234,7 +222,6 @@ void GProgressStartIndicator(
     int stages			/* Number of stages, each processing tot sub-entities */
 ) {
     GProgress *new;
-    FontRequest rq;
     GWindowAttrs wattrs;
     GWindow root;
     GGadgetData gd;
@@ -246,8 +233,7 @@ void GProgressStartIndicator(
     if ( screen_display==NULL )
 return;
 
-    if ( !progress_init )
-	GProgressResInit();
+    GResEditDoInit(&gprogress_ri);
     new = calloc(1,sizeof(GProgress));
     new->line1 = u_copy(line1);
     new->line2 = u_copy(line2);
@@ -256,16 +242,8 @@ return;
     new->prev = current;
 
     root = GDrawGetRoot(NULL);
-    if ( progress_font == NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.utf8_family_name = MONO_UI_FAMILIES;
-	rq.point_size = 12;
-	rq.weight = 400;
-	progress_font = GDrawAttachFont(root,&rq);
-    } else {
-        GDrawSetFont(root, progress_font);
-    }
-    GDrawWindowFontMetrics(root,new->font = progress_font,&as,&ds,&ld);
+    GDrawSetFont(root, progress_font.fi);
+    GDrawWindowFontMetrics(root,new->font = progress_font.fi,&as,&ds,&ld);
 
     if ( new->line1!=NULL )
 	new->l1width = GDrawGetTextWidth(root,new->line1,-1);
@@ -325,15 +303,6 @@ return;
     GProgressTimeCheck();
 }
 
-void GProgressStartIndicatorR( int delay, int win_titler, int line1r, int line2r,
-    int tot, int stages ) {
-    GProgressStartIndicator(delay,
-	GStringGetResource(win_titler,NULL),
-	GStringGetResource(line1r,NULL),
-	line2r==0?NULL:GStringGetResource(line2r,NULL),
-	tot,stages);
-}
-
 void GProgressEndIndicator(void) {
     GProgress *old=current;
 
@@ -370,10 +339,6 @@ return;
 	GDrawRequestExpose(current->gw,NULL,false);
 }
 
-void GProgressChangeLine1R(int line1r) {
-    GProgressChangeLine1(GStringGetResource(line1r,NULL));
-}
-
 void GProgressChangeLine2(const unichar_t *line2) {
     if ( current==NULL )
 return;
@@ -385,10 +350,6 @@ return;
     }
     if ( current->visible )
 	GDrawRequestExpose(current->gw,NULL,false);
-}
-
-void GProgressChangeLine2R(int line2r) {
-    GProgressChangeLine2(GStringGetResource(line2r,NULL));
 }
 
 void GProgressChangeTotal(int tot) {
@@ -511,11 +472,4 @@ void GProgressChangeLine2_8(const char *line2) {
     unichar_t *l2 = utf82u_copy(line2);
     GProgressChangeLine2(l2);
     free(l2);
-}
-
-GResInfo *_GProgressRIHead(void) {
-
-    if ( !progress_init )
-	GProgressResInit();
-return( &progress_ri );
 }

@@ -30,32 +30,35 @@
 #include "gdraw.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "gwidget.h"
 #include "ustring.h"
 
 static GBox gtabset_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gvtabset_box = GBOX_EMPTY; /* Don't initialize here */
-static FontInstance *gtabset_font = NULL;
-static int gtabset_inited = false;
+static GResFont gtabset_font = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
+static Color close_col = 0xff0000;
 
 static int GTS_TABPADDING = 25;
 
-static GResInfo gtabset_ri, gvtabset_ri;
-
-static GResInfo gtabset_ri = {
+static struct resed gtabset_re[] = {
+    {N_("Close Color"), "CloseColor", rt_color, &close_col, N_("Color of close icon in tab"), NULL, { 0 }, 0, 0 },
+    RESED_EMPTY
+};
+static GResInfo gvtabset_ri;
+GResInfo gtabset_ri = {
     &gvtabset_ri, &ggadget_ri, &gvtabset_ri, NULL,
     &gtabset_box,
+    &gtabset_font,
     NULL,
-    NULL,
-    NULL,
+    gtabset_re,
     N_("TabSet"),
     N_("Tab Set"),
     "GTabSet",
     "Gdraw",
     false,
+    false,
     omf_border_width|omf_border_shape,
-    NULL,
+    { 0, bs_rect, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -74,8 +77,9 @@ static GResInfo gvtabset_ri = {
     "GVTabSet",
     "Gdraw",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -83,22 +87,9 @@ static GResInfo gvtabset_ri = {
 };
 #define NEST_INDENT	4
 
-static void GTabSetInit() {
-
-    if ( gtabset_inited )
-return;
-
-    GGadgetInit();
-
-    _GGadgetCopyDefaultBox(&gtabset_box);
-    gtabset_box.border_width = 1; gtabset_box.border_shape = bs_rect;
-    /*gtabset_box.flags = 0;*/
-    gtabset_font = _GGadgetInitDefaultBox("GTabSet.",&gtabset_box,NULL);
-
-    gvtabset_box = gtabset_box; /* needs this to figure inheritance */
-    _GGadgetInitDefaultBox("GVTabSet.",&gvtabset_box,NULL);
-
-    gtabset_inited = true;
+void GTabSetInit() {
+    GResEditDoInit(&gtabset_ri);
+    GResEditDoInit(&gvtabset_ri);
 }
 
 static void GTabSetChanged(GTabSet *gts,int oldsel) {
@@ -182,9 +173,8 @@ static int DrawTab(GWindow pixmap, GTabSet *gts, int i, int x, int y ) {
     int nx1 = GDrawDrawText(pixmap,nx,ny,gts->tabs[i].name,-1,fg);
     if (gts->closable) {
         nx1 += (GTS_TABPADDING/2-5);
-        Color xcol = GResourceFindColor("GTabSet.CloseColor",0xff0000);
-        GDrawDrawLine(pixmap,nx+nx1,ny,nx+nx1+10,ny-10,xcol);
-        GDrawDrawLine(pixmap,nx+nx1,ny-10,nx+nx1+10,ny,xcol);
+        GDrawDrawLine(pixmap,nx+nx1,ny,nx+nx1+10,ny-10,close_col);
+        GDrawDrawLine(pixmap,nx+nx1,ny-10,nx+nx1+10,ny,close_col);
     }
     gts->tabs[i].x = x;
     x += gts->tabs[i].width;
@@ -418,7 +408,7 @@ static void GTabSet_Remetric(GTabSet *gts) {
 	/* Nothing much to do */
     } else if ( gts->scrolled ) {
 	free(gts->rowstarts);
-	gts->rowstarts = malloc(2*sizeof(int16));
+	gts->rowstarts = malloc(2*sizeof(int16_t));
 	gts->rowstarts[0] = 0; gts->rowstarts[1] = gts->tabcnt;
 	gts->rcnt = 1;
     } else {
@@ -428,7 +418,7 @@ static void GTabSet_Remetric(GTabSet *gts) {
 	    while ( (r2 = GTabSetRCnt(gts,width-(r-1)*gts->offset_per_row))!=r )
 		r = r2;
 	free(gts->rowstarts);
-	gts->rowstarts = malloc((r+1)*sizeof(int16));
+	gts->rowstarts = malloc((r+1)*sizeof(int16_t));
 	gts->rcnt = r;
 	gts->rowstarts[r] = gts->tabcnt;
 	for ( i=r=0; i<gts->tabcnt; ++i ) {
@@ -533,7 +523,7 @@ return(false);
 		else
 		    sel = i;
 	    }
-        if ( i < gts->tabcnt && i >= 0 )
+        if ( i < gts->tabcnt && i >= 0 ) {
 		if ( gts->closable && event->type==et_mouseup && event->u.mouse.x>=gts->tabs[i].x+gts->tabs[i].width+(-GTS_TABPADDING/2-10) ) {
 			TRACE("Closing tab %d\n", sel);
 			GTabSetRemoveTabByPos(&gts->g, i);
@@ -552,6 +542,7 @@ return(false);
 			}
 			gts->oldsel = sel;
 		}
+	}
 	} else {
 	    l = (event->u.mouse.y-gts->g.r.y)/gts->rowh;	/* screen row */
 	    if ( l>=gts->rcnt ) l = gts->rcnt-1;		/* can happen on single line tabsets (there's extra space then) */
@@ -566,7 +557,7 @@ return(false);
 		sel = i;
 	    }
 	}
-	if ( event->type==et_mousedown ) {
+	if ( event->type==et_mousedown && event->u.mouse.button <= 3 ) {
 	    gts->pressed = true;
 	    gts->pressed_sel = sel;
 	} else {
@@ -626,6 +617,8 @@ return;
 /*	if ( gts->tabs[i].w!=NULL ) */
 /*	    GDrawDestroyWindow(gts->tabs[i].w); */
     }
+    if ( gts->vsb!=NULL )
+	GGadgetDestroy(gts->vsb);
     free(gts->tabs);
     _ggadget_destroy(g);
 }
@@ -651,10 +644,10 @@ static void _gtabset_redraw(GGadget *g) {
 	GDrawRequestExpose(gts->tabs[i].w, NULL, false);
 }
 
-static void _gtabset_move(GGadget *g, int32 x, int32 y ) {
+static void _gtabset_move(GGadget *g, int32_t x, int32_t y ) {
     GTabSet *gts = (GTabSet *) g;
     int i;
-    int32 nx = x+g->inner.x-g->r.x, ny = y+g->inner.y-g->r.y;
+    int32_t nx = x+g->inner.x-g->r.x, ny = y+g->inner.y-g->r.y;
 
     for ( i=0; i<gts->tabcnt; ++i ) if ( gts->tabs[i].w!=NULL )
 	GDrawMove(gts->tabs[i].w,nx,ny);
@@ -666,7 +659,7 @@ static void _gtabset_move(GGadget *g, int32 x, int32 y ) {
     }
 }
 
-static void _gtabset_resize(GGadget *g, int32 width, int32 height ) {
+static void _gtabset_resize(GGadget *g, int32_t width, int32_t height ) {
     GTabSet *gts = (GTabSet *) g;
     int i;
 
@@ -811,6 +804,7 @@ static int sendtoparent_eh(GWindow gw, GEvent *event) {
       case et_resize:
 	GDrawRequestExpose(gw,NULL,false);
       break;
+      default: break;
     }
 
 return( true );
@@ -859,11 +853,10 @@ GGadget *GTabSetCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     childattrs.mask = wam_events;
     childattrs.event_masks = -1;
 
-    if ( !gtabset_inited )
-	GTabSetInit();
+    GTabSetInit();
     gts->g.funcs = &gtabset_funcs;
     _GGadget_Create(&gts->g,base,gd,data, gd->flags&gg_tabset_vert ? &gvtabset_box  : &gtabset_box);
-    gts->font = gtabset_font;
+    gts->font = gtabset_font.fi;
 
     gts->g.takes_input = true; gts->g.takes_keyboard = true; gts->g.focusable = true;
 
@@ -885,11 +878,10 @@ GGadget *GTabSetCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     gts->tabcnt = i;
     gts->tabs = calloc(i, sizeof(struct tabs));
     for ( i=0; gd->u.tabs[i].text!=NULL; ++i ) {
-	if ( gd->u.tabs[i].text_in_resource )
-	    gts->tabs[i].name = u_copy(GStringGetResource((intpt) (gd->u.tabs[i].text),NULL));
-	else if ( gd->u.tabs[i].text_is_1byte )
-	    gts->tabs[i].name = utf82u_copy((char *) (gd->u.tabs[i].text));
-	else
+	if ( gd->u.tabs[i].text_is_1byte ) {
+	    unichar_t mn;
+	    gts->tabs[i].name = utf82u_mncopy((char *) (gd->u.tabs[i].text), &mn);
+	} else
 	    gts->tabs[i].name = u_copy(gd->u.tabs[i].text);
 	gts->tabs[i].disabled = gd->u.tabs[i].disabled;
 	gts->tabs[i].nesting = gd->u.tabs[i].nesting;
@@ -1094,10 +1086,4 @@ void GTabSetRemoveTabByName(GGadget *g, char *name) {
     }
 
     free(uname);
-}
-
-GResInfo *_GTabSetRIHead(void) {
-    if ( !gtabset_inited )
-	GTabSetInit();
-return( &gtabset_ri );
 }

@@ -42,7 +42,7 @@ typedef struct hints {
 /* Instead of y and x coordinates these are based on major and other */
 /*  major maybe either x or y depending on what we're interested in */
 /*  at the moment, and other will be the other one. Of course it's */
-/*  consistant accross the datastructure at any given time */
+/*  consistent across the datastructure at any given time */
 typedef struct edge {
     real mmin, mmax;		/* relative to es->mmin */
     real t_mmin, t_mmax;
@@ -66,7 +66,7 @@ typedef struct edgelist {
     real omin, omax;
     real scale;
     int bytes_per_line;
-    uint8 *bitmap;
+    uint8_t *bitmap;
     Edge *last, *splinesetfirst;
     SplineChar *sc;
     int layer;

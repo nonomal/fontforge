@@ -35,12 +35,12 @@
 #include "bvedit.h"
 #include "cvundoes.h"
 #include "encoding.h"
+#include "ffglib_compat.h"
+#include "ffprocess.h"
 #include "fontforge.h"
 #include "fvcomposite.h"
 #include "fvfonts.h"
 #include "gfile.h"
-#include "gio.h"
-#include "gresource.h"
 #include "groups.h"
 #include "namelist.h"
 #include "psfont.h"
@@ -56,7 +56,7 @@
 #include "utype.h"
 
 #include <math.h>
-#include <unistd.h>
+#include "ffunistd.h"
 
 static FontViewBase *fv_list=NULL;
 
@@ -328,7 +328,6 @@ return;
 static void LinkEncToGid(FontViewBase *fv,int enc, int gid) {
     EncMap *map = fv->map;
     int old_gid;
-    int flags = -1;
     int j;
 
     if ( map->map[enc]!=-1 && map->map[enc]!=gid ) {
@@ -495,7 +494,6 @@ void BackgroundImageTransform(SplineChar *sc, ImageList *img,real transform[6]) 
 	/* Don't support rotating, flipping or skewing images */
 	;
     }
-    SCOutOfDateBackground(sc);
 }
 
 static void GV_Trans(struct glyphvariants *gv,real transform[6], int is_v) {
@@ -606,7 +604,7 @@ static void KCTrans(KernClass *kc,double scale) {
 	kc->offsets[i] = rint(scale*kc->offsets[i]);
 }
 
-static void SCTransLayer(FontViewBase *fv, SplineChar *sc, int flags, int i, real transform[6], uint8 *sel) {
+static void SCTransLayer(FontViewBase *fv, SplineChar *sc, int flags, int i, real transform[6], uint8_t *sel) {
     int j;
     RefChar *refs;
     real t[6];
@@ -661,13 +659,13 @@ static void SCTransLayer(FontViewBase *fv, SplineChar *sc, int flags, int i, rea
 }
 
 /* If sel is specified then we decide how to transform references based on */
-/*  whether the refered glyph is selected. (If we tranform a reference that */
+/*  whether the referred glyph is selected. (If we transform a reference that */
 /*  is selected we are, in effect, transforming it twice -- since the glyph */
 /*  itself will be transformed -- so instead we just transform the offsets */
 /*  of the reference */
 /* If sel is NULL then we transform the reference */
 /* if flags&fvt_partialreftrans then we always just transform the offsets */
-void FVTrans(FontViewBase *fv,SplineChar *sc,real transform[6], uint8 *sel,
+void FVTrans(FontViewBase *fv,SplineChar *sc,real transform[6], uint8_t *sel,
 	enum fvtrans_flags flags) {
     AnchorPoint *ap;
     int i,first,last;
@@ -929,6 +927,50 @@ void FVAddExtrema(FontViewBase *fv, int force_adding ) {
     break;
     }
     ff_progress_end_indicator();
+}
+
+void _FVElementAction(FontViewBase *fv, int anysel, void (*func)(SplineChar*, SplineSet*, int), const char* progressmsg) { 
+    int i, cnt=0, layer, first, last, gid;
+    SplineChar *sc;
+
+    for ( i=0; i<fv->map->enccount; ++i )
+	if ( fv->selected[i] && (gid = fv->map->map[i])!=-1 &&
+		SCWorthOutputting(fv->sf->glyphs[gid]) )
+	    ++cnt;
+    ff_progress_start_indicator(10,progressmsg,progressmsg,0,cnt,1);
+
+    SFUntickAll(fv->sf);
+    for ( i=0; i<fv->map->enccount; ++i ) if ( fv->selected[i] &&
+	    (gid = fv->map->map[i])!=-1 &&
+	    SCWorthOutputting((sc = fv->sf->glyphs[gid])) &&
+	    !sc->ticked) {
+	sc->ticked = true;
+	if ( sc->parent->multilayer ) {
+	    first = ly_fore;
+	    last = sc->layer_cnt-1;
+	} else
+	    first = last = fv->active_layer;
+	for ( layer = first; layer<=last; ++layer ) {
+	    SCPreserveLayer(sc,layer,false);
+	    func(sc, sc->layers[layer].splines, anysel); 
+	}
+	SCCharChangedUpdate(sc,fv->active_layer);
+	if ( !ff_progress_next())
+    break;
+    }
+    ff_progress_end_indicator();
+}
+
+void FVAddInflections(FontViewBase *fv, int anysel) {
+	_FVElementAction(fv,anysel,&SplineCharAddInflections,_("Adding points of inflection..."));
+}
+
+void FVBalance(FontViewBase *fv, int anysel) {
+	_FVElementAction(fv,anysel,&SplineCharBalance,_("Balancing..."));
+}
+
+void FVHarmonize(FontViewBase *fv, int anysel) {
+	_FVElementAction(fv,anysel,&SplineCharHarmonize,_("Harmonizing..."));
 }
 
 void FVCanonicalStart(FontViewBase *fv) {
@@ -1204,14 +1246,14 @@ return( true );		/* A glyph with hints! */
 return( false );
 }
 
-void CIDSetEncMap(FontViewBase *fv, SplineFont *new ) {
-    int gcnt = new->glyphcnt;
+void CIDSetEncMap(FontViewBase *fv, SplineFont *new_sf ) {
+    int gcnt = new_sf->glyphcnt;
 
     if ( fv->cidmaster!=NULL && gcnt!=fv->sf->glyphcnt ) {
 	int i;
 	if ( fv->map->encmax<gcnt ) {
-	    fv->map->map = realloc(fv->map->map,gcnt*sizeof(int32));
-	    fv->map->backmap = realloc(fv->map->backmap,gcnt*sizeof(int32));
+	    fv->map->map = realloc(fv->map->map,gcnt*sizeof(int32_t));
+	    fv->map->backmap = realloc(fv->map->backmap,gcnt*sizeof(int32_t));
 	    fv->map->backmax = fv->map->encmax = gcnt;
 	}
 	for ( i=0; i<gcnt; ++i )
@@ -1220,12 +1262,12 @@ void CIDSetEncMap(FontViewBase *fv, SplineFont *new ) {
 	    memset(fv->selected+gcnt,0,fv->map->enccount-gcnt);
 	else {
 	    free(fv->selected);
-	    fv->selected = calloc(gcnt,sizeof(uint8));
+	    fv->selected = calloc(gcnt,sizeof(uint8_t));
 	}
 	fv->map->enccount = gcnt;
     }
-    fv->sf = new;
-    new->fv = fv;
+    fv->sf = new_sf;
+    new_sf->fv = fv;
     FVSetTitle(fv);
     FontViewReformatOne(fv);
 }
@@ -1281,7 +1323,7 @@ void FVAutoInstr(FontViewBase *fv) {
     /* (This way the auto hinter won't complain if they existed) */
     if ( fv->sf->ttf_tables!=NULL && AllGlyphsSelected(fv))
 	ClearFpgmPrepCvt(fv->sf);
-    if ( fv->sf->private==NULL && !no_windowing_ui )
+    if ( fv->sf->private_dict==NULL && !no_windowing_ui )
 	ff_post_notice( _("Things could be better..."), _("You will get better instructions if you fill in the Private dictionary, Element->Font Info->Private, for the font"));
     if ( !no_windowing_ui && !AnySelectedHints(fv))
 	ff_post_notice(_("Things could be better..."), _("The selected glyphs have no hints. FontForge will not produce many instructions."));
@@ -1503,7 +1545,6 @@ void FVRemoveUnused(FontViewBase *fv) {
     EncMap *map = fv->map;
     int oldcount = map->enccount;
     int gid, i;
-    int flags = -1;
 
     for ( i=map->enccount-1;
             i>=map->enc->char_cnt &&
@@ -1565,7 +1606,6 @@ void FVDetachAndRemoveGlyphs(FontViewBase *fv) {
     int i, j, gid;
     EncMap *map = fv->map;
     SplineFont *sf = fv->sf;
-    int flags = -1;
     int changed = false, altered = false;
     FontViewBase *fvs;
 
@@ -1691,14 +1731,14 @@ return;
 	strcpy(buf,old->filename);
 	if ( old->compression!=0 ) {
 	    char *tmpf;
-	    strcat(buf,compressors[old->compression-1].ext);
+	    strcat(buf,ff_compression_ext(ff_compression_from_legacy(old->compression)));
 	    strcat(buf,"~");
-	    tmpf = Decompress(buf,old->compression-1);
+	    tmpf = Decompress(buf);
 	    if ( tmpf==NULL )
 		temp = NULL;
 	    else {
 		temp = ReadSplineFont(tmpf,0);
-		unlink(tmpf);
+		ff_unlink(tmpf);
 		free(tmpf);
 	    }
 	} else {
@@ -1711,13 +1751,13 @@ return;
 	    char *tmpf;
 	    char *buf = malloc(strlen(old->filename)+20);
 	    strcpy(buf,old->filename);
-	    strcat(buf,compressors[old->compression-1].ext);
-	    tmpf = Decompress(buf,old->compression-1);
+	    strcat(buf,ff_compression_ext(ff_compression_from_legacy(old->compression)));
+	    tmpf = Decompress(buf);
 	    if ( tmpf==NULL )
 		temp = NULL;
 	    else {
 		temp = ReadSplineFont(tmpf,0);
-		unlink(tmpf);
+		ff_unlink(tmpf);
 		free(tmpf);
 	    }
 	} else
@@ -1938,7 +1978,7 @@ static FontViewBase *_FontViewBaseCreate(SplineFont *sf) {
 	fv->map = EncMap1to1(sf->glyphcnt);
 	if ( fv->nextsame==NULL ) { sf->map = fv->map; }
     }
-    fv->selected = calloc(fv->map->enccount,sizeof(uint8));
+    fv->selected = calloc(fv->map->enccount,sizeof(uint8_t));
 
 #ifndef _NO_PYTHON
     PyFF_InitFontHook(fv);
@@ -2026,16 +2066,17 @@ return( false );
 }
 
 static SplineFont *FontOfFilename(const char *filename) {
-    char buffer[1025];
     FontViewBase *fv;
+    char *abspath = GFileGetAbsoluteName(filename);
 
-    GFileGetAbsoluteName((char *) filename,buffer,sizeof(buffer)); 
     for ( fv=fv_list; fv!=NULL ; fv=fv->next ) {
-	if ( fv->sf->filename!=NULL && strcmp(fv->sf->filename,buffer)==0 )
-return( fv->sf );
-	else if ( fv->sf->origname!=NULL && strcmp(fv->sf->origname,buffer)==0 )
-return( fv->sf );
+	if ( (fv->sf->filename!=NULL && strcmp(fv->sf->filename,abspath)==0) ||
+	     (fv->sf->origname!=NULL && strcmp(fv->sf->origname,abspath)==0) ) {
+	    free(abspath);
+	    return fv->sf;
+	}
     }
+    free(abspath);
 return( NULL );
 }
 

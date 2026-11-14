@@ -31,6 +31,7 @@
 
 #include "autohint.h"
 #include "bvedit.h"
+#include "ffglib_compat.h"
 #include "fontforge.h"
 #include "fvfonts.h"
 #include "gfile.h"
@@ -54,16 +55,16 @@
 #include <math.h>
 #include <stdarg.h>
 #include <time.h>
-#include <unistd.h>
+#include "ffunistd.h"
 
-#if !defined(__MINGW32__)
+#if !defined(__MINGW32__) && !defined(_MSC_VER)
 # include <pwd.h>
 #endif
 
 #ifdef __CygWin
  #include <sys/stat.h>
  #include <sys/types.h>
- #include <unistd.h>
+ #include "ffunistd.h"
 #endif
 
 extern int autohint_before_generate;
@@ -409,7 +410,7 @@ static void dumpsubrs(void (*dumpchar)(int ch,void *data), void *data,
 
     if ( subrs==NULL )
 return;
-    if ( (pt=PSDictHasEntry(sf->private,"lenIV"))!=NULL )
+    if ( (pt=PSDictHasEntry(sf->private_dict,"lenIV"))!=NULL )
 	leniv = strtol(pt,NULL,10);
     dumpf(dumpchar,data,"/Subrs %d array\n",subrs->next);
     for ( i=0; i<subrs->next; ++i ) {
@@ -427,7 +428,7 @@ static int dumpcharstrings(void (*dumpchar)(int ch,void *data), void *data,
     int i;
     char *pt;
 
-    if ( (pt=PSDictHasEntry(sf->private,"lenIV"))!=NULL )
+    if ( (pt=PSDictHasEntry(sf->private_dict,"lenIV"))!=NULL )
 	leniv = strtol(pt,NULL,10);
     dumpf(dumpchar,data,"2 index /CharStrings %d dict dup begin\n",chars->cnt);
     for ( i=0; i<chars->next; ++i ) {
@@ -574,8 +575,8 @@ static void dumpGradient(void (*dumpchar)(int ch,void *data), void *data,
 		    col = grad->grad_stops[j].col;
 		else {
 		    double percent = (t-grad->grad_stops[j-1].offset)/ (grad->grad_stops[j].offset-grad->grad_stops[j-1].offset);
-		    uint32 col1 = grad->grad_stops[j-1].col;
-		    uint32 col2 = grad->grad_stops[j  ].col;
+		    uint32_t col1 = grad->grad_stops[j-1].col;
+		    uint32_t col2 = grad->grad_stops[j  ].col;
 		    int red, green, blue;
 		    if ( col1==COLOR_INHERITED ) col1 = 0x000000;
 		    if ( col2==COLOR_INHERITED ) col2 = 0x000000;
@@ -613,7 +614,7 @@ static void dumpPattern(void (*dumpchar)(int ch,void *data), void *data,
 	/*  and can't live in the content stream, so they are done elsewhere */
     } else {
 	if ( pattern_sc==NULL )
-	    LogError(_("No glyph named %s, used as a pattern in %s\n"), pat->pattern, sc->name);
+	    LogError(_("No glyph named %s, used as a pattern in %s"), pat->pattern, sc->name);
 	PatternSCBounds(pattern_sc,&b);
 
 	dumpf(dumpchar,data, "<<\n" );
@@ -715,11 +716,11 @@ static void InitFilter(struct psfilter *ps,void (*dumpchar)(int ch,void *data), 
     ps->data = data;
 }
 
-static void Filter(struct psfilter *ps,uint8 ch) {
+static void Filter(struct psfilter *ps,uint8_t ch) {
     ps->ascii85encode = (ps->ascii85encode<<8) | ch;
     if ( ++ps->ascii85n == 4 ) {
 	int ch5, ch4, ch3, ch2, ch1;
-	uint32 val = ps->ascii85encode;
+	uint32_t val = ps->ascii85encode;
 	if ( val==0 ) {
 	    (ps->dumpchar)('z',ps->data);
 	    ps->ascii85n = 0;
@@ -746,7 +747,7 @@ static void Filter(struct psfilter *ps,uint8 ch) {
 }
 
 static void FlushFilter(struct psfilter *ps) {
-    uint32 val = ps->ascii85encode;
+    uint32_t val = ps->ascii85encode;
     int n = ps->ascii85n;
     if ( n!=0 ) {
 	int ch4, ch3, ch2, ch1;
@@ -774,15 +775,15 @@ static void FlushFilter(struct psfilter *ps) {
 /*  proc (as opposed to executing) */
 /* So I can't use run length filters or other compression technique */
 
-static void FilterStr(struct psfilter *ps,uint8 *pt, int len ) {
-    uint8 *end = pt+len;
+static void FilterStr(struct psfilter *ps,uint8_t *pt, int len ) {
+    uint8_t *end = pt+len;
 
     while ( pt<end )
 	Filter(ps,*pt++);
 }
 
 static void PSDumpBinaryData(void (*dumpchar)(int ch,void *data), void *data,
-	uint8 *bytes,int rows, int bytes_per_row, int useful_bytes_per_row) {
+	uint8_t *bytes,int rows, int bytes_per_row, int useful_bytes_per_row) {
     struct psfilter ps;
     int i,j,cnt,group_cnt;
     const int max_string = 65536;
@@ -792,9 +793,9 @@ static void PSDumpBinaryData(void (*dumpchar)(int ch,void *data), void *data,
 	dumpf(dumpchar,data, "{<~" );
 	InitFilter(&ps,dumpchar,data);
 	if (bytes_per_row==useful_bytes_per_row )
-	    FilterStr(&ps,(uint8 *) bytes, rows*bytes_per_row);
+	    FilterStr(&ps,(uint8_t *) bytes, rows*bytes_per_row);
 	else for ( i=0; i<rows; ++i ) {
-	    FilterStr(&ps,(uint8 *) (bytes + i*bytes_per_row),
+	    FilterStr(&ps,(uint8_t *) (bytes + i*bytes_per_row),
 		    useful_bytes_per_row);
 	}
 	FlushFilter(&ps);
@@ -812,7 +813,7 @@ static void PSDumpBinaryData(void (*dumpchar)(int ch,void *data), void *data,
 	    }
 	    InitFilter(&ps,dumpchar,data);
 	    for ( j=0; j<cnt && i<rows; ++i, ++j ) {
-		FilterStr(&ps,(uint8 *) (bytes + i*bytes_per_row),
+		FilterStr(&ps,(uint8_t *) (bytes + i*bytes_per_row),
 			useful_bytes_per_row);
 	    }
 	    FlushFilter(&ps);
@@ -829,8 +830,8 @@ static void PSDump24BinaryData(void (*dumpchar)(int ch,void *data), void *data,
 	struct _GImage *base ) {
     struct psfilter ps;
     int i,j,cnt,group_cnt;
-    register uint32 val;
-    register uint32 *pt, *end;
+    register uint32_t val;
+    register uint32_t *pt, *end;
     const int max_string = 65536;
 
     if ( 3*base->width*base->height<max_string ) {
@@ -838,7 +839,7 @@ static void PSDump24BinaryData(void (*dumpchar)(int ch,void *data), void *data,
 	dumpf(dumpchar,data, "{<~" );
 	InitFilter(&ps,dumpchar,data);
 	for ( i=0; i<base->height; ++i ) {
-	    pt = (uint32 *) (base->data + i*base->bytes_per_line);
+	    pt = (uint32_t *) (base->data + i*base->bytes_per_line);
 	    end = pt + base->width;
 	    while ( pt<end ) {
 		val = *pt++;
@@ -862,7 +863,7 @@ static void PSDump24BinaryData(void (*dumpchar)(int ch,void *data), void *data,
 	    }
 	    InitFilter(&ps,dumpchar,data);
 	    for ( j=0; j<cnt && i<base->height; ++i, ++j ) {
-		pt = (uint32 *) (base->data + i*base->bytes_per_line);
+		pt = (uint32_t *) (base->data + i*base->bytes_per_line);
 		end = pt + base->width;
 		while ( pt<end ) {
 		    val = *pt++;
@@ -891,7 +892,7 @@ static void PSDrawMonoImg(void (*dumpchar)(int ch,void *data), void *data,
 	dumpf(dumpchar,data, "true ");
     dumpf(dumpchar,data, "[%d 0 0 %d 0 %d]\n",
 	    base->width, -base->height, base->height);
-    PSDumpBinaryData(dumpchar,data,(uint8 *) base->data,base->height,base->bytes_per_line,(base->width+7)/8);
+    PSDumpBinaryData(dumpchar,data,(uint8_t *) base->data,base->height,base->bytes_per_line,(base->width+7)/8);
 
     dumpf(dumpchar,data, "%s\n",
 	    use_imagemask?"imagemask":"image" );
@@ -1212,7 +1213,7 @@ return( false );
 return( true );
 }
 
-extern const uint8 *const subrs[10];
+extern const uint8_t *const subrs[10];
 extern const int subrslens[10];
 static struct pschars *initsubrs(MMSet *mm) {
     int i;
@@ -1221,10 +1222,10 @@ static struct pschars *initsubrs(MMSet *mm) {
     sub = calloc(1,sizeof(struct pschars));
     sub->cnt = 10;
     sub->lens = malloc(10*sizeof(int));
-    sub->values = malloc(10*sizeof(uint8 *));
+    sub->values = malloc(10*sizeof(uint8_t *));
     for ( i=0; i<5; ++i ) {
 	++sub->next;
-	sub->values[i] = (uint8 *) copyn((const char *) subrs[i],subrslens[i]);
+	sub->values[i] = (uint8_t *) copyn((const char *) subrs[i],subrslens[i]);
 	sub->lens[i] = subrslens[i];
     }
     sub->next = 5;
@@ -1232,7 +1233,7 @@ static struct pschars *initsubrs(MMSet *mm) {
 	static int cnts[] = { 1,2,3,4,6 };
 	for ( ; i<10 && cnts[i-5]*mm->instance_count<22; ++i ) {
 	    ++sub->next;
-	    sub->values[i] = (uint8 *) copyn((const char *) subrs[i],subrslens[i]);
+	    sub->values[i] = (uint8_t *) copyn((const char *) subrs[i],subrslens[i]);
 	    sub->values[i][0] += cnts[i-5]*mm->instance_count;
 	    sub->lens[i] = subrslens[i];
 	}
@@ -1366,17 +1367,17 @@ static void dumpmmprivatearr(void (*dumpchar)(int ch,void *data), void *data,
 static void dumpmmprivate(void (*dumpchar)(int ch,void *data), void *data,MMSet *mm) {
     char *privates[16];
     int j,k, missing, allsame;
-    struct psdict *private = mm->instances[0]->private;
+    struct psdict *private_dict = mm->instances[0]->private_dict;
 
-    if ( private==NULL )
+    if ( private_dict==NULL )
 return;
 
     dumpstr(dumpchar,data,"3 index /Blend get /Private get begin\n");
-    for ( k=0; k<private->next; ++k ) {
-	privates[0] = private->values[k];
+    for ( k=0; k<private_dict->next; ++k ) {
+	privates[0] = private_dict->values[k];
 	missing = false; allsame = true;
 	for ( j=1; j<mm->instance_count; ++j ) {
-	    privates[j] = PSDictHasEntry(mm->instances[j]->private,private->keys[k]);
+	    privates[j] = PSDictHasEntry(mm->instances[j]->private_dict,private_dict->keys[k]);
 	    if ( privates[j]==NULL ) {
 		missing = true;
 	break;
@@ -1385,7 +1386,7 @@ return;
 	}
 	if ( missing || allsame )
     continue;
-	dumpf(dumpchar,data," /%s ", private->keys[k]);
+	dumpf(dumpchar,data," /%s ", private_dict->keys[k]);
 	dumpmmprivatearr(dumpchar,data,privates,mm->instance_count);
 	dumpstr(dumpchar,data, " def\n" );
     }
@@ -1483,13 +1484,13 @@ return( false );
 	iscjk = incid->iscjk;
     }
 
-    hasbold = PSDictHasEntry(sf->private,"ForceBold")!=NULL;
-    hasblue = PSDictHasEntry(sf->private,"BlueValues")!=NULL;
-    hash = PSDictHasEntry(sf->private,"StdHW")!=NULL;
-    hasv = PSDictHasEntry(sf->private,"StdVW")!=NULL;
-    hasshift = PSDictHasEntry(sf->private,"BlueShift")!=NULL;
-    /*hasxuid = PSDictHasEntry(sf->private,"XUID")!=NULL;*/
-    haslg = PSDictHasEntry(sf->private,"LanguageGroup")!=NULL;
+    hasbold = PSDictHasEntry(sf->private_dict,"ForceBold")!=NULL;
+    hasblue = PSDictHasEntry(sf->private_dict,"BlueValues")!=NULL;
+    hash = PSDictHasEntry(sf->private_dict,"StdHW")!=NULL;
+    hasv = PSDictHasEntry(sf->private_dict,"StdVW")!=NULL;
+    hasshift = PSDictHasEntry(sf->private_dict,"BlueShift")!=NULL;
+    /*hasxuid = PSDictHasEntry(sf->private_dict,"XUID")!=NULL;*/
+    haslg = PSDictHasEntry(sf->private_dict,"LanguageGroup")!=NULL;
     if ( sf->weight!=NULL &&
 	    (strstrmatch(sf->weight,"Bold")!=NULL ||
 	     strstrmatch(sf->weight,"Heavy")!=NULL ||
@@ -1518,7 +1519,7 @@ return( false );
 	if ( !ff_progress_next_stage())
 return( false );
     }
-    bluescale = BlueScaleFigure(sf->private,bluevalues,otherblues);
+    bluescale = BlueScaleFigure(sf->private_dict,bluevalues,otherblues);
 
     if ( !hash || !hasv )
     stdhw[0] = stdvw[0] = 0;
@@ -1576,7 +1577,7 @@ return( false );
 	if ( stdvw[0]!=0 ) ++cnt;
 	if ( stemsnapv[0]!=0 ) ++cnt;
     }
-    cnt += sf->private!=NULL?sf->private->next:0;
+    cnt += sf->private_dict!=NULL?sf->private_dict->next:0;
     if ( incid==NULL ) {
 	++cnt;			/* Subrs entry */
 	++cnt;			/* Other Subrs */
@@ -1624,16 +1625,16 @@ return( false );
 	dumpf(dumpchar,data,"/LanguageGroup 1 def\n" );
     if ( sf->tempuniqueid!=0 && sf->tempuniqueid!=-1 && sf->use_uniqueid )
 	dumpf(dumpchar,data,"/UniqueID %d def\n", sf->tempuniqueid );
-    if ( sf->private!=NULL ) {
-	for ( i=0; i<sf->private->next; ++i ) {
-	    dumpf(dumpchar,data,"/%s ", sf->private->keys[i]);
-	    dumpstr(dumpchar,data,sf->private->values[i]);
-	    if ( strcmp(sf->private->keys[i],"BlueValues")==0 ||
-		    strcmp(sf->private->keys[i],"OtherBlues")==0 ||
-		    strcmp(sf->private->keys[i],"StdHW")==0 ||
-		    strcmp(sf->private->keys[i],"StdVW")==0 ||
-		    strcmp(sf->private->keys[i],"StemSnapH")==0 ||
-		    strcmp(sf->private->keys[i],"StemSnapV")==0 )
+    if ( sf->private_dict!=NULL ) {
+	for ( i=0; i<sf->private_dict->next; ++i ) {
+	    dumpf(dumpchar,data,"/%s ", sf->private_dict->keys[i]);
+	    dumpstr(dumpchar,data,sf->private_dict->values[i]);
+	    if ( strcmp(sf->private_dict->keys[i],"BlueValues")==0 ||
+		    strcmp(sf->private_dict->keys[i],"OtherBlues")==0 ||
+		    strcmp(sf->private_dict->keys[i],"StdHW")==0 ||
+		    strcmp(sf->private_dict->keys[i],"StdVW")==0 ||
+		    strcmp(sf->private_dict->keys[i],"StemSnapH")==0 ||
+		    strcmp(sf->private_dict->keys[i],"StemSnapV")==0 )
 		dumpf(dumpchar,data," %s\n", ND);
 	    else
 		dumpstr(dumpchar,data," def\n");
@@ -1689,8 +1690,11 @@ static void dumpfontinfo(void (*dumpchar)(int ch,void *data), void *data, Spline
 	cnt += 3;
 
     dumpf(dumpchar,data,"/FontInfo %d dict dup begin\n", cnt );
-    if ( sf->subfontcnt==0 && sf->version )
-	dumpf(dumpchar,data," /version (%s) readonly def\n", sf->version );
+    if ( sf->subfontcnt==0 && sf->version ) {
+	dumpstr(dumpchar,data," /version (");
+	dumpcarefully(dumpchar,data,sf->version);
+	dumpstr(dumpchar,data,") readonly def\n");
+    }
     if ( sf->copyright ) {
 	dumpf(dumpchar,data," /Notice (");
 	dumpcarefully(dumpchar,data,sf->copyright);
@@ -1714,7 +1718,7 @@ static void dumpfontinfo(void (*dumpchar)(int ch,void *data), void *data, Spline
 	dumpf(dumpchar,data," /FSType %d def\n", sf->pfminfo.fstype );
     if ( sf->subfontcnt==0 ) {
 	dumpf(dumpchar,data," /ItalicAngle %g def\n", (double) sf->italicangle );
-	dumpf(dumpchar,data," /isFixedPitch %s def\n", SFOneWidth(sf)!=-1?"true":"false" );
+	dumpf(dumpchar,data," /isFixedPitch %s def\n", SFIsFixedWidth(sf)?"true":"false" );
 	if ( format==ff_type42 || format==ff_type42cid ) {
 	    if ( sf->upos )
 		dumpf(dumpchar,data," /UnderlinePosition %g def\n", (double) (sf->upos/(sf->ascent+sf->descent)) );
@@ -1768,7 +1772,7 @@ static void dumpfontcomments(void (*dumpchar)(int ch,void *data), void *data,
     now = GetTime();
     /* Werner points out that the DSC Version comment has a very specific */
     /*  syntax. We can't just put in a random string, must be <real> <int> */
-    /* So we can sort of do that for CID fonts (give it a <revsion> of 0 */
+    /* So we can sort of do that for CID fonts (give it a <revision> of 0 */
     /*  but for type1s just use a comment rather than a DSC statement */
     if (( format==ff_cid || format==ff_cffcid || format==ff_type42cid ) &&
 	    sf->cidregistry!=NULL ) {
@@ -1778,7 +1782,9 @@ static void dumpfontcomments(void (*dumpchar)(int ch,void *data), void *data,
 	/* CID keyed fonts are language level 3 */
     } else {
 	dumpf(dumpchar,data,"%%%%Title: %s\n", sf->fontname);
-	dumpf(dumpchar,data,"%%Version: %s\n", sf->version);
+	dumpstr(dumpchar,data,"%Version: ");
+	if ( sf->version!=NULL ) dumpstr(dumpchar,data,sf->version);
+	dumpchar('\n',data);
     }
     dumpf(dumpchar,data,"%%%%CreationDate: %s", ctime(&now));
     if ( author!=NULL )
@@ -1846,7 +1852,9 @@ static void dumprequiredfontinfo(void (*dumpchar)(int ch,void *data), void *data
     int uniqueid;
     char buffer[50];
 
-    dumpf(dumpchar,data,"%%!PS-AdobeFont-1.0: %s %s\n", sf->fontname, sf->version?sf->version:"" );
+    dumpf(dumpchar,data,"%%!PS-AdobeFont-1.0: %s ", sf->fontname);
+    if ( sf->version!=NULL ) dumpstr(dumpchar,data,sf->version);
+    dumpchar('\n',data);
     if ( format==ff_ptype0 && (map->enc->is_unicodebmp || map->enc->is_unicodefull))
 	dumpf(dumpchar,data,"%%%%DocumentNeededResources: font ZapfDingbats\n" );
 /*  dumpf(dumpchar,data, "%%%%DocumentSuppliedResources: font %s\n", sf->fontname );*/
@@ -1878,7 +1886,7 @@ static void dumprequiredfontinfo(void (*dumpchar)(int ch,void *data), void *data
 	cnt += 7;
 
     if ( sf->uniqueid==0 )
-	uniqueid = 4000000 + (rand()&0x3ffff);
+	uniqueid = 4000000 + (ff_random_int()&0x3ffff);
     else
 	uniqueid = sf->uniqueid ;
     sf->tempuniqueid = uniqueid;
@@ -1950,7 +1958,7 @@ static void dumprequiredfontinfo(void (*dumpchar)(int ch,void *data), void *data
 	}
 	dumpstr(dumpchar,data,"} def\n" );
 
-	dumpf(dumpchar,data,"  /Private %d dict def\n", sf->private->next+10 );
+	dumpf(dumpchar,data,"  /Private %d dict def\n", sf->private_dict->next+10 );
 	dumpstr(dumpchar,data," end def		%End of Blend dict\n" );
 
 	for ( j=0; makeblendedfont[j]!=NULL; ++j ) {
@@ -2133,7 +2141,7 @@ static void dumptype42(FILE *out, SplineFont *sf, int format, int flags,
     dumpfontinfo((DumpChar) fputc,out,sf,format);
 
     if ( sf->uniqueid==0 )
-	uniqueid = 4000000 + (rand()&0x3ffff);
+	uniqueid = 4000000 + (ff_random_int()&0x3ffff);
     else
 	uniqueid = sf->uniqueid ;
     sf->tempuniqueid = uniqueid;
@@ -2380,9 +2388,9 @@ static void dumptype0stuff(FILE *out,SplineFont *sf, EncMap *map) {
     fprintf( out, "%%%%EOF\n" );
 }
 
-static void dumpt1str(FILE *binary,uint8 *data, int len, int leniv) {
+static void dumpt1str(FILE *binary,uint8_t *data, int len, int leniv) {
     if ( leniv==-1 )
-	fwrite(data,sizeof(uint8),len,binary);
+	fwrite(data,sizeof(uint8_t),len,binary);
     else
 	encodestrout((DumpChar) fputc,binary,data,len,leniv);
 }
@@ -2427,7 +2435,7 @@ static FILE *gencidbinarydata(SplineFont *cidmaster,struct cidbytes *cidbytes,
 return( NULL );
 	}
 	fd->iscjk = SFIsCJK(sf,map);
-	pt = PSDictHasEntry(sf->private,"lenIV");
+	pt = PSDictHasEntry(sf->private_dict,"lenIV");
 	if ( pt!=NULL )
 	    fd->leniv = strtol(pt,NULL,10);
 	else
@@ -2566,10 +2574,10 @@ static int dumpcidstuff(FILE *out,SplineFont *cidmaster,int flags,EncMap *map,in
 	    ceil(res.maxx), ceil(res.maxy));
 
     if ( cidmaster->use_uniqueid ) {
-	fprintf( out,"/UIDBase %d def\n", cidmaster->uniqueid?cidmaster->uniqueid: 4000000 + (rand()&0x3ffff) );
+	fprintf( out,"/UIDBase %d def\n", cidmaster->uniqueid?cidmaster->uniqueid: 4000000 + (ff_random_int()&0x3ffff) );
 	if ( cidmaster->xuid!=NULL && cidmaster->use_xuid ) {
 	    fprintf( out,"/XUID %s def\n", cidmaster->xuid );
-	    /* SFIncrementXUID(cidmaster); */ /* Unique ID managment in CID fonts is too complex for this simple trick to work */
+	    /* SFIncrementXUID(cidmaster); */ /* Unique ID management in CID fonts is too complex for this simple trick to work */
 	}
     }
 
@@ -2699,9 +2707,9 @@ static void dumpimageproc(FILE *file,BDFChar *bdfc,BDFFont *font) {
 	   width, -height);
     InitFilter(&ps,(DumpChar) fputc,file);
     if ( bdfc->bytes_per_line==(width+7)/8 )
-	FilterStr(&ps,(uint8 *) bdfc->bitmap, height*bdfc->bytes_per_line);
+	FilterStr(&ps,(uint8_t *) bdfc->bitmap, height*bdfc->bytes_per_line);
     else for ( i=0; i<height; ++i )
-	FilterStr(&ps,(uint8 *) (bdfc->bitmap + i*bdfc->bytes_per_line),
+	FilterStr(&ps,(uint8_t *) (bdfc->bitmap + i*bdfc->bytes_per_line),
 		(width+7)/8);
     FlushFilter(&ps);
     fprintf(file,"} imagemask } bind def\n" );
@@ -2720,7 +2728,7 @@ int PSBitmapDump(char *filename,BDFFont *font, EncMap *map) {
     }
     file = fopen(filename,"w" );
     if ( file==NULL )
-	LogError( _("Can't open %s\n"), filename );
+	LogError( _("Can't open %s"), filename );
     else {
     	for ( i=0; i<font->glyphcnt; i++ ) if ( font->glyphs[i] != NULL )
     	    BCPrepareForOutput( font->glyphs[i],true );

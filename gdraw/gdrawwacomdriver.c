@@ -148,7 +148,7 @@ void _GXDraw_Wacom_Init(GXDisplay *gdisp) {
     WState *ws;
 /* Some of this code is stolen from xf86Wacom.c, the XFree driver for wacom */
     char name[256];
-    uint8 bit[2][(KEY_MAX-1)/8];
+    uint8_t bit[2][(KEY_MAX-1)/8];
     int abs[5];
     int j;
 /* End stolen section */
@@ -264,7 +264,7 @@ static void Wacom_SendCoreEvent(GXDisplay *gdisp,int button,int type) {
     XEvent e;
     struct timeval tv;
 
-    /* We don't need to send MotionNotify events becasue WarpPointer does */
+    /* We don't need to send MotionNotify events because WarpPointer does */
     /*  that for us (it won't get the state as we might like it, but there's */
     /*  nothing I can do about that) */
     if ( ws->xw==None )

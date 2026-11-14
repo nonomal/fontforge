@@ -30,7 +30,7 @@
 #include "cvundoes.h"
 #include "fontforgeui.h"
 #include "gkeysym.h"
-#include "gresource.h"
+#include "gresedit.h"
 #include "splineorder2.h"
 #include "splineutil.h"
 #include "ustring.h"
@@ -67,20 +67,11 @@ void CVDebugPointPopup(CharView *cv) {
 # define PPEMX(exc)	((exc)->size->root.metrics.x_ppem)
 # define PPEMY(exc)	((exc)->size->root.metrics.y_ppem)
 
-static Color rasterbackcol = 0xffffff;
-
-static int debuggercolsinited = false;
+GResFont debugview_font = GRESFONT_INIT("400 12px " SANS_UI_FAMILIES);
+Color dv_rasterbackcol = 0xffffff;
 
 static void DebugColInit( void ) {
-    GResStruct debugcolors[] = {
-	{ "Background", rt_color, &rasterbackcol, NULL, 0 },
-	GRESSTRUCT_EMPTY
-    };
-    if ( debuggercolsinited )
-return;
-    rasterbackcol = GDrawGetDefaultBackground(screen_display);
-    GResourceFind( debugcolors, "DVRaster.");
-    debuggercolsinited = true;
+    BVColInit();
 }
 
 static int DVBpCheck(struct instrinfo *ii, int ip) {
@@ -108,7 +99,7 @@ static void DVRasterExpose(GWindow pixmap,DebugView *dv,GEvent *event) {
     GRect r;
 
     GDrawGetSize(dv->raster,&r);
-    GDrawFillRect(pixmap,&event->u.expose.rect,rasterbackcol);
+    GDrawFillRect(pixmap,&event->u.expose.rect,dv_rasterbackcol);
     xem = cv->ft_ppemx;
     yem = cv->ft_ppemy;
     x = (r.width - xem)/2;
@@ -131,12 +122,12 @@ static void DVRasterExpose(GWindow pixmap,DebugView *dv,GEvent *event) {
 	if ( cv->raster->num_greys<=2 ) {
 	    base.image_type = it_mono;
 	    clut.clut_len = 2;
-	    clut.clut[0] = rasterbackcol;
+	    clut.clut[0] = dv_rasterbackcol;
 	    clut.trans_index = 0;
 	} else {
 	    base.image_type = it_index;
 	    clut.clut_len = 256;
-	    clut.clut[0] = rasterbackcol;
+	    clut.clut[0] = dv_rasterbackcol;
 	    for ( i=1; i<256; ++i ) {
 		clut.clut[i] = ( (COLOR_RED(clut.clut[0])*(0xff-i)/0xff)<<16 ) |
 			( (COLOR_GREEN(clut.clut[0])*(0xff-i)/0xff)<<8 ) |
@@ -275,7 +266,7 @@ static void DVStorageExpose(GWindow pixmap,DebugView *dv,GEvent *event) {
 	GDrawDrawText8(pixmap,3,y,_("<empty>"),-1,MAIN_FOREGROUND);
     } else {
 	int n_watch;
-	uint8 *watches = DebuggerGetWatchStores(dv->dc,&n_watch);
+	uint8_t *watches = DebuggerGetWatchStores(dv->dc,&n_watch);
 	for ( i=0; i<exc->storeSize; ++i ) {
 	    if ( !DebuggerIsStorageSet(dv->dc,i) )
 		sprintf( buffer, _("%3d: <uninitialized>"), i );
@@ -304,7 +295,7 @@ static void DVCvtExpose(GWindow pixmap,DebugView *dv,GEvent *event) {
 	GDrawDrawText8(pixmap,3,y,_("<empty>"),-1,MAIN_FOREGROUND);
     } else {
 	int n_watch;
-	uint8 *watches = DebuggerGetWatchCvts(dv->dc,&n_watch);
+	uint8_t *watches = DebuggerGetWatchCvts(dv->dc,&n_watch);
 	for ( i=0; dv->cvt_offtop+i<exc->cvtSize; ++i ) {
 	    sprintf(buffer, "%3d: %3ld (%.2f)", dv->cvt_offtop+i,
 		    exc->cvt[dv->cvt_offtop+i], exc->cvt[dv->cvt_offtop+i]/64.0 );
@@ -359,7 +350,7 @@ static void DVPointsVExpose(GWindow pixmap,DebugView *dv,GEvent *event) {
     FT_Vector *pts;
     int n, n_watch, ph;
     TT_GlyphZoneRec *r;
-    uint8 *watches;
+    uint8_t *watches;
     BasePoint me,me2;
     struct reflist *actives;
 
@@ -591,14 +582,14 @@ static int SameInstructionSet(DebugView *dv,TT_ExecContext exc) {
     /*  much harder */
     int i;
 
-    if ( dv->id.instrs!=(uint8 *) exc->code )
+    if ( dv->id.instrs!=(uint8_t *) exc->code )
 return( false );	/* We called (or returned from) a subroutine */
 
     if ( dv->codeSize != exc->codeSize )
 return( false );	/* A glyph with a different number of instrs has been copied into the glyph instr area */
 
     for ( i=0 ; i<sizeof(dv->initialbytes) && i<dv->codeSize; ++i )
-	if ( dv->initialbytes[i] != ((uint8 *) exc->code)[i] )
+	if ( dv->initialbytes[i] != ((uint8_t *) exc->code)[i] )
 return( false );
 
 return( true );		/* As best we can tell... */
@@ -630,13 +621,13 @@ static void DVPointsFigureSB(DebugView *dv);
 static void ChangeCode(DebugView *dv,TT_ExecContext exc) {
     int i;
 
-    dv->id.instrs =(uint8 *) exc->code;
+    dv->id.instrs =(uint8_t *) exc->code;
     dv->id.instr_cnt = exc->codeSize;
     IIReinit(&dv->ii,exc->IP);
     dv->codeSize = exc->codeSize;
     dv->last_npoints = exc->pts.n_points;
     for ( i=0 ; i<sizeof(dv->initialbytes) && i<dv->codeSize; ++i )
-	dv->initialbytes[i] = ((uint8 *) exc->code)[i];
+	dv->initialbytes[i] = ((uint8_t *) exc->code)[i];
 
     if ( dv->active_refs==NULL )
 	dv->active_refs = ARFindBase(dv->cv->b.sc,NULL,dv->layer);
@@ -721,7 +712,7 @@ static void DVFigureNewState(DebugView *dv,TT_ExecContext exc) {
 	}
 	if ( exc->pts.n_points<=2 )
 	    cv->b.ft_gridfitwidth = 0;
-	/* suport for vertical phantom pts */
+	/* support for vertical phantom pts */
 	else if ( FreeTypeAtLeast(2,1,8))
 	    cv->b.ft_gridfitwidth = exc->pts.cur[exc->pts.n_points-3].x * dv->scalex;
 	else
@@ -797,7 +788,7 @@ static int DV_WatchPnt(GGadget *g, GEvent *e) {
     int pnum=0, n, any=0;
     SplineSet *ss;
     SplinePoint *sp;
-    uint8 *watches;
+    uint8_t *watches;
 
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
 	dv = GDrawGetUserData(GGadgetGetWindow(g));
@@ -807,7 +798,7 @@ return( true );
 	}
 
 	DebuggerGetWatches(dv->dc,&n);
-	watches = calloc(n,sizeof(uint8));
+	watches = calloc(n,sizeof(uint8_t));
 
 	for ( ss = dv->cv->b.layerheads[dv->cv->b.drawmode]->splines; ss!=NULL; ss=ss->next ) {
 	    for ( sp=ss->first; ; ) {
@@ -1064,6 +1055,7 @@ static void dvreg_scroll(DebugView *dv,struct sbevent *sb) {
       case et_sb_thumbrelease:
         newpos = sb->pos;
       break;
+      case et_sb_halfup: case et_sb_halfdown: break;
     }
     if ( newpos>reg_size-size.height/dv->ii.fh )
         newpos = reg_size-size.height/dv->ii.fh;
@@ -1097,6 +1089,7 @@ return( DVChar(dv,event));
 	  case et_scrollbarchange:
 	    dvreg_scroll(dv,&event->u.control.u.sb);
 	  break;
+	  default: break;
 	}
       break;
       case et_resize:
@@ -1118,6 +1111,7 @@ return( DVChar(dv,event));
       case et_mousemove:
 	GGadgetEndPopup();
       break;
+      default: break;
     }
 return( true );
 }
@@ -1167,6 +1161,7 @@ static void dvstack_scroll(DebugView *dv,struct sbevent *sb) {
       case et_sb_thumbrelease:
         newpos = sb->pos;
       break;
+      case et_sb_halfup: case et_sb_halfdown: break;
     }
     if ( newpos>exc->top-size.height/dv->ii.fh )
         newpos = exc->top-size.height/dv->ii.fh;
@@ -1200,6 +1195,7 @@ return( DVChar(dv,event));
 	  case et_scrollbarchange:
 	    dvstack_scroll(dv,&event->u.control.u.sb);
 	  break;
+	  default: break;
 	}
       break;
       case et_resize:
@@ -1221,6 +1217,7 @@ return( DVChar(dv,event));
       case et_mousemove:
 	GGadgetEndPopup();
       break;
+      default: break;
     }
 return( true );
 }
@@ -1270,6 +1267,7 @@ static void dvstorage_scroll(DebugView *dv,struct sbevent *sb) {
       case et_sb_thumbrelease:
         newpos = sb->pos;
       break;
+      case et_sb_halfup: case et_sb_halfdown: break;
     }
     if ( newpos>exc->storeSize-size.height/dv->ii.fh )
         newpos = exc->storeSize-size.height/dv->ii.fh;
@@ -1303,6 +1301,7 @@ return( DVChar(dv,event));
 	  case et_scrollbarchange:
 	    dvstorage_scroll(dv,&event->u.control.u.sb);
 	  break;
+	  default: break;
 	}
       break;
       case et_resize:
@@ -1323,13 +1322,13 @@ return( DVChar(dv,event));
       case et_mouseup: {
 	int i;
 	int n;
-	uint8 *watches;
+	uint8_t *watches;
 	TT_ExecContext exc = DebuggerGetEContext(dv->dc);
 	i = (event->u.mouse.y-3)/dv->ii.fh+dv->storage_offtop;
 	if ( i>=0 && exc!=NULL ) {
 	    watches = DebuggerGetWatchStores(dv->dc,&n);
 	    if ( watches==NULL ) {
-		watches = calloc(n,sizeof(uint8));
+		watches = calloc(n,sizeof(uint8_t));
 		DebuggerSetWatchStores(dv->dc,n,watches);
 	    }
 	    if ( i<n ) {
@@ -1342,6 +1341,7 @@ return( DVChar(dv,event));
       case et_mousemove:
 	GGadgetEndPopup();
       break;
+      default: break;
     }
 return( true );
 }
@@ -1349,7 +1349,6 @@ return( true );
 static int dvpts_cnt(DebugView *dv) {
     TT_ExecContext exc = DebuggerGetEContext(dv->dc);
     int i, l, cnt;
-    FT_Vector *pts;
     int n;
     TT_GlyphZoneRec *r;
 
@@ -1360,7 +1359,6 @@ return( 0 );
     show_current = GGadgetIsChecked(GWidgetGetControl(dv->points,CID_Current));
     r = show_twilight ? &exc->twilight : &exc->pts;
     n = r->n_points;
-    pts = show_current ? r->cur : r->org;
 
     cnt = 0;
     for ( i=0; i<n; ++i ) {
@@ -1416,10 +1414,10 @@ return( DVChar(dv,event));
 		}
 		if ( k==i ) {
 		    int n;
-		    uint8 *watches;
+		    uint8_t *watches;
 		    watches = DebuggerGetWatches(dv->dc,&n);
 		    if ( watches==NULL ) {
-			watches = calloc(n,sizeof(uint8));
+			watches = calloc(n,sizeof(uint8_t));
 			DebuggerSetWatches(dv->dc,n,watches);
 		    }
 		    if ( j<n ) {
@@ -1453,6 +1451,7 @@ return( DVChar(dv,event));
       case et_resize:
 	DVPointsFigureSB(dv);
       break;
+      default: break;
     }
 return( true );
 }
@@ -1487,6 +1486,7 @@ static void dvpts_scroll(DebugView *dv,struct sbevent *sb) {
       case et_sb_thumbrelease:
         newpos = sb->pos;
       break;
+      case et_sb_halfup: case et_sb_halfdown: break;
     }
     if ( newpos>cnt-size.height/dv->ii.fh )
         newpos = cnt-size.height/dv->ii.fh;
@@ -1524,6 +1524,7 @@ return( DVChar(dv,event));
 	  case et_scrollbarchange:
 	    dvpts_scroll(dv,&event->u.control.u.sb);
 	  break;
+	  default: break;
 	}
       break;
       case et_resize:
@@ -1545,6 +1546,7 @@ return( DVChar(dv,event));
       case et_mousemove:
 	GGadgetEndPopup();
       break;
+      default: break;
     }
 return( true );
 }
@@ -1595,6 +1597,7 @@ static void dvcvt_scroll(DebugView *dv,struct sbevent *sb) {
       case et_sb_thumbrelease:
         newpos = sb->pos;
       break;
+      case et_sb_halfup: case et_sb_halfdown: break;
     }
     if ( newpos>exc->cvtSize-size.height/dv->ii.fh )
         newpos = exc->cvtSize-size.height/dv->ii.fh;
@@ -1628,6 +1631,7 @@ return( DVChar(dv,event));
 	  case et_scrollbarchange:
 	    dvcvt_scroll(dv,&event->u.control.u.sb);
 	  break;
+	  default: break;
 	}
       break;
       case et_resize:
@@ -1648,13 +1652,13 @@ return( DVChar(dv,event));
       case et_mouseup: {
 	int i;
 	int n;
-	uint8 *watches;
+	uint8_t *watches;
 	TT_ExecContext exc = DebuggerGetEContext(dv->dc);
 	i = (event->u.mouse.y-3)/dv->ii.fh+dv->cvt_offtop;
 	if ( i>=0 && exc!=NULL ) {
 	    watches = DebuggerGetWatchCvts(dv->dc,&n);
 	    if ( watches==NULL ) {
-		watches = calloc(n,sizeof(uint8));
+		watches = calloc(n,sizeof(uint8_t));
 		DebuggerSetWatchCvts(dv->dc,n,watches);
 	    }
 	    if ( i<n ) {
@@ -1667,6 +1671,7 @@ return( DVChar(dv,event));
       case et_mousemove:
 	GGadgetEndPopup();
       break;
+      default: break;
     }
 return( true );
 }
@@ -1954,6 +1959,7 @@ return( DVChar(dv,event));
 	  case et_scrollbarchange:
 	    instr_scroll(&dv->ii,&event->u.control.u.sb);
 	  break;
+	  default: break;
 	}
       break;
       case et_resize:
@@ -1973,6 +1979,7 @@ return( DVChar(dv,event));
       break;
       case et_mousemove:
       break;
+      default: break;
     }
 return( true );
 }
@@ -2056,14 +2063,12 @@ void CVDebugReInit(CharView *cv,int restart_debug,int dbg_fpgm) {
     GWindowAttrs wattrs;
     GRect pos, size;
     TT_ExecContext exc;
-    FontRequest rq;
     int as,ds,ld;
     GGadgetCreateData gcd[9];
     GTextInfo label[9];
     extern int _GScrollBar_Width;
     double scalex, scaley;
     int i;
-    static GFont *monofont = NULL;
 
     scalex = (cv->b.sc->parent->ascent+cv->b.sc->parent->descent)/(rint(cv->ft_pointsizex*cv->ft_dpi/72.0)) / (1<<6);
     scaley = (cv->b.sc->parent->ascent+cv->b.sc->parent->descent)/(rint(cv->ft_pointsizey*cv->ft_dpi/72.0)) / (1<<6);
@@ -2198,15 +2203,7 @@ return;
 	dv->ii.v = GWidgetCreateSubWindow(dv->dv,&pos,ii_v_e_h,&dv->ii,&wattrs);
 	dv->ii.instrdata = &dv->id;
 
-	if ( monofont==NULL ) {
-	    memset(&rq,0,sizeof(rq));
-	    rq.utf8_family_name = MONO_UI_FAMILIES;
-	    rq.point_size = -12;
-	    rq.weight = 400;
-	    monofont = GDrawInstanciateFont(cv->gw,&rq);
-	    monofont = GResourceFindFont("DebugView.Font",monofont);
-	}
-	dv->ii.gfont = monofont;
+	dv->ii.gfont = debugview_font.fi;
 	GDrawSetFont(dv->ii.v,dv->ii.gfont);
 	GDrawWindowFontMetrics(dv->ii.v,dv->ii.gfont,&as,&ds,&ld);
 	dv->ii.as = as+1;
@@ -2244,7 +2241,7 @@ void CVDebugPointPopup(CharView *cv) {
     TT_GlyphZoneRec *r;
     FT_Vector *pts;
     int i,l,n;
-    int32 x,y,fudge;
+    int32_t x,y,fudge;
     char cspace[210];
     extern float snapdistance;
 

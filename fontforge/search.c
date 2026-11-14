@@ -1230,7 +1230,7 @@ static void SDCopyToSC(SplineChar *checksc,SplineChar *into,enum fvcopy_type ful
 
 void FVBReplaceOutlineWithReference( FontViewBase *fv, double fudge ) {
     SearchData *sv;
-    uint8 *selected, *changed;
+    uint8_t *selected, *changed;
     SplineFont *sf = fv->sf;
     int i, j, selcnt = 0, gid;
     SplineChar *checksc;
@@ -1462,7 +1462,7 @@ void FVCorrectReferences(FontViewBase *fv) {
 			ref->transform[1]>0x7fff/16384.0 ||
 			ref->transform[2]>0x7fff/16384.0 ||
 			ref->transform[3]>0x7fff/16384.0 ||
-			ref->transform[0]<-2.0 ||	/* Numbers are asymetric, negative range slightly bigger */
+			ref->transform[0]<-2.0 ||	/* Numbers are asymmetric, negative range slightly bigger */
 			ref->transform[1]<-2.0 ||
 			ref->transform[2]<-2.0 ||
 			ref->transform[3]<-2.0 ) {

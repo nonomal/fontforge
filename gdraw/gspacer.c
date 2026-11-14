@@ -30,7 +30,6 @@
 #include "gdraw.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "ustring.h"
 
 static GBox spacer_box = GBOX_EMPTY;
@@ -66,7 +65,7 @@ static const unichar_t *_GSpacerGetTitle(GGadget *g) {
 return( NULL );
 }
 
-static void _gspacer_resize(GGadget *g, int32 width, int32 height ) {
+static void _gspacer_resize(GGadget *g, int32_t width, int32_t height ) {
 
     g->inner.height = g->r.height = height;
     g->inner.width = g->r.width = width;

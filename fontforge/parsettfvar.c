@@ -45,10 +45,10 @@
 /***************************************************************************/
 /*                                                                         */
 /* Apple documents these tables at                                         */
-/*    http:// developer.apple.com/fonts/TTRefMan/RM06/Chap6[fgca]var.html  */
-/* The documentation for fvar is inconsistant. At one point it says that   */
+/*    http://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6[fgca]var.html   */
+/* The documentation for fvar is inconsistent. At one point it says that   */
 /*  countSizePairs should be 3, at another point 2. It should be 2.        */
-/* The documentation for gvar is not intelligable, cvar refers you to gvar */
+/* The documentation for gvar is not intelligible, cvar refers you to gvar */
 /*  and is thus also incomprehensible                                      */
 /* The documentation for avar appears correct, but as Apple has no fonts   */
 /*  with an 'avar' table, so it's hard to test.                            */
@@ -105,30 +105,30 @@ return;
     data_off = getushort(ttf);
     cnt = getushort(ttf);
     if ( cnt>2 )
-	LogError( _("Hmm, this 'fvar' table has more count/size pairs than I expect\n") );
+	LogError( _("Hmm, this 'fvar' table has more count/size pairs than I expect") );
     else if ( cnt<2 ) {
-	LogError( _("Hmm, this 'fvar' table has too few count/size pairs, I shan't parse it\n") );
+	LogError( _("Hmm, this 'fvar' table has too few count/size pairs, I shan't parse it") );
 return;
     }
     axis_count = getushort(ttf);
     if ( axis_count==0 || axis_count>4 ) {
 	if ( axis_count==0 )
-	    LogError( _("Hmm, this 'fvar' table has no axes, that doesn't make sense.\n") );
+	    LogError( _("Hmm, this 'fvar' table has no axes, that doesn't make sense.") );
 	else
-	    LogError( _("Hmm, this 'fvar' table has more axes than FontForge can handle.\n") );
+	    LogError( _("Hmm, this 'fvar' table has more axes than FontForge can handle.") );
 return;
     }
     if ( getushort(ttf)!=20 ) {
-	LogError( _("Hmm, this 'fvar' table has an unexpected size for an axis, I shan't parse it\n") );
+	LogError( _("Hmm, this 'fvar' table has an unexpected size for an axis, I shan't parse it") );
 return;
     }
     instance_count = getushort(ttf);
     if ( getushort(ttf)!=4+4*axis_count ) {
-	LogError( _("Hmm, this 'fvar' table has an unexpected size for an instance, I shan't parse it\n") );
+	LogError( _("Hmm, this 'fvar' table has an unexpected size for an instance, I shan't parse it") );
 return;
     }
     if ( data_off+axis_count*20+instance_count*(4+4*axis_count)> info->fvar_len ) {
-	LogError( _("Hmm, this 'fvar' table is too short\n") );
+	LogError( _("Hmm, this 'fvar' table is too short") );
 return;
     }
 
@@ -173,7 +173,7 @@ return;
     }
     axis_count = getlong(ttf);
     if ( axis_count!=info->variations->axis_count ) {
-	LogError( _("Hmm, the axis count in the 'avar' table is different from that in the 'fvar' table.\n") );
+	LogError( _("Hmm, the axis count in the 'avar' table is different from that in the 'fvar' table.") );
 	VariationFree(info);
 return;
     }
@@ -189,7 +189,7 @@ return;
 	}
     }
     if ( ftell(ttf)-info->avar_start>info->avar_len) {
-	LogError( _("Hmm, the 'avar' table is too long.\n") );
+	LogError( _("Hmm, the 'avar' table is too long.") );
 	VariationFree(info);
 return;
     }
@@ -237,11 +237,11 @@ static int *readpackeddeltas(FILE *ttf,int n) {
 	} else if ( runcnt&0x40 ) {
 	    /* runcnt shorts from the stack */
 	    for ( j=0 ; j<=(runcnt&0x3f) && i<n ; ++j )
-		deltas[i++] = (int16) getushort(ttf);
+		deltas[i++] = (int16_t) getushort(ttf);
 	} else {
 	    /* runcnt signed bytes from the stack */
 	    for ( j=0; j<=(runcnt&0x3f) && i<n; ++j )
-		deltas[i++] = (int8) getc(ttf);
+		deltas[i++] = (int8_t) getc(ttf);
 	}
 	if ( j<=(runcnt&0x3f) ) {
 	    if ( n>0 )
@@ -503,7 +503,7 @@ static void VaryGlyphs(struct ttfinfo *info,int tupleIndex,int gnum,
     if ( info->chars[gnum]==NULL )	/* Apple doesn't support ttc so this */
 return;					/*  can't happen */
     if ( points==NULL ) {
-	LogError( _("Mismatched local and shared tuple flags.\n") );
+	LogError( _("Mismatched local and shared tuple flags.") );
 return;
     }
 
@@ -521,7 +521,7 @@ return;
     } else {
 	static int warned = false;
 	if ( !warned )
-	    LogError( _("Incorrect number of deltas in glyph %d (%s)\n"), gnum,
+	    LogError( _("Incorrect number of deltas in glyph %d (%s)"), gnum,
 		    info->chars[gnum]->name!=NULL?info->chars[gnum]->name:"<Nameless>" );
 	warned = true;
     }
@@ -532,7 +532,7 @@ return;
 static void parsegvar(struct ttfinfo *info, FILE *ttf) {
     /* I'm only going to support a subset of the gvar. Only the global tuples */
     int axiscount, globaltc, gvarflags, gc, i,j,g;
-    uint32 tupoff, dataoff, *gvars;
+    uint32_t tupoff, dataoff, *gvars;
     struct variations *v = info->variations;
     int warned=false;
 
@@ -543,7 +543,7 @@ return;
     }
     axiscount = getushort(ttf);
     if ( axiscount!=info->variations->axis_count ) {
-	LogError( _("Hmm, the axis count in the 'gvar' table is different from that in the 'fvar' table.\n") );
+	LogError( _("Hmm, the axis count in the 'gvar' table is different from that in the 'fvar' table.") );
 	VariationFree(info);
 return;
     }
@@ -554,19 +554,19 @@ return;
     dataoff = getlong(ttf) + info->gvar_start;
     if ( globaltc==0 || globaltc>AppleMmMax ) {
 	if ( globaltc==0 )
-	    LogError( _("Hmm, no global tuples specified in the 'gvar' table.\n") );
+	    LogError( _("Hmm, no global tuples specified in the 'gvar' table.") );
 	else
 	    LogError( _("Hmm, too many global tuples specified in the 'gvar' table.\n FontForge only supports %d\n"), AppleMmMax );
 	VariationFree(info);
 return;
     }
     if ( gc>info->glyph_cnt ) {
-	LogError( _("Hmm, more glyph variation data specified than there are glyphs in font.\n") );
+	LogError( _("Hmm, more glyph variation data specified than there are glyphs in font.") );
 	VariationFree(info);
 return;
     }
 
-    gvars = malloc((gc+1)*sizeof(uint32));
+    gvars = malloc((gc+1)*sizeof(uint32_t));
     if ( gvarflags&1 ) {	/* 32 bit data */
 	for ( i=0; i<=gc; ++i )
 	    gvars[i] = getlong(ttf)+dataoff;
@@ -579,7 +579,7 @@ return;
     v->tuples = calloc(globaltc,sizeof(struct tuples));
     fseek(ttf,tupoff,SEEK_SET);
     for ( i=0; i<globaltc; ++i ) {
-	v->tuples[i].coords = malloc(axiscount*sizeof(float));
+	v->tuples[i].coords = malloc(axiscount*sizeof(real));
 	for ( j=0; j<axiscount; ++j )
 	    v->tuples[i].coords[j] = ((short) getushort(ttf))/16384.0;
 	v->tuples[i].chars = InfoCopyGlyphs(info);
@@ -587,13 +587,13 @@ return;
 
     for ( g=0; g<gc; ++g ) if ( gvars[g]!=gvars[g+1] ) {
 	int tc;
-	uint32 datoff;
+	uint32_t datoff;
 	int *sharedpoints=NULL;
 	fseek(ttf,gvars[g],SEEK_SET);
 	tc = getushort(ttf);
 	datoff = gvars[g]+getushort(ttf);
 	if ( tc&0x8000 ) {
-	    uint32 here = ftell(ttf);
+	    uint32_t here = ftell(ttf);
 	    fseek(ttf,datoff,SEEK_SET);
 	    sharedpoints = readpackedpoints(ttf);
 	    datoff = ftell(ttf);
@@ -614,7 +614,7 @@ return;
 		    fseek(ttf,4*axiscount,SEEK_CUR);
 	    } else {
 		int *localpoints=NULL;
-		uint32 here = ftell(ttf);
+		uint32_t here = ftell(ttf);
 		fseek(ttf,datoff,SEEK_SET);
 		if ( tupleIndex&0x2000 )
 		    localpoints = readpackedpoints(ttf);
@@ -667,7 +667,7 @@ static void VaryCvts(struct ttfinfo *info,int tupleIndex, int *points, FILE *ttf
     struct variations *v = info->variations;
 
     if ( points[0]==ALL_POINTS )
-	pcnt = origcvt->len/sizeof(uint16);
+	pcnt = origcvt->len/sizeof(uint16_t);
     else {
 	for ( pcnt=0; points[pcnt]!=END_OF_POINTS; ++pcnt );
     }
@@ -679,7 +679,7 @@ static void VaryCvts(struct ttfinfo *info,int tupleIndex, int *points, FILE *ttf
     } else {
 	static int warned = false;
 	if ( !warned )
-	    LogError( _("Incorrect number of deltas in cvt\n") );
+	    LogError( _("Incorrect number of deltas in cvt") );
 	warned = true;
     }
     free(deltas);
@@ -688,7 +688,7 @@ static void VaryCvts(struct ttfinfo *info,int tupleIndex, int *points, FILE *ttf
 static void parsecvar(struct ttfinfo *info, FILE *ttf) {
     struct ttf_table *cvt;
     int tuplecount;
-    uint32 offset;
+    uint32_t offset;
     int *sharedpoints=NULL;
     int i;
     int warned = false;
@@ -710,7 +710,7 @@ return;
     /*  but John Jenkins tells me that shared points don't apply to cvar */
     /*  Might as well parse it just in case */
     if ( tuplecount&0x8000 ) {
-	uint32 here = ftell(ttf);
+	uint32_t here = ftell(ttf);
 	fseek(ttf,offset,SEEK_SET);
 	sharedpoints = readpackedpoints(ttf);
 	offset = ftell(ttf);
@@ -732,13 +732,13 @@ return;
 		fseek(ttf,4*info->variations->axis_count,SEEK_CUR);
 	} else {
 	    int *localpoints=NULL;
-	    uint32 here;
+	    uint32_t here;
 	    int j,k,ti;
 	    ti = tupleIndex&0xfff;
 	    if ( tupleIndex&0x8000 ) {
 		real *coords = malloc(info->variations->axis_count*sizeof(real));
 		for ( j=0; j<info->variations->axis_count; ++j )
-		    coords[j] = ((int16) getushort(ttf))/16384.0;
+		    coords[j] = ((int16_t) getushort(ttf))/16384.0;
 		for ( k=0 ; k<info->variations->tuple_count; ++k ) {
 		    for ( j=0; j<info->variations->axis_count; ++j )
 			if ( coords[j]!=info->variations->tuples[k].coords[j] )

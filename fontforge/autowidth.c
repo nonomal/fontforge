@@ -63,7 +63,7 @@ int aw_old_spaceguess;
 	rbearing so that our result is the visual spacing if the two
 	characters were jammed up against each other).
 	Here we look at all regions the characters have in common and
-	just find the seperation between.
+	just find the separation between.
 	Then given this array of distances we use a heuristic to define what
 	the visual spacing is.
     Then we find the "average visual distance" between two characters
@@ -81,11 +81,11 @@ Autokern has similar ideas, but is simpler:
     Adjust the kerning between the two characters so that
 	<kern> = <dspace>-(<rb>-<lb>-<visual>)
 	Again check for overlap (<dspace>/4 in any zone)
-    Kerning by the left character can always propigate to dependents
+    Kerning by the left character can always propagate to dependents
     Kerning by the right char should not
 	(ie. A and À kern the same with V
 	 but V kerns differently with e and é-- the accent gets in the way)
-    No, I think it is better not to propigate kerning.
+    No, I think it is better not to propagate kerning.
 */
 
 
@@ -151,14 +151,14 @@ static void CheckOutOfBounds(WidthInfo *wi) {
 
     for ( i=0; i<wi->real_rcnt; ++i ) {
 	if ( wi->right[i]->newl<-wi->spacing || wi->right[i]->newl>wi->spacing )
-	    LogError( _("AutoWidth failure on %s\n"), wi->right[i]->sc->name );
+	    LogError( _("AutoWidth failure on %s"), wi->right[i]->sc->name );
 	if ( wi->right[i]->newl<-minsp )
 	    wi->right[i]->newl = -rint(minsp);
     }
     for ( i=0; i<wi->real_lcnt; ++i ) {
 	if ( wi->left[i]->newr<-wi->spacing-wi->seriflength ||
 		wi->left[i]->newr>wi->spacing+wi->seriflength ) {
-	    LogError( _("AutoWidth failure on %s\n"), wi->right[i]->sc->name );
+	    LogError( _("AutoWidth failure on %s"), wi->right[i]->sc->name );
 	    if ( wi->left[i]->newr>wi->spacing )
 		wi->left[i]->newr = wi->spacing;
 	}
@@ -181,7 +181,7 @@ static void CheckOutOfBounds(WidthInfo *wi) {
 
 static void ApplyChanges(WidthInfo *wi) {
     EncMap *map = wi->fv->map;
-    uint8 *rsel = calloc(map->enccount,sizeof(uint8));
+    uint8_t *rsel = calloc(map->enccount,sizeof(uint8_t));
     int i, width;
     real transform[6];
     struct charone *ch;
@@ -1383,7 +1383,7 @@ return;
 	    vkc->seconds = calloc(any2+1,sizeof(char *));
 	    for ( i=0; i<kc->second_cnt; ++i ) if ( map2[i]!=0 )
 		vkc->seconds[map2[i]] = SCListToName(seconds[i]);
-	    vkc->offsets = calloc((any1+1)*(any2+1),sizeof(int16));
+	    vkc->offsets = calloc((any1+1)*(any2+1),sizeof(int16_t));
 	    vkc->adjusts = calloc((any1+1)*(any2+1),sizeof(DeviceTable));
 	    for ( i=0; i<kc->first_cnt; ++i ) if ( map1[i]!=0 ) {
 		for ( j=0; j<kc->second_cnt; ++j ) if ( map2[j]!=0 ) {

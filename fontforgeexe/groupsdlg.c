@@ -30,6 +30,7 @@
 #include "fontforgeui.h"
 #include "fvfonts.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "groups.h"
 #include "namelist.h"
 #include "splineutil.h"
@@ -39,7 +40,7 @@
 #include <math.h>
 #include <unistd.h>
 
-
+GResFont groups_font = GRESFONT_INIT("400 12pt " SANS_UI_FAMILIES);
 
 /******************************************************************************/
 /******************************** Group Widget ********************************/
@@ -97,6 +98,10 @@ return( NULL );
 	    if ( lpos<group->kids[i+1]->lpos )
 	break;
 	}
+
+   // Return null if this is an empty node (prevents segfault on clicks under a group list)
+   if(!group->kids) return NULL;
+
 	group = group->kids[i];
 	++*depth;
     }
@@ -237,7 +242,7 @@ static void GroupWExpose(struct groupdlg *grp,GWindow pixmap,GRect *rect) {
     while ( group!=NULL ) {
 	r.y = y-grp->as+1;
 	r.x = 5+8*depth - grp->off_left;
-	fg = group->selected ? 0xff0000 : 0x000000;
+	fg = group->selected ? GDrawGetWarningForeground(NULL) : GDrawGetDefaultForeground(NULL);
 	if ( group->glyphs==NULL ) {
 	    GDrawDrawRect(pixmap,&r,fg);
 	    GDrawDrawLine(pixmap,r.x+2,r.y+grp->as/2,r.x+grp->as-2,r.y+grp->as/2,
@@ -311,6 +316,7 @@ static void GroupScroll(struct groupdlg *grp,struct sbevent *sb) {
       case et_sb_thumbrelease:
         newpos = sb->pos;
       break;
+      case et_sb_halfup: case et_sb_halfdown: break;
     }
     if ( newpos>grp->open_cnt-grp->lines_page )
         newpos = grp->open_cnt-grp->lines_page;
@@ -350,6 +356,7 @@ static void GroupHScroll(struct groupdlg *grp,struct sbevent *sb) {
       case et_sb_thumbrelease:
         newpos = sb->pos;
       break;
+      case et_sb_halfup: case et_sb_halfdown: break;
     }
     if ( newpos>grp->maxl-grp->page_width )
         newpos = grp->maxl-grp->page_width;
@@ -544,28 +551,19 @@ return( GroupChar(grp,event));
       case et_mouseup:
 	GroupWMouse(grp,event);
       break;
+      default: break;
     }
 return( true );
 }
 
 static void GroupWCreate(struct groupdlg *grp,GRect *pos) {
-    FontRequest rq;
     int as, ds, ld;
     GGadgetCreateData gcd[5];
     GTextInfo label[4];
     int sbsize = GDrawPointsToPixels(NULL,_GScrollBar_Width);
     GWindowAttrs wattrs;
-    static GFont *font=NULL;
 
-    if ( font==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = 12;
-	rq.weight = 400;
-	font = GDrawInstanciateFont(grp->gw,&rq);
-	font = GResourceFindFont("Groups.Font",font);
-    }
-    grp->font = font;
+    grp->font = groups_font.fi;
     GDrawWindowFontMetrics(grp->gw,grp->font,&as,&ds,&ld);
     grp->fh = as+ds; grp->as = as;
 
@@ -574,7 +572,7 @@ static void GroupWCreate(struct groupdlg *grp,GRect *pos) {
     wattrs.mask = wam_events|wam_cursor/*|wam_bordwidth|wam_bordcol*/;
     wattrs.event_masks = ~0;
     wattrs.border_width = 1;
-    wattrs.border_color = 0x000000;
+    wattrs.border_color = GDrawGetDefaultForeground(NULL);
     wattrs.cursor = ct_pointer;
     pos->x = 0; pos->y = 0;
     pos->width -= sbsize; pos->height = grp->lines_page*grp->fh;
@@ -1018,7 +1016,7 @@ static int Group_AddColor(GGadget *g, GEvent *e) {
 		set = true;
 	    }
 	} else {
-	    xcol = (intpt) ti->userdata;
+	    xcol = (intptr_t) ti->userdata;
 	    set = true;
 	}
 
@@ -1122,6 +1120,7 @@ return( GroupChar(grp,event));
 	    grp->done = true;
 	    grp->oked = event->u.control.g == grp->ok;
 	  break;
+	  default: break;
 	}
       break;
       case et_close:
@@ -1131,6 +1130,7 @@ return( GroupChar(grp,event));
 	if ( grp->newsub!=NULL )
 	    free(grp);
 return( true );
+      default: break;
     }
     if ( grp->done && grp->newsub!=NULL ) {
 	if ( grp->oked ) {
@@ -1490,7 +1490,7 @@ static void EncodeToGroups(FontView *fv,Group *group, int compacted) {
 	enc->enc_name = EncNameFromGroups(group);
 	enc->is_temporary = true;
 	enc->char_max = 256;
-	enc->unicode = malloc(256*sizeof(int32));
+	enc->unicode = malloc(256*sizeof(int32_t));
 	enc->psnames = malloc(256*sizeof(char *));
 	map = EncMapNew(0,sf->glyphcnt,enc);
     }

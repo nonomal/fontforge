@@ -29,7 +29,7 @@
 
 #include "gimage.h"
 #include "gimagebmpP.h"
-GImage *_GImage_Create(enum image_type type, int32 width, int32 height);
+GImage *_GImage_Create(enum image_type type, int32_t width, int32_t height);
 
 static int getshort(FILE *fp) {
 /* Get Little-Endian short 16bit value. Return value if okay, -1 if error */
@@ -181,6 +181,9 @@ static int readpixels(FILE *file,struct bmpheader *head) {
 	int ii = 0;
 	while ( ii<head->height*head->width ) {
 	    int cnt = getc(file);
+	    if (cnt < 0 || ii + cnt > head->height * head->width) {
+		return 0;
+	    }
 	    if ( cnt!=0 ) {
 		int ch = getc(file);
 		while ( --cnt>=0 )
@@ -188,6 +191,9 @@ static int readpixels(FILE *file,struct bmpheader *head) {
 	    } else {
 		cnt = getc(file);
 		if ( cnt>= 3 ) {
+		    if (ii + cnt > head->height * head->width) {
+			return 0;
+		    }
 		    int odd = cnt&1;
 		    while ( --cnt>=0 )
 			head->byte_pixels[ii++] = getc(file);
@@ -233,6 +239,11 @@ static int readpixels(FILE *file,struct bmpheader *head) {
 	int ii = 0;
 	while ( ii<head->height*head->width ) {
 	    int cnt = getc(file);
+	    /* Each iteration below writes two nibbles, so a run writes
+	       cnt rounded up to an even number of pixels. */
+	    if ( cnt < 0 || ii + cnt + (cnt&1) > head->height * head->width ) {
+		return 0;
+	    }
 	    if ( cnt!=0 ) {
 		int ch = getc(file);
 		while ( (cnt-=2)>=-1 ) {
@@ -243,6 +254,9 @@ static int readpixels(FILE *file,struct bmpheader *head) {
 	    } else {
 		cnt = getc(file);
 		if ( cnt>= 3 ) {
+		    if ( ii + cnt + (cnt&1) > head->height * head->width ) {
+			return 0;
+		    }
 		    int odd = cnt&2;
 		    while ( (cnt-=2)>=-1 ) {
 		    	int ch = getc(file);
@@ -351,7 +365,7 @@ GImage *GImageRead_Bmp(FILE *file) {
 
     /* Create memory-space to read-in bmp file */
     if ( (bmp.bitsperpixel>=16 && \
-	 (bmp.int32_pixels=(uint32 *)(malloc(bmp.height*bmp.width*sizeof(uint32))))==NULL) || \
+	 (bmp.int32_pixels=(uint32_t *)(malloc(bmp.height*bmp.width*sizeof(uint32_t))))==NULL) || \
 	 (bmp.bitsperpixel==1  && \
 	 (bmp.byte_pixels=(unsigned char *)(malloc(bmp.height*((bmp.width+7)/8)*sizeof(unsigned char))))==NULL) || \
 	 (bmp.byte_pixels=(unsigned char *)(malloc(bmp.height*bmp.width*sizeof(unsigned char))))==NULL ) {
@@ -369,9 +383,9 @@ GImage *GImageRead_Bmp(FILE *file) {
 	    goto errorGImageMemBmp;
 	}
 	if ( bmp.bitsperpixel>=16 ) {
-	    ret->u.image->data = (uint8 *) bmp.int32_pixels;
+	    ret->u.image->data = (uint8_t *) bmp.int32_pixels;
 	} else if ( bmp.bitsperpixel!=1 ) {
-	    ret->u.image->data = (uint8 *) bmp.byte_pixels;
+	    ret->u.image->data = (uint8_t *) bmp.byte_pixels;
 	}
     } else {
 	if ( bmp.bitsperpixel>=16 ) {
@@ -382,7 +396,7 @@ GImage *GImageRead_Bmp(FILE *file) {
 	    base = ret->u.image;
 	    for ( i=0; i<bmp.height; ++i ) {
 		l = bmp.height-1-i;
-		memcpy(base->data+l*base->bytes_per_line,bmp.int32_pixels+i*bmp.width,bmp.width*sizeof(uint32));
+		memcpy(base->data+l*base->bytes_per_line,bmp.int32_pixels+i*bmp.width,bmp.width*sizeof(uint32_t));
 	    }
 	    free(bmp.int32_pixels);
 	} else if ( bmp.bitsperpixel!=1 ) {

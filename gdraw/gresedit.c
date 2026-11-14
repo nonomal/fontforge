@@ -27,10 +27,14 @@
 
 #include <fontforge-config.h>
 
+#include "ffglib.h"
 #include "gdrawP.h"		/* Need resolution of screen */
 #include "ggadget.h"
 #include "ggadgetP.h"
+#include "gkeysym.h"
 #include "gresedit.h"
+#include "gresourceP.h"
+#include "gutils.h"
 #include "gwidget.h"
 #include "ustring.h"
 
@@ -58,21 +62,21 @@ typedef struct greseditdlg {
 } GRE;
 
 static GTextInfo bordertype[] = {
-    { (unichar_t *) "None", NULL, 0, 0, (void *) (intpt) bt_none, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
-    { (unichar_t *) "Box", NULL, 0, 0, (void *) (intpt) bt_box, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
-    { (unichar_t *) "Raised", NULL, 0, 0, (void *) (intpt) bt_raised, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
-    { (unichar_t *) "Lowered", NULL, 0, 0, (void *) (intpt) bt_lowered, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
-    { (unichar_t *) "Engraved", NULL, 0, 0, (void *) (intpt) bt_engraved, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
-    { (unichar_t *) "Embossed", NULL, 0, 0, (void *) (intpt) bt_embossed, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
-    { (unichar_t *) "Double", NULL, 0, 0, (void *) (intpt) bt_double, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) "None", NULL, 0, 0, (void *) (intptr_t) bt_none, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) "Box", NULL, 0, 0, (void *) (intptr_t) bt_box, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) "Raised", NULL, 0, 0, (void *) (intptr_t) bt_raised, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) "Lowered", NULL, 0, 0, (void *) (intptr_t) bt_lowered, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) "Engraved", NULL, 0, 0, (void *) (intptr_t) bt_engraved, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) "Embossed", NULL, 0, 0, (void *) (intptr_t) bt_embossed, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) "Double", NULL, 0, 0, (void *) (intptr_t) bt_double, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
     GTEXTINFO_EMPTY
 };
 
 static GTextInfo bordershape[] = {
-    { (unichar_t *) "Rect", NULL, 0, 0, (void *) (intpt) bs_rect, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
-    { (unichar_t *) "Round Rect", NULL, 0, 0, (void *) (intpt) bs_roundrect, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
-    { (unichar_t *) "Elipse", NULL, 0, 0, (void *) (intpt) bs_elipse, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
-    { (unichar_t *) "Diamond", NULL, 0, 0, (void *) (intpt) bs_diamond, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) "Rect", NULL, 0, 0, (void *) (intptr_t) bs_rect, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) "Round Rect", NULL, 0, 0, (void *) (intptr_t) bs_roundrect, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) "Elipse", NULL, 0, 0, (void *) (intptr_t) bs_elipse, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) "Diamond", NULL, 0, 0, (void *) (intptr_t) bs_diamond, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
     GTEXTINFO_EMPTY
 };
 
@@ -90,26 +94,15 @@ static char *GFontSpec2String(GFont *font) {
 return( copy(""));
 
     GDrawDecomposeFont(font,&rq);
-    if ( rq.family_name!=NULL )
-	len = 4*u_strlen(rq.family_name);
-    else
-	len = strlen(rq.utf8_family_name);
+    len = strlen(rq.utf8_family_name);
     len += 6 /* point size */ + 1 +
 	    5 /* weight */ + 1 +
 	    10 /* style */;
     fontname = malloc(len);
-    if ( rq.family_name!=NULL ) {
-	char *utf8_name = u2utf8_copy(rq.family_name);
-	sprintf( fontname, "%d %s%dpt %s", rq.weight,
-	    rq.style&1 ? "italic " : "",
-	    rq.point_size,
-	    utf8_name );
-	free(utf8_name );
-    } else
-	sprintf( fontname, "%d %s%dpt %s", rq.weight,
-	    rq.style&1 ? "italic " : "",
-	    rq.point_size,
-	    rq.utf8_family_name );
+    sprintf( fontname, "%d %s%dpt %s", rq.weight,
+	rq.style&1 ? "italic " : "",
+	rq.point_size,
+	rq.utf8_family_name );
 return( fontname );
 }
 
@@ -123,7 +116,7 @@ static void GRE_Reflow(GRE *gre,GResInfo *res) {
 }
 
 static void GRE_FigureInheritance( GRE *gre, GResInfo *parent, int cid_off_inh,
-	int cid_off_data, int is_font, void *whatever,
+	int cid_off_data, void *whatever,
 	void (*do_something)(GRE *gre, int child_index, int cid_off_data, void *whatever)) {
     /* Look through the gadget tree for gadgets which inherit from parent */
     /*  (which just changed) then check if this child ggadget actually does */
@@ -133,15 +126,10 @@ static void GRE_FigureInheritance( GRE *gre, GResInfo *parent, int cid_off_inh,
     int i;
 
     for ( i=0; (child = gre->tofree[i].res)!=NULL; ++i ) {
-	if ( child->inherits_from==parent &&
-		(( is_font && child->font!=NULL ) ||
-		 ( !is_font && child->boxdata!=NULL)) ) {
-	     /* Fonts may have a different cid offset depending on wether */
-	     /* The ResInfo has a box or not */
-	    if (( is_font && GGadgetIsChecked(GWidgetGetControl(gre->gw,gre->tofree[i].fontcid-2)) ) ||
-		    ( !is_font && GGadgetIsChecked(GWidgetGetControl(gre->gw,gre->tofree[i].startcid+cid_off_inh)) )) {
+	if ( child->inherits_from==parent && child->boxdata!=NULL ) {
+	    if ( GGadgetIsChecked(GWidgetGetControl(gre->gw,gre->tofree[i].startcid+cid_off_inh)) ) {
 		(do_something)(gre,i,cid_off_data,whatever);
-		GRE_FigureInheritance(gre,child,cid_off_inh,cid_off_data,is_font,whatever,do_something);
+		GRE_FigureInheritance(gre,child,cid_off_inh,cid_off_data,whatever,do_something);
 	    }
 	}
     }
@@ -150,7 +138,7 @@ static void GRE_FigureInheritance( GRE *gre, GResInfo *parent, int cid_off_inh,
 static void inherit_color_change(GRE *gre, int childindex, int cid_off,
 	void *whatever) {
     GGadget *g = GWidgetGetControl(gre->gw,gre->tofree[childindex].startcid+cid_off);
-    Color col = (Color) (intpt) whatever;
+    Color col = (Color) (intptr_t) whatever;
 
     GColorButtonSetColor(g,col);
     *((Color *) GGadgetGetUserData(g)) = col;
@@ -159,28 +147,28 @@ static void inherit_color_change(GRE *gre, int childindex, int cid_off,
 static void inherit_list_change(GRE *gre, int childindex, int cid_off,
 	void *whatever) {
     GGadget *g = GWidgetGetControl(gre->gw,gre->tofree[childindex].startcid+cid_off);
-    int sel = (intpt) whatever;
+    int sel = (intptr_t) whatever;
 
     GGadgetSelectOneListItem(g,sel);
-    *((uint8 *) GGadgetGetUserData(g)) = sel;
+    *((uint8_t *) GGadgetGetUserData(g)) = sel;
 }
 
 static void inherit_byte_change(GRE *gre, int childindex, int cid_off,
 	void *whatever) {
     GGadget *g = GWidgetGetControl(gre->gw,gre->tofree[childindex].startcid+cid_off);
-    int val = (intpt) whatever;
+    int val = (intptr_t) whatever;
     char buf[20];
 
     sprintf( buf, "%d", val );
     GGadgetSetTitle8(g,buf);
-    *((uint8 *) GGadgetGetUserData(g)) = val;
+    *((uint8_t *) GGadgetGetUserData(g)) = val;
 }
 
 static void inherit_flag_change(GRE *gre, int childindex, int cid_off,
 	void *whatever) {
     GGadget *g = GWidgetGetControl(gre->gw,gre->tofree[childindex].startcid+cid_off);
-    int on = (intpt) whatever;
-    int flag = (intpt) GGadgetGetUserData(g);
+    int on = (intptr_t) whatever;
+    int flag = (intptr_t) GGadgetGetUserData(g);
     GResInfo *res = gre->tofree[childindex].res;
 
     if ( on )
@@ -188,18 +176,6 @@ static void inherit_flag_change(GRE *gre, int childindex, int cid_off,
     else
 	res->boxdata->flags &= ~flag;
     GGadgetSetChecked(g,on);
-}
-
-struct inherit_font_data { char *spec; GFont *font; };
-
-static void inherit_font_change(GRE *gre, int childindex, int cid_off,
-	void *whatever) {
-    GGadget *g = GWidgetGetControl(gre->gw,gre->tofree[childindex].fontcid);
-    struct inherit_font_data *ifd = (struct inherit_font_data *) whatever;
-
-    if ( ifd->font!=NULL )
-	*(gre->tofree[childindex].res->font) = ifd->font;
-    GGadgetSetTitle8(g,ifd->spec);
 }
 
 static int GRE_InheritColChange(GGadget *g, GEvent *e) {
@@ -219,8 +195,8 @@ static int GRE_InheritColChange(GGadget *g, GEvent *e) {
 		int cid_off = cid - gre->tofree[index].startcid;
 		GColorButtonSetColor(g,col);
 		*((Color *) GGadgetGetUserData(g)) = col;
-		GRE_FigureInheritance(gre,res,cid_off,cid_off+2,false,
-			(void *) (intpt) col, inherit_color_change);
+		GRE_FigureInheritance(gre,res,cid_off,cid_off+2,
+			(void *) (intptr_t) col, inherit_color_change);
 		GRE_RefreshAll(gre);
 	    }
 	}
@@ -240,13 +216,13 @@ static int GRE_InheritListChange(GGadget *g, GEvent *e) {
 	    int index = GTabSetGetSel(gre->tabset);
 	    GResInfo *res = gre->tofree[index].res;
 	    int offset = ((char *) GGadgetGetUserData(g)) - ((char *) (res->boxdata));
-	    int sel = *((uint8 *) (((char *) (res->inherits_from->boxdata))+offset));
-	    if ( sel != *(uint8 *) GGadgetGetUserData(g) ) {
+	    int sel = *((uint8_t *) (((char *) (res->inherits_from->boxdata))+offset));
+	    if ( sel != *(uint8_t *) GGadgetGetUserData(g) ) {
 		int cid_off = cid - gre->tofree[index].startcid;
 		GGadgetSelectOneListItem(g,sel);
-		*((uint8 *) GGadgetGetUserData(g)) = sel;
-		GRE_FigureInheritance(gre,res,cid_off,cid_off+2,false,
-			(void *) (intpt) sel, inherit_list_change);
+		*((uint8_t *) GGadgetGetUserData(g)) = sel;
+		GRE_FigureInheritance(gre,res,cid_off,cid_off+2,
+			(void *) (intptr_t) sel, inherit_list_change);
 		GRE_Reflow(gre,res);
 	    }
 	}
@@ -266,15 +242,15 @@ static int GRE_InheritByteChange(GGadget *g, GEvent *e) {
 	    int index = GTabSetGetSel(gre->tabset);
 	    GResInfo *res = gre->tofree[index].res;
 	    int offset = ((char *) GGadgetGetUserData(g)) - ((char *) (res->boxdata));
-	    int val = *((uint8 *) (((char *) (res->inherits_from->boxdata))+offset));
-	    if ( val != *(uint8 *) GGadgetGetUserData(g) ) {
+	    int val = *((uint8_t *) (((char *) (res->inherits_from->boxdata))+offset));
+	    if ( val != *(uint8_t *) GGadgetGetUserData(g) ) {
 		int cid_off = cid - gre->tofree[index].startcid;
 		char buf[20];
 		sprintf( buf, "%d", val );
 		GGadgetSetTitle8(g,buf);
-		*((uint8 *) GGadgetGetUserData(g)) = val;
-		GRE_FigureInheritance(gre,res,cid_off,cid_off+2,false,
-			(void *) (intpt) val, inherit_byte_change);
+		*((uint8_t *) GGadgetGetUserData(g)) = val;
+		GRE_FigureInheritance(gre,res,cid_off,cid_off+2,
+			(void *) (intptr_t) val, inherit_byte_change);
 		GRE_Reflow(gre,res);
 	    }
 	}
@@ -292,7 +268,7 @@ static int GRE_InheritFlagChange(GGadget *g, GEvent *e) {
 	if ( on ) {
 	    int index = GTabSetGetSel(gre->tabset);
 	    GResInfo *res = gre->tofree[index].res;
-	    int flag = (intpt) GGadgetGetUserData(g);
+	    int flag = (intptr_t) GGadgetGetUserData(g);
 	    if ( (res->boxdata->flags&flag) != (res->inherits_from->boxdata->flags&flag)) {
 		int cid_off = cid - gre->tofree[index].startcid;
 		int on = (res->inherits_from->boxdata->flags&flag)?1:0 ;
@@ -301,40 +277,9 @@ static int GRE_InheritFlagChange(GGadget *g, GEvent *e) {
 		    res->boxdata->flags |= flag;
 		else
 		    res->boxdata->flags &= ~flag;
-		GRE_FigureInheritance(gre,res,cid_off,cid_off+2,false,
-			(void *) (intpt) on, inherit_flag_change);
+		GRE_FigureInheritance(gre,res,cid_off,cid_off+2,
+			(void *) (intptr_t) on, inherit_flag_change);
 		GRE_Reflow(gre,res);
-	    }
-	}
-    }
-return( true );
-}
-
-static int GRE_InheritFontChange(GGadget *g, GEvent *e) {
-
-    if ( e->type==et_controlevent && e->u.control.subtype == et_radiochanged ) {
-	GRE *gre = GDrawGetUserData(GGadgetGetWindow(g));
-	int cid = GGadgetGetCid(g), on = GGadgetIsChecked(g);
-	GGadgetSetEnabled(GWidgetGetControl(gre->gw,cid+1),!on);
-	g = GWidgetGetControl(gre->gw,cid+2);
-	GGadgetSetEnabled(g,!on);
-	if ( on ) {
-	    int index = GTabSetGetSel(gre->tabset);
-	    GResInfo *res = gre->tofree[index].res;
-	    int pi;
-	    for ( pi=0; gre->tofree[pi].res!=NULL && gre->tofree[pi].res!=res->inherits_from; ++pi );
-	    if ( gre->tofree[pi].res!=NULL ) {
-		struct inherit_font_data ifd;
-		int cid_off = cid - gre->tofree[index].startcid;
-
-		ifd.spec = GGadgetGetTitle8(GWidgetGetControl(gre->gw,gre->tofree[pi].fontcid));
-		ifd.font = *gre->tofree[pi].res->font;
-		*res->font = ifd.font;
- 
-		GGadgetSetTitle8(g,ifd.spec);
-		GRE_FigureInheritance(gre,res,cid_off,cid_off+2,true,
-			(void *) &ifd, inherit_font_change);
-		free( ifd.spec );
 	    }
 	}
     }
@@ -350,11 +295,11 @@ static int GRE_FlagChanged(GGadget *g, GEvent *e) {
 	int cid_off = GGadgetGetCid(g) - gre->tofree[index].startcid;
 	int on;
 	if ( (on = GGadgetIsChecked(g)) )
-	    res->boxdata->flags |= (int) (intpt) GGadgetGetUserData(g);
+	    res->boxdata->flags |= (int) (intptr_t) GGadgetGetUserData(g);
 	else
-	    res->boxdata->flags &= ~(int) (intpt) GGadgetGetUserData(g);
-	GRE_FigureInheritance(gre,res,cid_off-1,cid_off,false,
-		(void *) (intpt) on, inherit_flag_change);
+	    res->boxdata->flags &= ~(int) (intptr_t) GGadgetGetUserData(g);
+	GRE_FigureInheritance(gre,res,cid_off-1,cid_off,
+		(void *) (intptr_t) on, inherit_flag_change);
 	GRE_Reflow(gre,res);
     }
 return( true );
@@ -369,9 +314,9 @@ static int GRE_ListChanged(GGadget *g, GEvent *e) {
 	int cid_off = GGadgetGetCid(g) - gre->tofree[index].startcid;
 	int sel = GGadgetGetFirstListSelectedItem(g);
 
-	*((uint8 *) GGadgetGetUserData(g)) = sel;
-	GRE_FigureInheritance(gre,res,cid_off-2,cid_off,false,
-		(void *) (intpt) sel, inherit_list_change);
+	*((uint8_t *) GGadgetGetUserData(g)) = sel;
+	GRE_FigureInheritance(gre,res,cid_off-2,cid_off,
+		(void *) (intptr_t) sel, inherit_list_change);
 	GRE_Reflow(gre,res);
     }
 return( true );
@@ -395,9 +340,9 @@ static int GRE_ByteChanged(GGadget *g, GEvent *e) {
 	GResInfo *res = gre->tofree[index].res;
 	if ( *end=='\0' && val>=0 && val<=255 ) {
 	    int cid_off = GGadgetGetCid(g) - gre->tofree[index].startcid;
-	    *((uint8 *) GGadgetGetUserData(g)) = val;
-	    GRE_FigureInheritance(gre,res,cid_off-2,cid_off,false,
-		    (void *) (intpt) val, inherit_byte_change);
+	    *((uint8_t *) GGadgetGetUserData(g)) = val;
+	    GRE_FigureInheritance(gre,res,cid_off-2,cid_off,
+		    (void *) (intptr_t) val, inherit_byte_change);
 	    GRE_Reflow(gre,res);
 	}
 	free(txt);
@@ -444,8 +389,8 @@ static int GRE_ColorChanged(GGadget *g, GEvent *e) {
 	Color col = GColorButtonGetColor(g);
 
 	*((Color *) GGadgetGetUserData(g)) = col;
-	GRE_FigureInheritance(gre,res,cid_off-2,cid_off,false,
-		(void *) (intpt) col, inherit_color_change);
+	GRE_FigureInheritance(gre,res,cid_off-2,cid_off,
+		(void *) (intptr_t) col, inherit_color_change);
 	GRE_RefreshAll(gre);
     }
 return( true );
@@ -461,62 +406,33 @@ static int GRE_ExtraColorChanged(GGadget *g, GEvent *e) {
 return( true );
 }
 
-static int GRE_FontChanged(GGadget *g, GEvent *e) {
-    struct inherit_font_data ifd;
-
-    if ( e->type==et_controlevent && e->u.control.subtype == et_textchanged ) {
-	GRE *gre = GDrawGetUserData(GGadgetGetWindow(g));
-	int index = GTabSetGetSel(gre->tabset);
-	GResInfo *res = gre->tofree[index].res;
-	int cid_off = GGadgetGetCid(g) - gre->tofree[index].startcid;
-	char *fontdesc = GGadgetGetTitle8(g);
-	ifd.spec = fontdesc;
-	ifd.font = NULL;
-
-	GRE_FigureInheritance(gre,res,cid_off-2,cid_off,true,
-		(void *) &ifd, inherit_font_change);
-	free(fontdesc);
-    } else if ( e->type==et_controlevent && e->u.control.subtype == et_textfocuschanged &&
-	    !e->u.control.u.tf_focus.gained_focus ) {
-	GRE *gre = GDrawGetUserData(GGadgetGetWindow(g));
-	if ( gre->tabset!=NULL ) {
-	    int index = GTabSetGetSel(gre->tabset);
-	    GResInfo *res = gre->tofree[index].res;
-	    int cid_off = GGadgetGetCid(g) - gre->tofree[index].startcid;
-	    char *fontdesc = GGadgetGetTitle8(g);
-	    GFont *new = GResource_font_cvt(fontdesc,NULL);
-
-	    if ( new==NULL )
-		gwwv_post_error(_("Bad font"),_("Bad font specification"));
-	    else {
-		ifd.spec = fontdesc;
-		ifd.font = new;
-
-		*((GFont **) GGadgetGetUserData(g)) = new;
-		GRE_FigureInheritance(gre,res,cid_off-2,cid_off,true,
-			(void *) &ifd, inherit_font_change);
-		GRE_Reflow(gre,res);
-	    }
-	    free(fontdesc);
-	}
-    }
-return( true );
-}
-
 static void GRE_ParseFont(GGadget *g) {
     char *fontdesc = GGadgetGetTitle8(g);
-    GFont *new = GResource_font_cvt(fontdesc,NULL);
+    FontRequest rq;
+    GResFont *rf = (GResFont *) GGadgetGetUserData(g);
+    FontInstance *fi;
 
-    if ( new==NULL )
-	gwwv_post_error(_("Bad font"),_("Bad font specification"));
-    else {
-	*((GFont **) GGadgetGetUserData(g)) = new;
+    if ( fontdesc!=NULL && rf->rstr!=NULL && strcmp(fontdesc, rf->rstr)==0 )
+	return;
+
+    if ( !ResStrToFontRequest(fontdesc, &rq) ) {
+	gwwv_post_error(_("Bad font"),_("Bad or incomplete font specification '%s'"), fontdesc);
+	free(fontdesc);
+    } else {
+	fi = GDrawInstanciateFont(NULL, &rq);
+	if ( fi==NULL ) {
+	    gwwv_post_error(_("Bad font"),_("Could not find font corresponding to '%s'"), fontdesc);
+	    free(fontdesc);
+	} else {
+	    // The old rstr might be a constant so just (potentially) leak here.
+	    rf->rstr = fontdesc;
+	    rf->fi = fi;
+	}
     }
-    free(fontdesc);
+    free((char *) rq.utf8_family_name);
 }
 
-static int GRE_ExtraFontChanged(GGadget *g, GEvent *e) {
-
+static int GRE_FontChanged(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_textfocuschanged &&
 	    !e->u.control.u.tf_focus.gained_focus ) {
 	GRE *gre = GDrawGetUserData(GGadgetGetWindow(g));
@@ -539,38 +455,32 @@ static int GRE_ImageChanged(GGadget *g, GEvent *e) {
 
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
 	GRE *gre = GDrawGetUserData(GGadgetGetWindow(g));
-	GResImage **ri = GGadgetGetUserData(g);
+	GResImage *ri = GGadgetGetUserData(g);
+	const char *path;
 	char *new;
-	GImage *newi;
-	GRect size;
+	if ( ri->bucket && ri->bucket->absname )
+	    path = ri->bucket->absname;
+	else
+	    path = ri->ini_name;
 	new = gwwv_open_filename_with_path("Find Image",
-		(*ri)==NULL?NULL: (*ri)->filename,
-		"*.{png,jpeg,jpg,tiff,bmp,xbm}",NULL,
+		path, "*.{png,jpeg,jpg,tiff,bmp,xbm}",NULL,
 		_GGadget_GetImagePath());
 	if ( new==NULL )
-return( true );
-	newi = GImageRead(new);
-	if ( newi==NULL ) {
-	    gwwv_post_error(_("Could not open image"),_("Could not open %s"), new );
-	    free( new );
-	} else if ( *ri==NULL ) {
-	    *ri = calloc(1,sizeof(GResImage));
-	    (*ri)->filename = new;
-	    (*ri)->image = newi;
-	    GGadgetSetTitle8(g,"...");
+	    return true;
+	GImageCacheBucket *newb = _GGadgetImageCache(new, false);
+	if ( newb==NULL ) {
+	    gwwv_post_error(_("Could not open image"),_("Could not open %s as image"), new );
+	    free(new);
 	} else {
-	    free( (*ri)->filename );
-	    (*ri)->filename = new;
-	    if ( !_GGadget_ImageInCache((*ri)->image ) )
-		GImageDestroy((*ri)->image);
-	    (*ri)->image = newi;
+	    ri->bucket = newb;
 	}
-	((GButton *) g)->image = newi;
+	((GButton *) g)->image = GResImageGetImage(ri);
+	GRect size;
 	GGadgetGetDesiredSize(g,&size,NULL);
 	GGadgetResize(g,size.width,size.height);
 	GRE_RefreshAll(gre);
     }
-return( true );
+    return true;
 }
 
 static void GRE_DoCancel(GRE *gre) {
@@ -579,7 +489,6 @@ static void GRE_DoCancel(GRE *gre) {
     for ( i=0; gre->tofree[i].res!=NULL; ++i ) {
 	GResInfo *res = gre->tofree[i].res;
 	struct resed *extras;
-	GResImage **_ri, *ri;
 	if ( res->boxdata!=NULL )
 	    *res->boxdata = res->orig_state;
 	if ( res->extras!=NULL ) {
@@ -595,32 +504,10 @@ static void GRE_DoCancel(GRE *gre) {
 		    *(int *) (extras->val) = extras->orig.dval;
 		  break;
 		  case rt_font:
-		    *(GFont **) (extras->val) = extras->orig.fontval;
+		    *(GResFont *) (extras->val) = extras->orig.fontval;
 		  break;
 		  case rt_image:
-		    _ri = extras->val;
-		    ri = *_ri;
-		    if ( extras->orig.sval==NULL ) {
-			if ( ri!=NULL ) {
-			    free(ri->filename);
-			    if ( ri->image!=NULL )
-				GImageDestroy(ri->image);
-			    free(ri);
-			    *_ri = NULL;
-			}
-		    } else {
-			if ( strcmp(extras->orig.sval,ri->filename)!=0 ) {
-			    GImage *temp;
-			    temp = GImageRead(extras->orig.sval);
-			    if ( temp!=NULL ) {
-				if ( !_GGadget_ImageInCache(ri->image ) )
-				    GImageDestroy(ri->image);
-				ri->image = temp;
-			        free(ri->filename);
-			        ri->filename = copy(extras->orig.sval);
-			    }
-			}
-		    }
+		    *(GResImage *) (extras->val) = extras->orig.imageval;
 		  break;
 		  case rt_string: case rt_stringlong:
 		    /* These don't change dynamically */
@@ -764,13 +651,8 @@ static int GRE_Save(GGadget *g, GEvent *e) {
                 }
             }
             if ( res->font!=NULL ) {
-                if ( !GGadgetIsChecked( GWidgetGetControl(gre->gw,gre->tofree[i].fontcid-1))
-                      || (res->override_mask&omf_font) ) {
-                    char *ival = GGadgetGetTitle8( GWidgetGetControl(gre->gw,gre->tofree[i].fontcid));
-                    fprintf( output, "%s.%s.Font: %s\n",
-                        res->progname, res->resname, ival );
-                    free(ival);
-                }
+		char *ival = GGadgetGetTitle8( GWidgetGetControl(gre->gw,gre->tofree[i].fontcid));
+		fprintf( output, "%s.%s.Font: %s\n", res->progname, res->resname, ival ); free(ival);
             }
             if ( res->extras!=NULL )
                 for ( extras=res->extras; extras->name!=NULL; ++extras ) {
@@ -812,32 +694,18 @@ static int GRE_Save(GGadget *g, GEvent *e) {
                         GColorButtonGetColor(g) );
                   break;
                   case rt_font: {
-                    char *fontdesc = GGadgetGetTitle8(g);
-                    if ( *fontdesc!='\0' )
+                    GResFont *rf = (GResFont *) extras->val;
+                    if ( rf!=NULL && rf->rstr!=NULL && *rf->rstr!=0 )
                         fprintf( output, "%s.%s%s%s: %s\n",
                             res->progname, res->resname, *res->resname=='\0'?"":".", extras->resname,
-                            fontdesc );
-                    free(fontdesc);
+                            rf->rstr );
                   } break;
                   case rt_image: {
-                    GResImage *ri = *((GResImage **) (extras->val));
-                    if ( ri!=NULL && ri->filename!=NULL ) {
-                        const char* const* paths = _GGadget_GetImagePath();
-                        int i;
-                        for ( i=0; paths[i]!=NULL; ++i ) {
-                            if ( strncmp(paths[i],ri->filename,strlen(paths[i]))==0 ) {
-                                char *pt = ri->filename+strlen(paths[i]);
-                                while ( *pt=='/' ) ++pt;
-                                fprintf( output, "%s.%s%s%s: %s\n",
-                                    res->progname, res->resname, *res->resname=='\0'?"":".", extras->resname,
-                                    pt );
-                                break;
-                            }
-                        }
-                        if ( paths[i]==NULL )
-                            fprintf( output, "%s.%s%s%s: %s\n",
-                                res->progname, res->resname, *res->resname=='\0'?"":".", extras->resname,
-                                ri->filename );
+                    GResImage *ri = (GResImage *) extras->val;
+                    if ( ri!=NULL && ri->bucket!=NULL && *ri->bucket->filename!=0 ) {
+			fprintf( output, "%s.%s%s%s: %s\n",
+			    res->progname, res->resname, *res->resname=='\0'?"":".", extras->resname,
+			    ri->bucket->filename );
                     }
                   } break;
                   case rt_string: case rt_stringlong: {
@@ -928,8 +796,12 @@ return( true );
 		      case rt_bool:
 		      case rt_color:
 		      case rt_coloralpha:
+			// These should have been set as we went along
+		      break;
 		      case rt_image:
-			/* These should have been set as we went along */
+			// Already converted; this is a hook for side-effects
+			if ( extras->cvt!=NULL )
+			    (extras->cvt)(NULL, (void *) (extras->val));
 		      break;
 		      case rt_font:
 			GRE_ParseFont(GWidgetGetControl(gre->gw,extras->cid));
@@ -940,7 +812,10 @@ return( true );
 			/* We can't free the old value, because sometimes it is a */
 			/*  static string, not something allocated */
 			if ( *spec=='\0' ) { free( spec ); spec=NULL; }
-			*(char **) (extras->val) = spec;
+			if ( extras->cvt!=NULL )
+			    *(void **) (extras->val) = (extras->cvt)(spec, *(void **) (extras->val));
+			else
+			    *(char **) (extras->val) = spec;
 		      } break;
 		    }
 		}
@@ -956,7 +831,11 @@ static int gre_e_h(GWindow gw, GEvent *event) {
 	GRE *gre = GDrawGetUserData(gw);
 	GRE_DoCancel(gre);
     } else if ( event->type == et_char ) {
-return( false );
+        if ( event->u.chr.keysym == GK_F1 || event->u.chr.keysym == GK_Help ) {
+			help("ui/misc/resedit.html", NULL);
+	    return true;
+        }
+	return false;
     }
 return( true );
 }
@@ -987,7 +866,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
     wattrs.restrict_input_to_me = 1;
     wattrs.is_dlg = true;
     wattrs.cursor = ct_pointer;
-    wattrs.utf8_window_title = _("X Resource Editor");
+    wattrs.utf8_window_title = _("Appearance Editor");
     pos.x = pos.y = 10;
     pos.width = pos.height = 100;
     gre.gw = gw = GDrawCreateTopWindow(NULL,&pos,gre_e_h,&gre,&wattrs);
@@ -1028,7 +907,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	if ( res->boxdata!=NULL )
 	    cnt += 3*18 + 8*2;
 	if ( res->font )
-	    cnt+=3;
+	    cnt+=2;
 	if ( res->inherits_from!=NULL )
 	    cnt+=2;
 	if ( res->seealso1!=NULL ) {
@@ -1104,7 +983,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    if ( res->boxdata->flags & box_foreground_border_inner )
 		gcd[k].gd.flags |= gg_cb_on;
 	    gcd[k].gd.handle_controlevent = GRE_FlagChanged;
-	    gcd[k].data = (void *) (intpt) box_foreground_border_inner;
+	    gcd[k].data = (void *) (intptr_t) box_foreground_border_inner;
 	    gcd[k++].creator = GCheckBoxCreate;
 	    tofree[i].farray[l][1] = &gcd[k-1];
 	    if ( res->inherits_from==NULL )
@@ -1132,7 +1011,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    if ( res->boxdata->flags & box_foreground_border_outer )
 		gcd[k].gd.flags |= gg_cb_on;
 	    gcd[k].gd.handle_controlevent = GRE_FlagChanged;
-	    gcd[k].data = (void *) (intpt) box_foreground_border_outer;
+	    gcd[k].data = (void *) (intptr_t) box_foreground_border_outer;
 	    gcd[k++].creator = GCheckBoxCreate;
 	    tofree[i].farray[l][3] = &gcd[k-1];
 	    if ( res->inherits_from==NULL )
@@ -1163,7 +1042,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    if ( res->boxdata->flags & box_active_border_inner )
 		gcd[k].gd.flags |= gg_cb_on;
 	    gcd[k].gd.handle_controlevent = GRE_FlagChanged;
-	    gcd[k].data = (void *) (intpt) box_active_border_inner;
+	    gcd[k].data = (void *) (intptr_t) box_active_border_inner;
 	    gcd[k++].creator = GCheckBoxCreate;
 	    tofree[i].farray[l][1] = &gcd[k-1];
 	    if ( res->inherits_from==NULL )
@@ -1191,7 +1070,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    if ( res->boxdata->flags & box_foreground_shadow_outer )
 		gcd[k].gd.flags |= gg_cb_on;
 	    gcd[k].gd.handle_controlevent = GRE_FlagChanged;
-	    gcd[k].data = (void *) (intpt) box_foreground_shadow_outer;
+	    gcd[k].data = (void *) (intptr_t) box_foreground_shadow_outer;
 	    gcd[k++].creator = GCheckBoxCreate;
 	    tofree[i].farray[l][3] = &gcd[k-1];
 	    if ( res->inherits_from==NULL )
@@ -1222,7 +1101,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    if ( res->boxdata->flags & box_do_depressed_background )
 		gcd[k].gd.flags |= gg_cb_on;
 	    gcd[k].gd.handle_controlevent = GRE_FlagChanged;
-	    gcd[k].data = (void *) (intpt) box_do_depressed_background;
+	    gcd[k].data = (void *) (intptr_t) box_do_depressed_background;
 	    gcd[k++].creator = GCheckBoxCreate;
 	    tofree[i].farray[l][1] = &gcd[k-1];
 	    if ( res->inherits_from==NULL )
@@ -1250,7 +1129,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    if ( res->boxdata->flags & box_draw_default )
 		gcd[k].gd.flags |= gg_cb_on;
 	    gcd[k].gd.handle_controlevent = GRE_FlagChanged;
-	    gcd[k].data = (void *) (intpt) box_draw_default;
+	    gcd[k].data = (void *) (intptr_t) box_draw_default;
 	    gcd[k++].creator = GCheckBoxCreate;
 	    tofree[i].farray[l][3] = &gcd[k-1];
 	    if ( res->inherits_from==NULL )
@@ -1281,7 +1160,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    if ( res->boxdata->flags & box_gradient_bg )
 		gcd[k].gd.flags |= gg_cb_on;
 	    gcd[k].gd.handle_controlevent = GRE_FlagChanged;
-	    gcd[k].data = (void *) (intpt) box_gradient_bg;
+	    gcd[k].data = (void *) (intptr_t) box_gradient_bg;
 	    gcd[k++].creator = GCheckBoxCreate;
 	    tofree[i].farray[l][1] = &gcd[k-1];
 	    if ( res->inherits_from==NULL )
@@ -1303,7 +1182,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 
 	    l = 0;
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1338,7 +1217,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		gcd[k-1].gd.flags &= ~gg_enabled;
 	    }
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1375,7 +1254,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    tofree[i].carray[l][7] = GCD_Glue;
 	    tofree[i].carray[l++][8] = NULL;
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1410,7 +1289,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		gcd[k-1].gd.flags &= ~gg_enabled;
 	    }
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1447,7 +1326,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    tofree[i].carray[l][7] = GCD_Glue;
 	    tofree[i].carray[l++][8] = NULL;
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1482,7 +1361,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		gcd[k-1].gd.flags &= ~gg_enabled;
 	    }
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1519,7 +1398,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    tofree[i].carray[l][7] = GCD_Glue;
 	    tofree[i].carray[l++][8] = NULL;
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1554,7 +1433,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		gcd[k-1].gd.flags &= ~gg_enabled;
 	    }
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1592,7 +1471,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    tofree[i].carray[l++][8] = NULL;
 
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1627,7 +1506,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		gcd[k-1].gd.flags &= ~gg_enabled;
 	    }
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1665,7 +1544,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    tofree[i].carray[l++][8] = NULL;
 
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1700,7 +1579,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		gcd[k-1].gd.flags &= ~gg_enabled;
 	    }
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1738,7 +1617,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    tofree[i].carray[l++][8] = NULL;
 
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1779,7 +1658,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    tofree[i].carray[l][7] = GCD_Glue;
 	    tofree[i].carray[l++][8] = NULL;
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1815,7 +1694,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		gcd[k-1].gd.flags &= ~gg_enabled;
 	    }
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1853,7 +1732,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    tofree[i].carray[l][7] = GCD_Glue;
 	    tofree[i].carray[l++][8] = NULL;
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1892,7 +1771,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		gcd[k-1].gd.flags &= ~gg_enabled;
 	    }
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1933,7 +1812,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    tofree[i].carray[l][7] = GCD_Glue;
 	    tofree[i].carray[l++][8] = NULL;
 
-/* GT: "I." is an abreviation for "Inherits" */
+/* GT: "I." is an abbreviation for "Inherits" */
 	    lab[k].text = (unichar_t *) _("I.");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
@@ -1986,17 +1865,10 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	}
 
 	if ( res->font!=NULL ) {
-	    tofree[i].fontname = GFontSpec2String( *res->font );
-
-	    lab[k].text = (unichar_t *) _("I.");
-	    lab[k].text_is_1byte = true;
-	    gcd[k].gd.label = &lab[k];
-	    gcd[k].gd.flags = gg_visible|gg_enabled;
-	    gcd[k].gd.popup_msg = _("Inherits for same field in parent");
-	    gcd[k].gd.cid = ++cid;
-	    gcd[k].gd.handle_controlevent = GRE_InheritFontChange;
-	    gcd[k++].creator = GCheckBoxCreate;
-	    tofree[i].fontarray[0] = &gcd[k-1];
+	    if ( res->font->rstr )
+		tofree[i].fontname = copy(res->font->rstr);
+	    else if ( res->font->fi )
+		tofree[i].fontname = GFontSpec2String(res->font->fi);
 
 	    lab[k].text = (unichar_t *) _("Font:");
 	    lab[k].text_is_1byte = true;
@@ -2004,7 +1876,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    gcd[k].gd.flags = gg_visible|gg_enabled;
 	    gcd[k].gd.cid = ++cid;
 	    gcd[k++].creator = GLabelCreate;
-	    tofree[i].fontarray[1] = &gcd[k-1];
+	    tofree[i].fontarray[0] = &gcd[k-1];
 
 	    lab[k].text = (unichar_t *) tofree[i].fontname;
 	    lab[k].text_is_1byte = true;
@@ -2014,16 +1886,9 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    gcd[k].gd.handle_controlevent = GRE_FontChanged;
 	    gcd[k].data = res->font;
 	    gcd[k++].creator = GTextFieldCreate;
-	    tofree[i].fontarray[2] = &gcd[k-1];
-	    if ( res->inherits_from==NULL )
-		gcd[k-3].gd.flags &= ~gg_enabled;
-	    else if ( *res->inherits_from->font == *res->font ) {
-		gcd[k-3].gd.flags |= gg_cb_on;
-		gcd[k-2].gd.flags &= ~gg_enabled;
-		gcd[k-1].gd.flags &= ~gg_enabled;
-	    }
-	    tofree[i].fontarray[3] = GCD_Glue;
-	    tofree[i].fontarray[4] = NULL;
+	    tofree[i].fontarray[1] = &gcd[k-1];
+	    tofree[i].fontarray[2] = GCD_Glue;
+	    tofree[i].fontarray[3] = NULL;
 
 	    tofree[i].fontbox.gd.flags = gg_enabled | gg_visible;
 	    tofree[i].fontbox.gd.u.boxelements = tofree[i].fontarray;
@@ -2229,7 +2094,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 			tofree[i].earray[hl][7] = NULL;
 			base=0; ++hl;
 		    }
-		    extras->orig.fontval = *(GFont **) (extras->val);
+		    extras->orig.fontval = *(GResFont *) (extras->val);
 		    lab[k].text = (unichar_t *) S_(extras->name);
 		    lab[k].text_is_1byte = true;
 		    gcd[k].gd.label = &lab[k];
@@ -2239,8 +2104,12 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		    gcd[k++].creator = GLabelCreate;
 		    tofree[i].earray[hl][base] = &gcd[k-1];
 
-		    if ( extras->orig.fontval != NULL ) {
-			tofree[i].extradefs[l] = GFontSpec2String( extras->orig.fontval );
+		    if ( extras->orig.fontval.rstr != NULL ) {
+			lab[k].text = (unichar_t *) extras->orig.fontval.rstr;
+			lab[k].text_is_1byte = true;
+			gcd[k].gd.label = &lab[k];
+		    } else if ( extras->orig.fontval.fi != NULL ) {
+			tofree[i].extradefs[l] = GFontSpec2String( extras->orig.fontval.fi );
 			lab[k].text = (unichar_t *) tofree[i].extradefs[l];
 			lab[k].text_is_1byte = true;
 			gcd[k].gd.label = &lab[k];
@@ -2250,7 +2119,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 			gcd[k].gd.popup_msg = _(extras->popup);
 		    gcd[k].data = extras->val;
 		    gcd[k].gd.cid = extras->cid = ++cid;
-		    gcd[k].gd.handle_controlevent = GRE_ExtraFontChanged;
+		    gcd[k].gd.handle_controlevent = GRE_FontChanged;
 		    gcd[k++].creator = GTextFieldCreate;
 		    tofree[i].earray[hl][base+1] = &gcd[k-1];
 		    tofree[i].earray[hl][base+2] = GCD_ColSpan;
@@ -2263,8 +2132,8 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		    base=3;
 		  break;
 		  case rt_image: {
-		    GResImage *ri = *(GResImage **) (extras->val);
-		    extras->orig.sval = copy( ri==NULL ? NULL : ri->filename );
+		    GResImage *ri = (GResImage *) extras->val;
+		    extras->orig.imageval = *ri;
 		    lab[k].text = (unichar_t *) S_(extras->name);
 		    lab[k].text_is_1byte = true;
 		    gcd[k].gd.label = &lab[k];
@@ -2274,9 +2143,10 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		    gcd[k++].creator = GLabelCreate;
 		    tofree[i].earray[hl][base] = &gcd[k-1];
 
-		    if ( ri != NULL && ri->image!=NULL ) {
+		    GImage *timg = GResImageGetImage(ri);;
+		    if ( timg!=NULL ) {
 			lab[k].text = (unichar_t *) "...";
-			lab[k].image = ri->image;
+			lab[k].image = timg;
 		    } else
 			lab[k].text = (unichar_t *) "? ...";
 		    lab[k].text_is_1byte = true;
@@ -2395,7 +2265,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	if ( tofree[i].sabox.ret!=NULL )
 	    GHVBoxSetExpandableCol(tofree[i].sabox.ret,gb_expandglue);
 	if ( tofree[i].fontbox.ret!=NULL )
-	    GHVBoxSetExpandableCol(tofree[i].fontbox.ret,2);
+	    GHVBoxSetExpandableCol(tofree[i].fontbox.ret,1);
 	if ( res->boxdata!=NULL ) {
 	    GGadgetSelectOneListItem(GWidgetGetControl(gw,tofree[i].btcid),res->boxdata->border_type);
 	    GGadgetSelectOneListItem(GWidgetGetControl(gw,tofree[i].btcid+3),res->boxdata->border_shape);
@@ -2404,7 +2274,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 
     GHVBoxFitWindowCentered(topbox[0].ret);
     GDrawSetVisible(gw,true);
-    
+
     while ( !gre.done )
 	GDrawProcessOneEvent(NULL);
     GDrawDestroyWindow(gw);
@@ -2425,91 +2295,64 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
     free( panes );
 }
 
-static double _GDraw_Width_cm, _GDraw_Width_Inches;
-static Color _GDraw_fg, _GDraw_bg;
-static struct resed gdrawcm_re[] = {
-    {N_("Default Background"), "Background", rt_color, &_GDraw_bg, N_("Default background color for windows"), NULL, { 0 }, 0, 0 },
-    {N_("Default Foreground"), "Foreground", rt_color, &_GDraw_fg, N_("Default foreground color for windows"), NULL, { 0 }, 0, 0 },
-    {N_("Screen Width in Centimeters"), "ScreenWidthCentimeters", rt_double, &_GDraw_Width_cm, N_("Physical screen width, measured in centimeters\nFor this to take effect you must save the resource data (press the [Save] button)\nand restart fontforge"), NULL, { 0 }, 0, 0 },
+Color _GDraw_res_fg = COLOR_CREATE(0x00,0x00,0x00), _GDraw_res_bg = COLOR_CREATE(0xf5,0xff,0xfa);
+Color _GDraw_res_warnfg = COLOR_CREATE(0xBD,0x43,0x37);
+int _GDraw_res_res = 0, _GDraw_res_multiclicktime = 200, _GDraw_res_multiclickwiggle = 3;
+int _GDraw_res_selnottime = 2, _GDraw_res_twobuttonfixup = true, _GDraw_res_synchronize = false;
+#if __Mac
+int _GDraw_res_macosxcmd = true;
+#else
+int _GDraw_res_macosxcmd = false;
+#endif
+
+static struct resed gdraw_re[] = {
+    {N_("Default Background"), "Background", rt_color, &_GDraw_res_bg, N_("Default background color for windows"), NULL, { 0 }, 0, 0 },
+    {N_("Default Foreground"), "Foreground", rt_color, &_GDraw_res_fg, N_("Default foreground color for windows"), NULL, { 0 }, 0, 0 },
+    {N_("Warning Foreground"), "WarningForeground", rt_color, &_GDraw_res_warnfg, N_("Foreground color for warning messages and error conditions"), NULL, { 0 }, 0, 0 },
+    {N_("Screen Resolution"), "ScreenResolution", rt_int, &_GDraw_res_res, N_("Dots per inch of screen (0 for default/auto-detect)"), NULL, { 0 }, 0, 0 },
+    {N_("Multi Click Time"), "MultiClickTime", rt_int, &_GDraw_res_multiclicktime, N_("Maximum time (in ms) between clicks to be considered a double (triple, etc.) click"), NULL, { 0 }, 0, 0 },
+    {N_("Multi Click Wiggle"), "MultiClickWiggle", rt_int, &_GDraw_res_multiclickwiggle, N_("Maximum pixel distance between clicks to be considered a multi click"), NULL, { 0 }, 0, 0 },
+    {N_("Selection Notify Timeout"), "SelectionNotifyTimeout", rt_int, &_GDraw_res_selnottime, N_("Time (in secs) after making a request for a selection (ie. a Paste) to wait for a response before reporting an error"), NULL, { 0 }, 0, 0 },
+    {N_("Middle Mouse Button Fixup"), "TwoButtonFixup", rt_bool, &_GDraw_res_twobuttonfixup, N_("Use the Windows key (if present) to simulate middle mouse button"), NULL, { 0 }, 0, 0 },
+    {N_("Mac OS X Command as Ctrl"), "MacOSXCmd", rt_bool, &_GDraw_res_macosxcmd, N_("On Mac OS X use the Command key as if it were the Control key"), NULL, { 0 }, 0, 0 },
+    {N_("Synchronize"), "Synchronize", rt_bool, &_GDraw_res_synchronize, N_("Synchronize the display before raising the first window"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
-static struct resed gdrawin_re[] = {
-    {N_("Default Background"), "Background", rt_color, &_GDraw_bg, N_("Default background color for windows"), NULL, { 0 }, 0, 0 },
-    {N_("Default Foreground"), "Foreground", rt_color, &_GDraw_fg, N_("Default foreground color for windows"), NULL, { 0 }, 0, 0 },
-    {N_("Screen Width in Inches"), "ScreenWidthInches", rt_double, &_GDraw_Width_Inches, N_("Physical screen width, measured in inches\nFor this to take effect you must save the resource data (press the [Save] button)\nand restart fontforge"), NULL, { 0 }, 0, 0 },
-    RESED_EMPTY
-};
-static GResInfo gdraw_ri = {
-    NULL, NULL,NULL, NULL,
+extern GResInfo gpopup_ri;
+GResInfo gdraw_ri = {
+    &gpopup_ri, NULL,NULL, NULL,
     NULL,
     NULL,
     NULL,
-    gdrawcm_re,
+    gdraw_re,
     N_("GDraw"),
     N_("General facts about the windowing system"),
     "",
     "Gdraw",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
     NULL
 };
 
+void GDrawResourceFind() {
+    GResEditFind(gdraw_re, NULL);
+}
+
 static int refresh_eh(GWindow cover,GEvent *event) {
     if ( event->type==et_expose )
 	GDrawDestroyWindow(cover);
 return( true );
 }
-    
+
 void GResEdit(GResInfo *additional,const char *def_res_file,void (*change_res_filename)(const char *)) {
     GResInfo *re_end, *re;
-    static int initted = false;
-    char *oldimagepath;
-    extern char *_GGadget_ImagePath;
+    static int inited = false;
 
-    if ( !initted ) {
-	initted = true;
-	_GDraw_Width_Inches = screen_display->groot->pos.width / (double) screen_display->res;
-	_GDraw_Width_cm = _GDraw_Width_Inches * 2.54;
-	_GDraw_bg = GDrawGetDefaultBackground(NULL);
-	_GDraw_fg = GDrawGetDefaultForeground(NULL);
-	if ( getenv("LC_MESSAGES")!=NULL ) {
-	    if ( strstr(getenv("LC_MESSAGES"),"_US")!=NULL )
-		gdraw_ri.extras = gdrawin_re;
-	} else if ( getenv("LANG")!=NULL ) {
-	    if ( strstr(getenv("LANG"),"_US")!=NULL )
-		gdraw_ri.extras = gdrawin_re;
-	}
-	gdraw_ri.next = _GProgressRIHead();
-	for ( re_end = _GProgressRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GGadgetRIHead();
-	for ( re_end = _GGadgetRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GButtonRIHead();
-	for ( re_end = _GButtonRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GRadioRIHead();
-	for ( re_end = _GRadioRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GTextFieldRIHead();
-	for ( re_end = _GTextFieldRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GListRIHead();
-	for ( re_end = _GListRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GScrollBarRIHead();
-	for ( re_end = _GScrollBarRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GLineRIHead();
-	for ( re_end = _GLineRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GHVBoxRIHead();
-	for ( re_end = _GHVBoxRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GMenuRIHead();
-	for ( re_end = _GMenuRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GMatrixEditRIHead();
-	for ( re_end = _GMatrixEditRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GDrawableRIHead();
-	for ( re_end = _GDrawableRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GTabSetRIHead();
-	for ( re_end = _GTabSetRIHead(); re_end->next!=NULL; re_end = re_end->next );
-    }
     if ( additional!=NULL ) {
 	for ( re_end=additional; re_end->next!=NULL; re_end = re_end->next );
 	re_end->next = &gdraw_ri;
@@ -2517,17 +2360,22 @@ void GResEdit(GResInfo *additional,const char *def_res_file,void (*change_res_fi
 	additional = &gdraw_ri;
 	re_end = NULL;
     }
-    oldimagepath = copy( _GGadget_ImagePath );
+    if ( !inited ) {
+	inited = true;
+	for ( re=additional; re!=NULL; re=re->next )
+	    GResEditDoInit(re);
+
+    }
+    {
+       extern GResFont list_font;
+       extern GGadgetCreateData list_gcd[];
+       int as, ds, ld;
+       GDrawWindowFontMetrics(GDrawGetRoot(NULL),list_font.fi,&as, &ds, &ld);
+       list_gcd[0].gd.pos.height = list_gcd[1].gd.pos.height = 2*(as+ds)+4;
+    }
+
     GResEditDlg(additional,def_res_file,change_res_filename);
-    if (( oldimagepath!=NULL && _GGadget_ImagePath==NULL ) ||
-	    ( oldimagepath==NULL && _GGadget_ImagePath!=NULL ) ||
-	    ( oldimagepath!=NULL && _GGadget_ImagePath!=NULL &&
-		    strcmp(oldimagepath,_GGadget_ImagePath)!=0 )) {
-	char *new = _GGadget_ImagePath;
-	_GGadget_ImagePath = oldimagepath;
-	GGadgetSetImagePath(new);
-    } else
-	free( oldimagepath );
+
     for ( re=additional; re!=NULL; re=re->next ) {
 	if ( (re->override_mask&omf_refresh) && re->refresh!=NULL )
 	    (re->refresh)();
@@ -2555,7 +2403,7 @@ void GResEdit(GResInfo *additional,const char *def_res_file,void (*change_res_fi
 	GDrawSetVisible(gw,true);
     }
 }
-    
+ 
 void GResEditFind( struct resed *resed, char *prefix) {
     int i;
     GResStruct *info;
@@ -2572,13 +2420,83 @@ void GResEditFind( struct resed *resed, char *prefix) {
 	    info[i].type = rt_color;
 	info[i].val = resed[i].val;
 	info[i].cvt = resed[i].cvt;
-	if ( info[i].type==rt_font ) {
-	    info[i].type = rt_string;
-	    info[i].cvt = GResource_font_cvt;
-	}
     }
     GResourceFind(info,prefix);
     for ( i=0; resed[i].name!=NULL; ++i )
 	resed[i].found = info[i].found;
     free(info);
+}
+
+int _GResEditInitialize(GResInfo *ri) {
+    if ( ri->is_initialized )
+	return false;
+
+    if ( ri->inherits_from!=NULL )
+	GResEditDoInit(ri->inherits_from);
+
+    if ( ri->boxdata!=NULL ) {
+	if ( ri->inherits_from!=NULL && ri->inherits_from->boxdata!=NULL )
+	    *ri->boxdata = *ri->inherits_from->boxdata;
+
+	ri->boxdata->flags |= ri->override_mask & box_flag_mask;
+
+	if ( ri->override_mask & omf_border_type )
+	    ri->boxdata->border_type = ri->overrides.border_type;
+	if ( ri->override_mask & omf_border_shape )
+	    ri->boxdata->border_shape = ri->overrides.border_shape;
+	if ( ri->override_mask & omf_border_width )
+	    ri->boxdata->border_width = ri->overrides.border_width;
+	if ( ri->override_mask & omf_padding )
+	    ri->boxdata->padding = ri->overrides.padding;
+	if ( ri->override_mask & omf_rr_radius )
+	    ri->boxdata->rr_radius = ri->overrides.rr_radius;
+	if ( ri->override_mask & omf_main_foreground )
+	    ri->boxdata->main_foreground = ri->overrides.main_foreground;
+	if ( ri->override_mask & omf_disabled_foreground )
+	    ri->boxdata->disabled_foreground = ri->overrides.disabled_foreground;
+	if ( ri->override_mask & omf_main_background )
+	    ri->boxdata->main_background = ri->overrides.main_background;
+	if ( ri->override_mask & omf_disabled_background )
+	    ri->boxdata->disabled_background = ri->overrides.disabled_background;
+	if ( ri->override_mask & omf_depressed_background )
+	    ri->boxdata->depressed_background = ri->overrides.depressed_background;
+	if ( ri->override_mask & omf_gradient_bg_end )
+	    ri->boxdata->gradient_bg_end = ri->overrides.gradient_bg_end;
+	if ( ri->override_mask & omf_border_brightest )
+	    ri->boxdata->border_brightest = ri->overrides.border_brightest;
+	if ( ri->override_mask & omf_border_brighter )
+	    ri->boxdata->border_brighter = ri->overrides.border_brighter;
+	if ( ri->override_mask & omf_border_darkest )
+	    ri->boxdata->border_darkest = ri->overrides.border_darkest;
+	if ( ri->override_mask & omf_border_darker )
+	    ri->boxdata->border_darker = ri->overrides.border_darker;
+	if ( ri->override_mask & omf_active_border )
+	    ri->boxdata->active_border = ri->overrides.active_border;
+
+	_GGadgetInitDefaultBox(ri->resname, ri->boxdata);
+    }
+
+    if ( ri->font!=NULL ) {
+        fix_CJK_UI_font(ri->font);
+        GResourceFindFont(ri->resname, "Font", ri->font);
+    }
+
+    if ( ri->extras!=NULL ) {
+        for ( int i=0; ri->extras[i].name!=NULL; ++i ) {
+            if (ri->extras[i].type == rt_font) {
+                fix_CJK_UI_font(ri->extras[i].val);
+            }
+        }
+        GResEditFind(ri->extras, ri->resname);
+    }
+
+    ri->is_initialized = true;
+    return true;
+}
+
+void GResEditDoInit(GResInfo *ri) {
+    if ( ri->initialize!=NULL )
+	(*ri->initialize)(ri);
+    else
+	_GResEditInitialize(ri);
 }

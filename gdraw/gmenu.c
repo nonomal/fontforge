@@ -30,7 +30,7 @@
 #include "gdraw.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
-#include "gresource.h"
+#include "gresourceP.h"
 #include "gwidget.h"
 #include "hotkeys.h"
 #include "prefs.h"
@@ -39,32 +39,20 @@
 
 static GBox menubar_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox menu_box = GBOX_EMPTY; /* Don't initialize here */
-static FontInstance *menu_font = NULL, *menubar_font = NULL;
-static int gmenubar_inited = false;
+static GResFont menu_font = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
+static GResFont menubar_font = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
 #ifdef __Mac
 static int mac_menu_icons = true;
 #else
 static int mac_menu_icons = false;
 #endif
 static int menu_3d_look = 1; // The 3D look is the default/legacy setting.
+static int menu_grabs=true;
 static int mask_set=0;
 static int menumask = ksm_control|ksm_meta|ksm_shift;		/* These are the modifier masks expected in menus. Will be overridden by what's actually there */
-#ifndef _Keyboard
-# define _Keyboard 0
-#endif
-static enum { kb_ibm, kb_mac, kb_sun, kb_ppc } keyboard = _Keyboard;
-/* Sigh. In old XonX the command key is mapped to 0x20 and Option to 0x8 (meta) */
-/*  the option key conversions (option-c => ccidilla) are not done */
-/*  In the next X, the command key is mapped to 0x10 and Option to 0x2000 */
-/*  (again option key conversion are not done) */
-/*  In 10.3, the command key is mapped to 0x10 and Option to 0x8 */
-/*  In 10.5 the command key is mapped to 0x10 and Option to 0x8 */
-/*   (and option conversions are done) */
-/*  While in Suse PPC X, the command key is 0x8 (meta) and option is 0x2000 */
-/*  and the standard mac option conversions are done */
 
 static GResInfo gmenu_ri;
-static GResInfo gmenubar_ri = {
+GResInfo gmenubar_ri = {
     &gmenu_ri, &ggadget_ri,&gmenu_ri, NULL,
     &menubar_box,
     &menubar_font,
@@ -75,8 +63,9 @@ static GResInfo gmenubar_ri = {
     "GMenuBar",
     "Gdraw",
     false,
+    false,
     omf_border_shape|omf_border_width|box_foreground_border_outer,
-    NULL,
+    { 0, bs_rect, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -84,10 +73,13 @@ static GResInfo gmenubar_ri = {
 };
 static struct resed menu_re[] = {
     {N_("MacIcons"), "MacIcons", rt_bool, &mac_menu_icons, N_("Whether to use mac-like icons to indicate modifiers (for instance ^ for Control)\nor to use an abbreviation (for instance \"Cnt-\")"), NULL, { 0 }, 0, 0 },
+    {N_("3D Look"), "3DLook", rt_bool, &menu_3d_look, N_("Whether the menu is presented with a 3D appearance"), NULL, { 0 }, 0, 0 },
+    {N_("Grab"), "Grab", rt_bool, &menu_grabs, N_("Whether the menu 'grabs' the mouse pointer"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
+extern GResInfo gmatrixedit_ri;
 static GResInfo gmenu_ri = {
-    NULL, &ggadget_ri,&gmenubar_ri, NULL,
+    &gmatrixedit_ri, &ggadget_ri,&gmenubar_ri, NULL,
     &menu_box,
     &menu_font,
     NULL,
@@ -97,13 +89,19 @@ static GResInfo gmenu_ri = {
     "GMenu",
     "Gdraw",
     false,
+    false,
     omf_border_shape|omf_padding|box_foreground_border_outer,
-    NULL,
+    { 0, bs_rect, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
     NULL
 };
+
+static void GMenuInit(void) {
+    GResEditDoInit(&gmenubar_ri);
+    GResEditDoInit(&gmenu_ri);
+}
 
 char* HKTextInfoToUntranslatedText( char* text_untranslated );
 char* HKTextInfoToUntranslatedTextFromTextInfo( GTextInfo* ti );
@@ -112,43 +110,7 @@ static void GMenuBarChangeSelection(GMenuBar *mb, int newsel,GEvent *);
 static struct gmenu *GMenuCreateSubMenu(struct gmenu *parent,GMenuItem *mi,int disable);
 static struct gmenu *GMenuCreatePulldownMenu(GMenuBar *mb,GMenuItem *mi, int disabled);
 
-static int menu_grabs=true;
 static struct gmenu *most_recent_popup_menu = NULL;
-
-static void GMenuInit() {
-    FontRequest rq;
-    char *keystr, *end;
-
-    GGadgetInit();
-    memset(&rq,0,sizeof(rq));
-    GDrawDecomposeFont(_ggadget_default_font,&rq);
-    rq.weight = 400;
-    menu_font = menubar_font = GDrawInstanciateFont(NULL,&rq);
-    _GGadgetCopyDefaultBox(&menubar_box);
-    _GGadgetCopyDefaultBox(&menu_box);
-    menubar_box.border_shape = menu_box.border_shape = bs_rect;
-    menubar_box.border_width = 0;
-    menu_box.padding = 1;
-    menubar_box.flags |= box_foreground_border_outer;
-    menu_box.flags |= box_foreground_border_outer;
-    menubar_font = _GGadgetInitDefaultBox("GMenuBar.",&menubar_box,menubar_font);
-    menu_font = _GGadgetInitDefaultBox("GMenu.",&menu_box,menubar_font);
-    keystr = GResourceFindString("Keyboard");
-    if ( keystr!=NULL ) {
-	if ( strmatch(keystr,"mac")==0 ) keyboard = kb_mac;
-	else if ( strmatch(keystr,"sun")==0 ) keyboard = kb_sun;
-	else if ( strmatch(keystr,"ppc")==0 ) keyboard = kb_ppc;
-	else if ( strmatch(keystr,"ibm")==0 || strmatch(keystr,"pc")==0 ) keyboard = kb_ibm;
-	else if ( strtol(keystr,&end,10), *end=='\0' )
-	    keyboard = strtol(keystr,NULL,10);
-        free(keystr);
-    }
-    menu_grabs = GResourceFindBool("GMenu.Grab",menu_grabs);
-    mac_menu_icons = GResourceFindBool("GMenu.MacIcons",mac_menu_icons);
-    menu_3d_look = GResourceFindBool("GMenu.3DLook", menu_3d_look);
-    gmenubar_inited = true;
-    _GGroup_Init();
-}
 
 typedef struct gmenu {
     unsigned int hasticks: 1;
@@ -186,125 +148,6 @@ typedef struct gmenu {
     /*  in the indicated directions */
     GGadget *vsb;
 } GMenu;
-
-static char*
-translate_shortcut (int i, char *modifier)
-{
-  char buffer[32];
-  char *temp;
-  TRACE("translate_shortcut(top) i:%d modifier:%s\n", i, modifier );
-
-  sprintf (buffer, "Flag0x%02x", 1 << i);
-  temp = dgettext (GMenuGetShortcutDomain (), buffer);
-
-  if (strcmp (temp, buffer) != 0)
-      modifier = temp;
-  else
-      modifier = dgettext (GMenuGetShortcutDomain (), modifier);
-
-  TRACE("translate_shortcut(end) i:%d modifier:%s\n", i, modifier );
-
-  return modifier;
-}
-
-
-
-static void _shorttext(int shortcut, int short_mask, unichar_t *buf) {
-    unichar_t *pt = buf;
-    static int initted = false;
-    struct { int mask; char *modifier; } mods[8] = {
-	{ ksm_shift, H_("Shift+") },
-	{ ksm_capslock, H_("CapsLk+") },
-	{ ksm_control, H_("Ctrl+") },
-	{ ksm_meta, H_("Alt+") },
-	{ 0x10, H_("Flag0x10+") },
-	{ 0x20, H_("Flag0x20+") },
-	{ 0x40, H_("Flag0x40+") },
-	{ 0x80, H_("Flag0x80+") }
-	};
-    int i;
-    char buffer[32];
-
-    uc_strcpy(pt,"xx⎇");
-    pt += u_strlen(pt);
-    *pt = '\0';
-    return;
-
-    if ( !initted )
-    {
-	/* char *temp; */
-	for ( i=0; i<8; ++i )
-	{
-	    /* sprintf( buffer,"Flag0x%02x", 1<<i ); */
-	    /* temp = dgettext(GMenuGetShortcutDomain(),buffer); */
-	    /* if ( strcmp(temp,buffer)!=0 ) */
-	    /* 	mods[i].modifier = temp; */
-	    /* else */
-	    /* 	mods[i].modifier = dgettext(GMenuGetShortcutDomain(),mods[i].modifier); */
-
-          if (mac_menu_icons)
-	  {
-	      TRACE("mods[i].mask: %s\n", mods[i].modifier );
-
-              if (mods[i].mask == ksm_cmdmacosx)
-		  mods[i].modifier = "⌘";
-              else if (mods[i].mask == ksm_control)
-		  mods[i].modifier = "⌃";
-              else if (mods[i].mask == ksm_meta)
-		  mods[i].modifier = "⎇";
-              else if (mods[i].mask == ksm_shift)
-		  mods[i].modifier = "⇧";
-              else
-		  mods[i].modifier = translate_shortcut (i, mods[i].modifier);
-	  }
-	  else
-	  {
-              translate_shortcut (i, mods[i].modifier);
-	  }
-
-
-
-
-	}
-	/* It used to be that the Command key was available to X on the mac */
-	/*  but no longer. So we used to use it, but we can't now */
-	/* It's sort of available. X11->Preferences->Input->Enable Keyboard shortcuts under X11 needs to be OFF */
-	/* if ( strcmp(mods[2].modifier,"Ctl+")==0 ) */
-	    /* mods[2].modifier = keyboard!=kb_mac?"Ctl+":"Cmd+"; */
-	if ( strcmp(mods[3].modifier,"Alt+")==0 )
-	    mods[3].modifier = keyboard==kb_ibm?"Alt+":keyboard==kb_mac?"Opt+":keyboard==kb_ppc?"Cmd+":"Meta+";
-    }
-
-
-    if ( shortcut==0 ) {
-	*pt = '\0';
-return;
-    }
-
-    for ( i=7; i>=0 ; --i ) {
-	if ( short_mask&(1<<i) ) {
-	    uc_strcpy(pt,mods[i].modifier);
-	    pt += u_strlen(pt);
-	}
-    }
-
-
-    if ( shortcut>=0xff00 && GDrawKeysyms[shortcut-0xff00] ) {
-    	cu_strcpy(buffer,GDrawKeysyms[shortcut-0xff00]);
-    	utf82u_strcpy(pt,dgettext(GMenuGetShortcutDomain(),buffer));
-    } else {
-    	*pt++ = islower(shortcut)?toupper(shortcut):shortcut;
-    	*pt = '\0';
-    }
-}
-
-
-/*
- * Unused
-static void shorttext(GMenuItem *gi,unichar_t *buf) {
-    _shorttext(gi->shortcut,gi->short_mask,buf);
-}
-*/
 
 static int GMenuGetMenuPathRecurse( GMenuItem** stack,
 				    GMenuItem *basemi,
@@ -572,7 +415,7 @@ static int GMenuDrawMenuLine(struct gmenu *m, GMenuItem *mi, int y,GWindow pixma
 	x = m->tioff;
     h = GTextInfoDraw(pixmap,x,y,&mi->ti,m->font,
 	    (mi->ti.disabled || m->disabled )?m->box->disabled_foreground:fg,
-	    m->box->active_border,new.y+new.height);
+	    m->box->active_border,new.y+new.height, -1, -1);
     if ( mi->ti.checkable ) {
 	if ( mi->ti.checked )
 	    GMenuDrawCheckMark(m,fg,ybase,r2l);
@@ -584,9 +427,6 @@ static int GMenuDrawMenuLine(struct gmenu *m, GMenuItem *mi, int y,GWindow pixma
 	GMenuDrawArrow(m,ybase,r2l);
     else
     {
-	_shorttext(mi->shortcut,0,shortbuf);
-	uint16 short_mask = mi->short_mask;
-
 	/* TRACE("m->menubar: %p\n", m->menubar ); */
 	/* TRACE("m->parent: %p\n", m->parent ); */
 	/* TRACE("m->toplevel: %p\n", getTopLevelMenubar(m)); */
@@ -610,15 +450,13 @@ static int GMenuDrawMenuLine(struct gmenu *m, GMenuItem *mi, int y,GWindow pixma
 						GMenuGetMenuPath( m->mi, mi ));
 	}
 
-	short_mask = 0;
-	uc_strcpy(shortbuf,"");
+	shortbuf[0] = '\0';
 
 	if( hk )
 	{
 	    /* TRACE("m->menubar->mi: %p\n", toplevel->mi ); */
 	    /* TRACE("m->menubar->window: %p\n", toplevel->g.base ); */
 	    /* TRACE("drawline... hk: %p\n", hk ); */
-	    short_mask = hk->state;
 	    char* keydesc = hk->text;
 	    if( mac_menu_icons )
 	    {
@@ -675,24 +513,6 @@ static int gmenu_expose(struct gmenu *m, GEvent *event,GWindow pixmap) {
     GDrawPopClip(pixmap,&old2);
     GDrawPopClip(pixmap,&old1);
 return( true );
-}
-
-static void GMenuDrawLines(struct gmenu *m, int ln, int cnt) {
-    GRect r, old1, old2, winrect;
-
-    winrect.x = 0; winrect.width = m->width; winrect.y = 0; winrect.height = m->height;
-    r = winrect; r.height = cnt*m->fh;
-    r.y = (ln-m->offtop)*m->fh+m->bp;
-    GDrawPushClip(m->w,&r,&old1);
-    GBoxDrawBackground(m->w,&winrect,m->box,gs_active,false);
-    GBoxDrawBorder(m->w,&winrect,m->box,gs_active,false);
-    r.x = m->tickoff; r.width = m->rightedge-r.x;
-    GDrawPushClip(m->w,&r,&old2);
-    cnt += ln;
-    for ( ; ln<cnt; ++ln )
-	GMenuDrawMenuLine(m, &m->mi[ln], m->bp+(ln-m->offtop)*m->fh,m->w);
-    GDrawPopClip(m->w,&old2);
-    GDrawPopClip(m->w,&old1);
 }
 
 static void GMenuSetPressed(struct gmenu *m, int pressed) {
@@ -783,16 +603,7 @@ return;
     if ( old!=-1 )
 	m->mi[old].ti.selected = false;
 
-    if ( newsel==old+1 && old!=-1 ) {
-	GMenuDrawLines(m,old,2);
-    } else if ( old==newsel+1 && newsel!=-1 ) {
-	GMenuDrawLines(m,newsel,2);
-    } else {
-	if ( newsel!=-1 )
-	    GMenuDrawLines(m,newsel,1);
-	if ( old!=-1 )
-	    GMenuDrawLines(m,old,1);
-    }
+    GDrawRequestExpose(m->w, NULL, false);
     if ( newsel!=-1 ) {
 	if ( m->mi[newsel].moveto!=NULL )
 	    (m->mi[newsel].moveto)(m->owner,&m->mi[newsel],event);
@@ -890,14 +701,15 @@ return( (GDrawGetEH(testm->menubar->g.base))(testm->menubar->g.base,event));
 	    GMenuDismissAll(m);
 	else if ( event->type==et_mouseup )
 	    GMenuSetPressed(m,false);
-	else if ( m->pressed )
+	else if ( event->type==et_mousemove )
+	    /* A displayed menu tracks the pointer whether or not a button is
+	     * held (sticky menus): moving off the menu clears the highlight. */
 	    GMenuChangeSelection(m,-1,event);
 return( true );
     }
 
     event->u.mouse.x = p.x; event->u.mouse.y = p.y; event->w = m->w;
-    if (( m->pressed && event->type==et_mousemove ) ||
-	    event->type == et_mousedown ) {
+    if ( event->type==et_mousemove || event->type == et_mousedown ) {
 	int l = (event->u.mouse.y-m->bp)/m->fh;
 	int i = l + m->offtop;
 	if ( m->scrollit!=NULL )
@@ -1130,7 +942,7 @@ static GMenuItem *GMenuSearchActionRecursive( GWindow gw,
 	    if( HKActionMatchesFirstPartOfTextInfo( action, &mi[i].ti )) {
 		char* subaction = HKActionPointerPastLeftmostKey(action);
 
-//		TRACE("GMenuSearchAction() action:%s decending menu:%s\n", action, u_to_c(mi[i].ti.text) );
+//		TRACE("GMenuSearchAction() action:%s descending menu:%s\n", action, u_to_c(mi[i].ti.text) );
 		GMenuItem *ret = GMenuSearchActionRecursive(gw,mi[i].sub,subaction,event,call_moveto);
 		if ( ret!=NULL )
 		    return( ret );
@@ -1171,15 +983,13 @@ static GMenuItem *GMenuSearchAction( GWindow gw,
 static GMenuItem *GMenuSearchShortcut(GWindow gw, GMenuItem *mi, GEvent *event,
 	int call_moveto) {
     int i;
-    unichar_t keysym = event->u.chr.keysym;
 
-    if ( keysym<GK_Special && islower(keysym))
-	keysym = toupper(keysym); /*getkey(keysym,event->u.chr.state&0x2000 );*/
     for ( i=0; mi[i].ti.text!=NULL || mi[i].ti.image!=NULL || mi[i].ti.line; ++i ) {
 	if ( call_moveto && mi[i].moveto != NULL)
 	    (mi[i].moveto)(gw,&(mi[i]),event);
-	if ( mi[i].sub==NULL && mi[i].shortcut == keysym &&
-		(menumask&event->u.chr.state)==mi[i].short_mask )
+	if ( mi[i].sub==NULL &&
+		(menumask&event->u.chr.state)==mi[i].short_mask &&
+		GDrawShortcutKeyMatches(event, mi[i].shortcut) )
 return( &mi[i]);
 	else if ( mi[i].sub!=NULL ) {
 	    GMenuItem *ret = GMenuSearchShortcut(gw,mi[i].sub,event,call_moveto);
@@ -1316,20 +1126,18 @@ static int gmenu_key(struct gmenu *m, GEvent *event) {
     int i;
     GMenuItem *mi;
     GMenu *top;
-    unichar_t keysym = event->u.chr.keysym;
 
     if ( m->dying )
 	return( false );
 
-    if ( islower(keysym)) keysym = toupper(keysym);
     if ( event->u.chr.state&ksm_meta && !(event->u.chr.state&(menumask&~(ksm_meta|ksm_shift)))) {
 	/* Only look for mneumonics in the child */
 	while ( m->child!=NULL )
 	    m = m->child;
 	for ( i=0; i<m->mcnt; ++i ) {
-	    if ( m->mi[i].ti.mnemonic == keysym &&
-			!m->disabled &&
-			!m->mi[i].ti.disabled ) {
+	    if ( !m->disabled &&
+			!m->mi[i].ti.disabled &&
+			GDrawShortcutKeyMatches(event, m->mi[i].ti.mnemonic) ) {
 		GMenuKeyInvoke(m,i);
 return( true );
 	    }
@@ -1394,6 +1202,7 @@ return( gmenu_destroy(m));
       case et_close:
 	GMenuDestroy(m);
 return( true );
+      default: break;
     }
 return( false );
 }
@@ -1491,7 +1300,6 @@ static GMenu *_GMenu_Create( GMenuBar* toplevel,
 	    max_iwidth = temp;
 
 	uc_strcpy(buffer,"");
-	uint16 short_mask = 0;
 	/**
 	 * Grab the hotkey if there is one. First we work out the
 	 * menubar for this menu item, and then get the path from the
@@ -1518,7 +1326,6 @@ static GMenu *_GMenu_Create( GMenuBar* toplevel,
 //	TRACE("hk:%p\n", hk);
 	if( hk )
 	{
-	    short_mask = hk->state;
 	    char* keydesc = hk->text;
 	    if( mac_menu_icons )
 	    {
@@ -1665,14 +1472,13 @@ GWindow _GMenuCreatePopupMenuWithName( GWindow owner,GEvent *event, GMenuItem *m
     GMenu *m;
     GEvent e;
 
-    if ( !gmenubar_inited )
-	GMenuInit();
+    GMenuInit();
 
     p.x = event->u.mouse.x;
     p.y = event->u.mouse.y;
     GDrawTranslateCoordinates(owner,GDrawGetRoot(GDrawGetDisplayOfWindow(owner)),&p);
     m = _GMenu_Create( 0, owner, GMenuItemArrayCopy(mi,NULL), &p,
-		       0, 0, menu_font,false, subMenuName );
+		       0, 0, menu_font.fi,false, subMenuName );
     m->any_unmasked_shortcuts = GMenuItemArrayAnyUnmasked(m->mi);
     GDrawPointerUngrab(GDrawGetDisplayOfWindow(owner));
     GDrawPointerGrab(m->w);
@@ -1705,163 +1511,6 @@ int GMenuPopupCheckKey(GEvent *event) {
     return( gmenu_key(most_recent_popup_menu,event) );
 }
 
-/* ************************************************************************** */
-
-int GGadgetUndoMacEnglishOptionCombinations(GEvent *event) {
-    int keysym = event->u.chr.keysym;
-
-    switch ( keysym ) {
-    /* translate special mac keys to ordinary keys */
-      case 0xba:
-	keysym = '0'; break;
-      case 0xa1:
-	keysym = '1'; break;
-      case 0x2122:
-	keysym = '2'; break;
-      case 0xa3:
-	keysym = '3'; break;
-      case 0xa2:
-	keysym = '4'; break;
-      case 0x221e:
-	keysym = '5'; break;
-      case 0xa7:
-	keysym = '6'; break;
-      case 0xb6:
-	keysym = '7'; break;
-      case 0x2022:
-	keysym = '8'; break;
-      case 0xaa:
-	keysym = '9'; break;
-      case 0xe5:
-	keysym = 'a'; break;
-      case 0x222b:
-	keysym = 'b'; break;
-      case 0xe7:
-	keysym = 'c'; break;
-      case 0x2202:
-	keysym = 'd'; break;
-      /* e is a modifier */
-      case 0x192:
-	keysym = 'f'; break;
-      case 0xa9:
-	keysym = 'g'; break;
-      case 0x2d9:
-	keysym = 'h'; break;
-      /* i is a modifier */
-      case 0x2206:
-	keysym = 'j'; break;
-      case 0x2da:
-	keysym = 'k'; break;
-      case 0xac:
-	keysym = 'l'; break;
-      case 0xb5:
-	keysym = 'm'; break;
-      /* n is a modifier */
-      case 0xf8:
-	keysym = 'o'; break;
-      case 0x3c0:
-	keysym = 'p'; break;
-      case 0x153:
-	keysym = 'q'; break;
-      case 0xae:
-	keysym = 'r'; break;
-      case 0x2020:
-	keysym = 's'; break;
-      case 0xee:
-	keysym = 't'; break;
-      /* u is a modifier */
-      case 0x221a:
-	keysym = 'v'; break;
-      case 0x2211:
-	keysym = 'w'; break;
-      case 0x2248:
-	keysym = 'x'; break;
-      case 0xa5:
-	keysym = 'y'; break;
-      case 0x3a9:
-	keysym = 'z'; break;
-    }
-    return( keysym );
-}
-
-/**
- * On OSX the XEvents have some extra translation performed to try to be handier.
- * For example, in xev you might notice that alt+- gives a keysym of endash.
- *
- * Under Linux this translation doesn't happen and you get the alt
- * modifier and the minus keysym. The hotkey code is expecting
- * modifier(s) + base keysym not what osx gives (modifier(s) +
- * alternate-keysym). So this little function is designed to convert
- * the osx "enhanced" keysym back to their basic keysym.
- */
-#ifdef __Mac
-static int osx_handle_keysyms( int st, int k )
-{
-//    TRACE("osx_handle_keysyms() st:%d k:%d\n", st, k );
-
-    if( (st & ksm_control) && (st & ksm_meta) )
-	switch( k )
-	{
-	case 8211:  return 45; // Command + Alt + -
-	case 8804:  return 44; // Command + Alt + ,
-	}
-
-    if( (st & ksm_control) && (st & ksm_meta) && (st & ksm_shift) )
-	switch( k )
-	{
-	case 177:   return 43; // Command + Alt + Shift + =
-	case 197:   return 65; // Command + Alt + Shift + A
-	case 305:   return 66; // Command + Alt + Shift + B
-	case 199:   return 67; // Command + Alt + Shift + C
-	case 206:   return 68; // Command + Alt + Shift + D
-	case 180:   return 69; // Command + Alt + Shift + E
-	case 207:   return 70; // Command + Alt + Shift + F
-	case 733:   return 71; // Command + Alt + Shift + G
-	case 211:   return 72; // Command + Alt + Shift + H
-	case 710:   return 73; // Command + Alt + Shift + I
-	case 212:   return 74; // Command + Alt + Shift + J
-	case 63743: return 75; // Command + Alt + Shift + K
-	case 210:   return 76; // Command + Alt + Shift + L
-	case 194:   return 77; // Command + Alt + Shift + M
-	case 732:   return 78; // Command + Alt + Shift + N
-	case 216:   return 79; // Command + Alt + Shift + O
-	case 8719:  return 80; // Command + Alt + Shift + P
-	case 65505: return 81; // Command + Alt + Shift + Q
-	case 8240:  return 82; // Command + Alt + Shift + R
-	case 205:   return 83; // Command + Alt + Shift + S
-	case 711:   return 84; // Command + Alt + Shift + T
-	case 168:   return 85; // Command + Alt + Shift + U
-	case 9674:  return 86; // Command + Alt + Shift + V
-	case 8222:  return 87; // Command + Alt + Shift + W
-	case 731:   return 88; // Command + Alt + Shift + X
-	case 193:   return 89; // Command + Alt + Shift + Y
-	case 184:   return 90; // Command + Alt + Shift + Z
-
-	case 8260:  return 33; // Command + Alt + Shift + 1
-	case 8360:  return 64; // Command + Alt + Shift + 2
-	case 8249:  return 35; // Command + Alt + Shift + 3
-	case 8250:  return 36; // Command + Alt + Shift + 4
-	case 64257: return 37; // Command + Alt + Shift + 5
-	case 64258: return 94; // Command + Alt + Shift + 6
-	case 8225:  return 38; // Command + Alt + Shift + 7
-	case 176:   return 42; // Command + Alt + Shift + 8
-	case 183:   return 40; // Command + Alt + Shift + 9
-	case 8218:  return 41; // Command + Alt + Shift + 0
-	}
-
-    if( st & ksm_meta )
-	switch( k )
-	{
-	case 2730:  return 45; // Alt + -
-	case 2237:  return 61; // Alt + = (can avoid shift on this one for simpler up/down)
-	case 8800:  return 61; // Alt + = (can avoid shift on this one for simpler up/down)
-	}
-
-    return k;
-}
-#endif
-
-int osx_fontview_copy_cut_counter = 0;
 
 
 static int GMenuBarCheckHotkey(GWindow top, GGadget *g, GEvent *event) {
@@ -1884,33 +1533,6 @@ static int GMenuBarCheckHotkey(GWindow top, GGadget *g, GEvent *event) {
 	    event->u.chr.state ^= (ksm_cmdmacosx|ksm_control);
 	}
     }
-#ifdef __Mac
-
-    //
-    // Command + Alt + Shift + F on OSX doesn't give the keysym one
-    // might expect if they have been testing on a Linux Machine.
-    //
-    TRACE("looking2 for hotkey in new system...state:%d keysym:%d\n", event->u.chr.state, event->u.chr.keysym );
-    TRACE("     has ksm_control:%d\n", (event->u.chr.state & ksm_control ));
-    TRACE("     has ksm_cmdmacosx:%d\n", (event->u.chr.state & ksm_cmdmacosx ));
-    TRACE("     has ksm_cmdmacosx|control:%d\n", ((event->u.chr.state & (ksm_cmdmacosx|ksm_control)) == ksm_cmdmacosx) );
-    TRACE("     has ksm_meta:%d\n",    (event->u.chr.state & ksm_meta ));
-    TRACE("     has ksm_shift:%d\n",   (event->u.chr.state & ksm_shift ));
-    TRACE("     has ksm_option:%d\n",   (event->u.chr.state & ksm_option ));
-
-    if( event->u.chr.state & ksm_option )
-	event->u.chr.state ^= ksm_option;
-
-    event->u.chr.keysym = osx_handle_keysyms( event->u.chr.state, event->u.chr.keysym );
-    TRACE(" 3   has ksm_option:%d\n",   (event->u.chr.state & ksm_option ));
-
-    // Command-c or Command-x
-    if( event->u.chr.state == ksm_control
-	&& (event->u.chr.keysym == 99 || event->u.chr.keysym == 120 ))
-    {
-	osx_fontview_copy_cut_counter++;
-    }
-#endif
 
 //    TRACE("about to look for hotkey in new system...state:%d keysym:%d\n", event->u.chr.state, event->u.chr.keysym );
 //    TRACE("     has ksm_control:%d\n", (event->u.chr.state & ksm_control ));
@@ -1991,20 +1613,14 @@ int GMenuBarCheckKey(GWindow top, GGadget *g, GEvent *event) {
 
     if ( g==NULL || keysym==0 ) return( false ); /* exit if no gadget or key */
 
-    if ( (menumask&ksm_cmdmacosx) && keysym>0x7f &&
-	    (event->u.chr.state&ksm_meta) &&
-	    !(event->u.chr.state&menumask&(ksm_control|ksm_cmdmacosx)) )
-	keysym = GGadgetUndoMacEnglishOptionCombinations(event);
 
-    if ( keysym<GK_Special && islower(keysym))
-	keysym = toupper(keysym);
     if ( event->u.chr.state&ksm_meta && !(event->u.chr.state&(menumask&~(ksm_meta|ksm_shift)))) {
 	/* Only look for mneumonics in the leaf of the displayed menu structure */
 	if ( mb->child!=NULL )
 	    return( gmenu_key(mb->child,event)); /* this routine will do shortcuts too */
 
 	for ( i=0; i<mb->mtot; ++i ) {
-	    if ( mb->mi[i].ti.mnemonic == keysym && !mb->mi[i].ti.disabled ) {
+	    if ( !mb->mi[i].ti.disabled && GDrawShortcutKeyMatches(event, mb->mi[i].ti.mnemonic) ) {
 		GMenuBarKeyInvoke(mb,i);
 		return( true );
 	    }
@@ -2083,11 +1699,27 @@ static int gmenubar_expose(GWindow pixmap, GGadget *g, GEvent *expose) {
 
     r = g->inner;
     for ( i=0; i<mb->lastmi; ++i ) {
-	r.x = mb->xs[i]+mb->g.inner.x; r.width = mb->xs[i+1]-mb->xs[i];
+	int cellx = mb->xs[i]+mb->g.inner.x;
+	int cellw = mb->xs[i+1]-mb->xs[i];
+	/* Draw the active title's highlight ourselves, with horizontal padding
+	 * and filling the bar height, rather than relying on GTextInfoDraw's
+	 * text-tight fill (which hugs the glyphs and looks cramped on macOS).
+	 * We then pass COLOR_DEFAULT below so GTextInfoDraw skips its own fill. */
+	if ( mb->mi[i].ti.selected && mb->g.box->active_border!=COLOR_DEFAULT ) {
+	    GRect hl;
+	    int padx = GDrawPointsToPixels(mb->g.base,5);
+	    int textw = cellw - GDrawPointsToPixels(mb->g.base,8); /* cell = 8pt gap + text */
+	    hl.x = cellx - padx; hl.width = textw + 2*padx;
+	    if ( hl.x < g->inner.x ) { hl.width -= g->inner.x - hl.x; hl.x = g->inner.x; }
+	    hl.y = g->inner.y; hl.height = g->inner.height;
+	    GDrawFillRect(pixmap,&hl,mb->g.box->active_border);
+	}
+	r.x = cellx; r.width = cellw;
 	GDrawPushClip(pixmap,&r,&old3);
 	GTextInfoDraw(pixmap,r.x,r.y,&mb->mi[i].ti,mb->font,
 		mb->mi[i].ti.disabled?mb->g.box->disabled_foreground:fg,
-		mb->g.box->active_border,r.y+r.height);
+		COLOR_DEFAULT,r.y+r.height, mb->ascender,
+		mb->descender);
 	GDrawPopClip(pixmap,&old3);
     }
     if ( i<mb->mtot ) {
@@ -2131,10 +1763,19 @@ return( true );
 	    mb->initial_press = true;
 	    GMenuBarChangeSelection(mb,which,event);
 	}
-    } else if ( event->type == et_mousemove && mb->pressed ) {
-	if ( GGadgetWithin(g,event->u.mouse.x,event->u.mouse.y))
-	    GMenuBarChangeSelection(mb,GMenuBarIndex(mb,event->u.mouse.x),event);
-	else if ( mb->child!=NULL ) {
+    } else if ( event->type == et_mousemove && mb->entry_with_mouse!=-1 ) {
+	/* Once a menu is active on the bar, moving across it switches menus on
+	 * hover. Keyed off entry_with_mouse rather than button state or child!=NULL
+	 * so that hovering a disabled top-level menu (which opens no pulldown)
+	 * doesn't end navigation. */
+	if ( GGadgetWithin(g,event->u.mouse.x,event->u.mouse.y)) {
+	    int which = GMenuBarIndex(mb,event->u.mouse.x);
+	    /* Don't let the pointer passing over a gap between titles (which==-1)
+	     * close the open menu -- that causes the menu to flicker shut and
+	     * reopen. Only switch to another real title. */
+	    if ( which!=-1 )
+		GMenuBarChangeSelection(mb,which,event);
+	} else if ( mb->child!=NULL ) {
 	    GPoint p;
 
 	    p.x = event->u.mouse.x; p.y = event->u.mouse.y;
@@ -2198,7 +1839,7 @@ static void GMenuBarTestSize(GMenuBar *mb) {
     }
 }
 
-static void GMenuBarResize(GGadget *g, int32 width, int32 height) {
+static void GMenuBarResize(GGadget *g, int32_t width, int32_t height) {
     _ggadget_resize(g,width,height);
     GMenuBarTestSize((GMenuBar *) g);
 }
@@ -2264,9 +1905,19 @@ static void GMenuBarFit(GMenuBar *mb,GGadgetData *gd) {
 	mb->g.r.width = r.width-mb->g.r.x;
     }
     if ( mb->g.r.height == 0 ) {
-	int as,ds,ld;
-	GDrawWindowFontMetrics(mb->g.base,mb->font,&as, &ds, &ld);
-	mb->g.r.height = as+ds+2*bp;
+	int ld, i;
+	GTextBounds bounds;
+	GDrawWindowFontMetrics(mb->g.base, mb->font, &mb->ascender,
+	                       &mb->descender, &ld);
+	GDrawSetFont(mb->g.base, mb->font);
+	for ( i=0; i<mb->mtot; ++i ) {
+	    GDrawGetTextBounds(mb->g.base, mb->mi[i].ti.text, -1, &bounds);
+	    if ( mb->ascender<bounds.as )
+		mb->ascender = bounds.as;
+	    if ( mb->descender<bounds.ds )
+		mb->descender = bounds.ds;
+	}
+	mb->g.r.height = mb->ascender+mb->descender+2*bp;
     }
     mb->g.inner.x = mb->g.r.x + bp;
     mb->g.inner.y = mb->g.r.y + bp;
@@ -2298,15 +1949,14 @@ static void MenuMaskInit(GMenuItem *mi) {
 GGadget *GMenuBarCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     GMenuBar *mb = calloc(1,sizeof(GMenuBar));
 
-    if ( !gmenubar_inited )
-	GMenuInit();
+    GMenuInit();
     mb->g.funcs = &gmenubar_funcs;
     _GGadget_Create(&mb->g,base,gd,data,&menubar_box);
 
     mb->mi = GMenuItemArrayCopy(gd->u.menu,&mb->mtot);
-    mb->xs = malloc((mb->mtot+1)*sizeof(uint16));
+    mb->xs = malloc((mb->mtot+1)*sizeof(uint16_t));
     mb->entry_with_mouse = -1;
-    mb->font = menubar_font;
+    mb->font = menubar_font.fi;
 
     GMenuBarFit(mb,gd);
     GMenuBarFindXs(mb);
@@ -2325,15 +1975,14 @@ return( &mb->g );
 GGadget *GMenu2BarCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     GMenuBar *mb = calloc(1,sizeof(GMenuBar));
 
-    if ( !gmenubar_inited )
-	GMenuInit();
+    GMenuInit();
     mb->g.funcs = &gmenubar_funcs;
     _GGadget_Create(&mb->g,base,gd,data,&menubar_box);
 
     mb->mi = GMenuItem2ArrayCopy(gd->u.menu2,&mb->mtot);
-    mb->xs = malloc((mb->mtot+1)*sizeof(uint16));
+    mb->xs = malloc((mb->mtot+1)*sizeof(uint16_t));
     mb->entry_with_mouse = -1;
-    mb->font = menubar_font;
+    mb->font = menubar_font.fi;
 
     GMenuBarFit(mb,gd);
     GMenuBarFindXs(mb);
@@ -2399,29 +2048,19 @@ void GMenuBarSetItemName(GGadget *g, int mid, const unichar_t *name) {
 /*  syntax and subject to gettext translation */
 int GMenuIsCommand(GEvent *event,char *shortcut) {
     GMenuItem foo;
-    unichar_t keysym = event->u.chr.keysym;
 
     if ( event->type!=et_char )
 return( false );
-
-    if ( keysym<GK_Special && islower(keysym))
-	keysym = toupper(keysym);
 
     memset(&foo,0,sizeof(foo));
 
     GMenuItemParseShortCut(&foo,shortcut);
 
-return( (menumask&event->u.chr.state)==foo.short_mask && foo.shortcut == keysym );
+return( (menumask&event->u.chr.state)==foo.short_mask && GDrawShortcutKeyMatches(event, foo.shortcut) );
 }
 
 int GMenuMask(void) {
 return( menumask );
-}
-
-GResInfo *_GMenuRIHead(void) {
-    if ( !gmenubar_inited )
-	GMenuInit();
-return( &gmenubar_ri );
 }
 
 int GMenuAnyUnmaskedShortcuts(GGadget *mb1, GGadget *mb2) {

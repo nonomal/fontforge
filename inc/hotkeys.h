@@ -44,7 +44,7 @@
  * CharView.Menu.File.Open is an action for the file/open menu item in
  * the charview/glyph editing window.
  *
- * This namespace convension uses dot separated strings. The window
+ * This namespace convention uses dot separated strings. The window
  * type as the first string, followed by "Menu", followed by each menu
  * item on the path down to the menu that should be invoked when the
  * hotkey is pressed.
@@ -74,7 +74,7 @@
  * the new hotkeyExecuteAction() function which itself could handle
  * working out if it is a CharView.Python prefix action and
  * dispatching accordingly. The gain to that is that other code might
- * also like to execute a hotkey independant of the existing code. For
+ * also like to execute a hotkey independent of the existing code. For
  * example, python code might execute an "action" through that
  * function.
  *
@@ -92,6 +92,9 @@
  * current version of ff offers in terms of actions.
  * 
  */
+
+enum hk_source { hk_ff=1, hk_user=2, hk_python=3 };
+
 typedef struct hotkey {
     /**
      * Hotkeys are stored in a doubly linked list. Having this entry
@@ -107,25 +110,25 @@ typedef struct hotkey {
     char   action[HOTKEY_ACTION_MAX_SIZE+1];
 
     /**
-     * A directly machine usable represetation of the modifiers that
+     * A directly machine usable representation of the modifiers that
      * must be in use for this hotkey to be fired. For example, shift,
      * control etc.
      */
-    uint16 state;
+    uint16_t state;
 
     /**
-     * A directly machine usable represetation of the key that is to
+     * A directly machine usable representation of the key that is to
      * be pressed fo r this hotkey. This would be a number for a key
      * so that 'k' might be 642
      */
-    uint16 keysym;
+    uint16_t keysym;
 
     /**
      * If this hotkey is user defined this is true. If this is true
      * then the hotkey should be saved back to the user
      * ~/.FontForge/hotkeys file instead of any system file.
      */
-    int    isUserDefined;
+    enum hk_source source;
 
     /**
      * The plain text representation for the key combination that is
@@ -219,9 +222,9 @@ extern Hotkey* isImmediateKey( GWindow w, char* path, GEvent *event );
  *
  * The new hotkey is returned.
  */
-extern Hotkey* hotkeySet( char* action, char* keydefinition, int append );
+extern Hotkey* hotkeySetFull( const char* action, const char* keydefinition, int append, enum hk_source source);
 
-extern void HotkeyParse( Hotkey* hk, const char *shortcut );
+extern int HotkeyParse( Hotkey* hk, const char *shortcut );
 
 /**
  * Set to true if the hotkey system can use the Command key for its

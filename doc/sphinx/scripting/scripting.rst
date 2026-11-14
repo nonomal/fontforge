@@ -12,6 +12,7 @@ means use the old interpreter)
 
    scripting-alpha
    python
+   python-extension
 
 .. contents::
    :backlinks: none
@@ -147,7 +148,7 @@ operators (and their precedences) are:
   If the first operand of + is a string then + will be treated as concatenation
   rather than addition. If the second operand is a number it will be converted to
   a string (decimal representation) and then concatenated. If the first operand of
-  + is an array then + will do array concatenation -- if the second argment is
+  + is an array then + will do array concatenation -- if the second argument is
   also an array the two will be concatenated ([1,2] + [3,4] yields [1,2,3,4],
   while [1,2] + 3 yields [1,2,3]). Otherwise these are the normal arithmetric
   operations.
@@ -660,8 +661,10 @@ Built-in procedures that act like the Element Menu
 
 * :func:`AddAccent()`
 * :func:`AddExtrema()`
+* :func:`AddInflections()`
 * :func:`ApplySubstitution()`
 * :func:`AutoTrace()`
+* :func:`Balance()`
 * :func:`BitmapsAvail()`
 * :func:`BitmapsRegen()`
 * :func:`BuildAccented()`
@@ -677,6 +680,7 @@ Built-in procedures that act like the Element Menu
 * :func:`DefaultUseMyMetrics()`
 * :func:`ExpandStroke()`
 * :func:`FindIntersections()`
+* :func:`Harmonize()`
 * :func:`HFlip()`
 * :func:`Inline()`
 * :func:`InterpolateFonts()`
@@ -1038,7 +1042,7 @@ Deprecated Names
 Examples
 --------
 
-* `FontForge's testsuite in the test subdirectory <https://github.com/fontforge/fontforge/tree/master/test>`__
+* `FontForge's testsuite in the test subdirectory <https://github.com/fontforge/fontforge/tree/master/tests>`__
   (such as it is)
 * `Directory of donated scripts <https://github.com/fontforge/fontforge/tree/master/pycontrib>`__
 * Scripts used in other projects

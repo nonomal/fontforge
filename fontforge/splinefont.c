@@ -31,6 +31,8 @@
 #include "autotrace.h"
 #include "dumppfa.h"
 #include "encoding.h"
+#include "ffglib_compat.h"
+#include "ffprocess.h"
 #include "fontforgevw.h"
 #include "fvcomposite.h"
 #include "fvfonts.h"
@@ -61,7 +63,7 @@
 #include <math.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
+#include "ffunistd.h"
 
 void SFUntickAll(SplineFont *sf) {
     int i;
@@ -244,7 +246,7 @@ return( _SFMakeChar(sf,map,enc));
 }
 
 int NameToEncoding(SplineFont *sf,EncMap *map,const char *name) {
-    int enc, uni, i, ch;
+    int enc, uni, ch;
     char *end, *freeme=NULL;
     const char *upt = name;
 
@@ -308,21 +310,21 @@ return( enc );
 return( enc );
 }
 
-void SFRemoveUndoes(SplineFont *sf,uint8 *selected, EncMap *map) {
-    SplineFont *main = sf->cidmaster? sf->cidmaster : sf, *ssf;
+void SFRemoveUndoes(SplineFont *sf,uint8_t *selected, EncMap *map) {
+    SplineFont *mainfont = sf->cidmaster? sf->cidmaster : sf, *ssf;
     int i,k, max, layer, gid;
     SplineChar *sc;
     BDFFont *bdf;
 
-    if ( selected!=NULL || main->subfontcnt==0 )
+    if ( selected!=NULL || mainfont->subfontcnt==0 )
 	max = sf->glyphcnt;
     else {
 	max = 0;
-	for ( k=0; k<main->subfontcnt; ++k )
-	    if ( main->subfonts[k]->glyphcnt>max ) max = main->subfonts[k]->glyphcnt;
+	for ( k=0; k<mainfont->subfontcnt; ++k )
+	    if ( mainfont->subfonts[k]->glyphcnt>max ) max = mainfont->subfonts[k]->glyphcnt;
     }
     for ( i=0; ; ++i ) {
-	if ( selected==NULL || main->subfontcnt!=0 ) {
+	if ( selected==NULL || mainfont->subfontcnt!=0 ) {
 	    if ( i>=max )
     break;
 	    gid = i;
@@ -335,7 +337,7 @@ void SFRemoveUndoes(SplineFont *sf,uint8 *selected, EncMap *map) {
 	    if ( gid==-1 )
     continue;
 	}
-	for ( bdf=main->bitmaps; bdf!=NULL; bdf=bdf->next ) {
+	for ( bdf=mainfont->bitmaps; bdf!=NULL; bdf=bdf->next ) {
 	    if ( bdf->glyphs[gid]!=NULL ) {
 		UndoesFree(bdf->glyphs[gid]->undoes); bdf->glyphs[gid]->undoes = NULL;
 		UndoesFree(bdf->glyphs[gid]->redoes); bdf->glyphs[gid]->redoes = NULL;
@@ -343,7 +345,7 @@ void SFRemoveUndoes(SplineFont *sf,uint8 *selected, EncMap *map) {
 	}
 	k = 0;
 	do {
-	    ssf = main->subfontcnt==0? main: main->subfonts[k];
+	    ssf = mainfont->subfontcnt==0? mainfont: mainfont->subfonts[k];
 	    if ( gid<ssf->glyphcnt && ssf->glyphs[gid]!=NULL ) {
 		sc = ssf->glyphs[gid];
 		for ( layer = 0; layer<sc->layer_cnt; ++layer ) {
@@ -352,7 +354,7 @@ void SFRemoveUndoes(SplineFont *sf,uint8 *selected, EncMap *map) {
 		}
 	    }
 	    ++k;
-	} while ( k<main->subfontcnt );
+	} while ( k<mainfont->subfontcnt );
     }
 }
 
@@ -485,17 +487,17 @@ static void SFScalePrivate(SplineFont *sf,double scale) {
     int i;
 
     for ( i=0; integerscalethese[i]!=NULL; ++i ) {
-	char *str = PSDictHasEntry(sf->private,integerscalethese[i]);
+	char *str = PSDictHasEntry(sf->private_dict,integerscalethese[i]);
 	char *new = iscaleString(str,scale);
 	if ( new!=NULL )
-	    PSDictChangeEntry(sf->private,integerscalethese[i],new);
+	    PSDictChangeEntry(sf->private_dict,integerscalethese[i],new);
 	free(new);
     }
     for ( i=0; scalethese[i]!=NULL; ++i ) {
-	char *str = PSDictHasEntry(sf->private,scalethese[i]);
+	char *str = PSDictHasEntry(sf->private_dict,scalethese[i]);
 	char *new = scaleString(str,scale);
 	if ( new!=NULL )
-	    PSDictChangeEntry(sf->private,scalethese[i],new);
+	    PSDictChangeEntry(sf->private_dict,scalethese[i],new);
 	free(new);
     }
 }
@@ -523,7 +525,7 @@ int SFScaleToEm(SplineFont *sf, int as, int des) {
     bigreal scale;
     real transform[6];
     BVTFunc bvts;
-    uint8 *oldselected = sf->fv->selected;
+    uint8_t *oldselected = sf->fv->selected;
     enum fvtrans_flags trans_flags =
 	fvt_alllayers|fvt_round_to_int|fvt_dontsetwidth|fvt_scalekernclasses|fvt_scalepstpos|fvt_dogrid;
 
@@ -555,7 +557,7 @@ int SFScaleToEm(SplineFont *sf, int as, int des) {
     sf->ufo_ascent *= scale;
     sf->ufo_descent *= scale;
 
-    if ( sf->private!=NULL )
+    if ( sf->private_dict!=NULL )
 	SFScalePrivate(sf,scale);
     if ( sf->horiz_base!=NULL )
 	ScaleBase(sf->horiz_base, scale);
@@ -641,7 +643,12 @@ struct archivers archivers[] = {
     { ".tar.bz2", "tar", "tar", "tfj", "xfj", "rfj", ars_tar },
     { ".tbz2", "tar", "tar", "tfj", "xfj", "rfj", ars_tar },
     { ".tbz", "tar", "tar", "tfj", "xfj", "rfj", ars_tar },
-    { ".zip", "unzip", "zip", "-l", "", "", ars_zip },
+#ifdef _WIN32
+    /* In Windows 10/11 the built-in tar can handle zip files */
+    { ".zip", "tar", "tar", "tfj", "xfj", "rfj", ars_tar },
+#else
+    { ".zip", "unzip", "zip", "-Z1", "-q", "", ars_zip },
+#endif
     /* { ".tar.lzma", ? } */
     ARCHIVERS_EMPTY
 };
@@ -674,13 +681,10 @@ return( NULL );
     rewind(file);
 
     /* tar outputs its table of contents as a simple list of names */
-    /* zip includes a bunch of other info, headers (and lines for directories)*/
-
     linebuffer = malloc(linelenmax+3);
     fcnt = 0;
     files = malloc((nlcnt+1)*sizeof(char *));
 
-    if ( ars == ars_tar ) {
 	pt = linebuffer;
 	while ( (ch=getc(file))!=EOF ) {
 	    if ( ch=='\n' ) {
@@ -692,26 +696,6 @@ return( NULL );
 	    } else
 		*pt++ = ch;
 	}
-    } else {
-	/* Skip the first three lines, header info */
-	fgets(linebuffer,linelenmax+3,file);
-	fgets(linebuffer,linelenmax+3,file);
-	fgets(linebuffer,linelenmax+3,file);
-	pt = linebuffer;
-	while ( (ch=getc(file))!=EOF ) {
-	    if ( ch=='\n' ) {
-		*pt = '\0';
-		if ( linebuffer[0]==' ' && linebuffer[1]=='-' && linebuffer[2]=='-' )
-	break;		/* End of file list */
-		/* Blessed if I know what encoded was used for filenames */
-		/*  inside the zip file. I shall assume utf8, faut de mieux */
-		if ( pt-linebuffer>=28 && pt[-1]!='/' )
-		    files[fcnt++] = copy(linebuffer+28);
-		pt = linebuffer;
-	    } else
-		*pt++ = ch;
-	}
-    }
     files[fcnt] = NULL;
     fclose(file);
 
@@ -787,12 +771,15 @@ return( name );
 #define TOC_NAME	"ff-archive-table-of-contents"
 
 char *Unarchive(char *name, char **_archivedir) {
-    char *dir = getenv("TMPDIR");
-    char *pt, *archivedir, *listfile, *listcommand, *unarchivecmd, *desiredfile;
+    const char *dir = ff_get_tmp_dir();
+    char *pt, *archivedir, *listfile, *desiredfile;
     char *finalfile;
     int i;
     int doall=false;
     static int cnt=0;
+    char *command[5];
+    char *stdoutresponse = NULL;
+    FFProcessResult result;
 
     *_archivedir = NULL;
 
@@ -816,7 +803,6 @@ return( NULL );
 return( NULL );
     }
 
-    if ( dir==NULL ) dir = P_tmpdir;
     archivedir = malloc(strlen(dir)+100);
     sprintf( archivedir, "%s/ffarchive-%d-%d", dir, getpid(), ++cnt );
     if ( GFileMkDir(archivedir, 0755)!=0 ) {
@@ -827,18 +813,26 @@ return( NULL );
     listfile = malloc(strlen(archivedir)+strlen("/" TOC_NAME)+1);
     sprintf( listfile, "%s/" TOC_NAME, archivedir );
 
-    listcommand = malloc( strlen(archivers[i].unarchive) + 1 +
-			strlen( archivers[i].listargs) + 1 +
-			strlen( name ) + 3 +
-			strlen( listfile ) +4 );
-    sprintf( listcommand, "%s %s %s > %s", archivers[i].unarchive,
-	    archivers[i].listargs, name, listfile );
-    if ( system(listcommand)!=0 ) {
-	free(listcommand); free(listfile);
-	ArchiveCleanup(archivedir);
-return( NULL );
+    command[0] = (char*)archivers[i].unarchive;
+    command[1] = (char*)archivers[i].listargs;
+    command[2] = name;
+    command[3] = NULL;
+
+    result = ff_run_command(command, NULL, &stdoutresponse, NULL);
+    if (result != FF_PROCESS_OK) {
+        free(listfile);
+        ArchiveCleanup(archivedir);
+        return NULL;
     }
-    free(listcommand);
+
+    /* Write out the listfile to be read in later */
+    FILE *fp = fopen(listfile, "wb");
+    if (fp != NULL && stdoutresponse != NULL) {
+        fwrite(stdoutresponse, strlen(stdoutresponse), 1, fp);
+        fclose(fp);
+    }
+    free(stdoutresponse);
+    stdoutresponse = NULL;
 
     desiredfile = ArchiveParseTOC(listfile, archivers[i].ars, &doall);
     free(listfile);
@@ -847,22 +841,19 @@ return( NULL );
 return( NULL );
     }
 
-    /* I tried sending everything to stdout, but that doesn't work if the */
-    /*  output is a directory file (ufo, sfdir) */
-    unarchivecmd = malloc( strlen(archivers[i].unarchive) + 1 +
-			strlen( archivers[i].listargs) + 1 +
-			strlen( name ) + 1 +
-			strlen( desiredfile ) + 3 +
-			strlen( archivedir ) + 30 );
-    sprintf( unarchivecmd, "( cd %s ; %s %s %s %s ) > /dev/null", archivedir,
-	    archivers[i].unarchive,
-	    archivers[i].extractargs, name, doall ? "" : desiredfile );
-    if ( system(unarchivecmd)!=0 ) {
-	free(unarchivecmd); free(desiredfile);
-	ArchiveCleanup(archivedir);
-return( NULL );
+    command[0] = (char*)archivers[i].unarchive;
+    command[1] = (char*)archivers[i].extractargs;
+    command[2] = name;
+    command[3] = doall ? (char*)"" : desiredfile;
+    command[4] = NULL;
+
+    result = ff_run_command(command, archivedir, &stdoutresponse, NULL);
+    free(stdoutresponse);
+    if (result != FF_PROCESS_OK) {
+        free(desiredfile);
+        ArchiveCleanup(archivedir);
+        return NULL;
     }
-    free(unarchivecmd);
 
     finalfile = malloc( strlen(archivedir) + 1 + strlen(desiredfile) + 1);
     sprintf( finalfile, "%s/%s", archivedir, desiredfile );
@@ -872,45 +863,27 @@ return( NULL );
 return( finalfile );
 }
 
-struct compressors compressors[] = {
-    { ".gz", "gunzip", "gzip" },
-    { ".bz2", "bunzip2", "bzip2" },
-    { ".bz", "bunzip2", "bzip2" },
-    { ".Z", "gunzip", "compress" },
-    { ".lzma", "unlzma", "lzma" },
-/* file types which are both archived and compressed (.tgz, .zip) are handled */
-/*  by the archiver above */
-    COMPRESSORS_EMPTY
-};
+char *Decompress(char *name) {
+    char *tmpfn = NULL;
+    FFProcessResult result;
 
-char *Decompress(char *name, int compression) {
-    char *dir = getenv("TMPDIR");
-    char buf[1500];
-    char *tmpfn;
-
-    if ( dir==NULL ) dir = P_tmpdir;
-    tmpfn = malloc(strlen(dir)+strlen(GFileNameTail(name))+2);
-    strcpy(tmpfn,dir);
-    strcat(tmpfn,"/");
-    strcat(tmpfn,GFileNameTail(name));
-    *strrchr(tmpfn,'.') = '\0';
-    snprintf( buf, sizeof(buf), "%s < %s > %s", compressors[compression].decomp, name, tmpfn );
-    if ( system(buf)==0 )
-return( tmpfn );
-    free(tmpfn);
-return( NULL );
+    result = ff_decompress_to_temp(name, &tmpfn);
+    if (result != FF_PROCESS_OK) {
+        return NULL;
+    }
+    return tmpfn;
 }
 
-static char *ForceFileToHaveName(FILE *file, char *exten) {
+static char *ForceFileToHaveName(FILE *file, const char *exten) {
     char tmpfilename[L_tmpnam+100];
     static int try=0;
     FILE *newfile;
 
     for (;;) {
-	sprintf( tmpfilename, P_tmpdir "/fontforge%d-%d", getpid(), try++ );
+	sprintf( tmpfilename, "%s/fontforge%d-%d", ff_get_tmp_dir(), getpid(), try++ );
 	if ( exten!=NULL )
 	    strcat(tmpfilename,exten);
-	if ( access( tmpfilename, F_OK )==-1 &&
+	if ( ff_access( tmpfilename, F_OK )==-1 &&
 		(newfile = fopen(tmpfilename,"w"))!=NULL ) {
 	    char buffer[1024];
 	    int len;
@@ -977,7 +950,7 @@ SplineFont *_ReadSplineFont(FILE *file, const char *filename, enum openflags ope
     // Some explorers (PCManFM) may pass a file:// URL, special case it
     // here so that we don't defer to the HTTP code.
     if ( strncmp(filename,"file://",7)==0 ) {
-        fname = g_uri_unescape_string(filename+7, NULL);
+        fname = ff_uri_unescape_string(filename+7, NULL);
         free(fullname);
         fullname = fname;
     }
@@ -1009,7 +982,7 @@ SplineFont *_ReadSplineFont(FILE *file, const char *filename, enum openflags ope
 		    char *spuriousname = ForceFileToHaveName(file,archivers[i].ext);
 		    strippedname = Unarchive(spuriousname,&archivedir);
 		    fclose(file); file = NULL;
-		    unlink(spuriousname); free(spuriousname);
+		    ff_unlink(spuriousname); free(spuriousname);
 		} else
 		    strippedname = Unarchive(strippedname,&archivedir);
 		if ( strippedname==NULL )
@@ -1027,42 +1000,39 @@ SplineFont *_ReadSplineFont(FILE *file, const char *filename, enum openflags ope
 	}
     }
 
-    i = -1;
-    if ( pt!=NULL ) for ( i=0; compressors[i].ext!=NULL; ++i )
-	if ( strcmp(compressors[i].ext,pt)==0 )
-    break;
     oldstrippedname = strippedname;
-    if ( i==-1 || compressors[i].ext==NULL )
-	i=-1;
-    else {
-	if ( file!=NULL ) {
-	    char *spuriousname = ForceFileToHaveName(file,compressors[i].ext);
-	    tmpfn = Decompress(spuriousname,i);
-	    fclose(file); file = NULL;
-	    unlink(spuriousname); free(spuriousname);
-	} else
-	    tmpfn = Decompress(strippedname,i);
-	if ( tmpfn!=NULL ) {
-	    strippedname = tmpfn;
-	} else {
-	    ff_post_error(_("Decompress Failed!"),_("Decompress Failed!"));
-	    ArchiveCleanup(archivedir);
-        return NULL;
+    {
+	FFCompressionType ctype = ff_compression_type(strippedname);
+	if ( ctype != FF_COMPRESS_NONE ) {
+	    if ( file!=NULL ) {
+		char *spuriousname = ForceFileToHaveName(file, ff_compression_ext(ctype));
+		tmpfn = Decompress(spuriousname);
+		fclose(file); file = NULL;
+		ff_unlink(spuriousname); free(spuriousname);
+	    } else
+		tmpfn = Decompress(strippedname);
+	    if ( tmpfn!=NULL ) {
+		strippedname = tmpfn;
+	    } else {
+		ff_post_error(_("Decompress Failed!"),_("Decompress Failed!"));
+		ArchiveCleanup(archivedir);
+		return NULL;
+	    }
+	    compression = ff_compression_to_legacy(ctype);
+	    if ( strippedname!=fname && paren!=NULL ) {
+		fullname = malloc(strlen(strippedname)+strlen(paren)+1);
+		strcpy(fullname,strippedname);
+		strcat(fullname,paren);
+	    } else
+		fullname = strippedname;
 	}
-	compression = i+1;
-	if ( strippedname!=fname && paren!=NULL ) {
-	    fullname = malloc(strlen(strippedname)+strlen(paren)+1);
-	    strcpy(fullname,strippedname);
-	    strcat(fullname,paren);
-	} else
-	    fullname = strippedname;
     }
 
     /* If there are no pfaedit windows, give them something to look at */
     /*  immediately. Otherwise delay a bit */
     strncpy(ubuf,_("Loading font from "),sizeof(ubuf)-1);
     len = strlen(ubuf);
-    if ( i==-1 )	/* If it wasn't compressed then the fullname is reasonable, else use the original name */
+    if ( compression==0 )	/* If it wasn't compressed then the fullname is reasonable, else use the original name */
 	    strncat(ubuf,temp = def2utf8_copy(GFileNameTail(fullname)),100);
     else
 	    strncat(ubuf,temp = def2utf8_copy(GFileNameTail(fname)),100);
@@ -1160,7 +1130,7 @@ SplineFont *_ReadSplineFont(FILE *file, const char *filename, enum openflags ope
 	    else {
 		char *spuriousname = ForceFileToHaveName(file,NULL);
 		sf = SFReadSVG(spuriousname,0);
-		unlink(spuriousname); free(spuriousname);
+		ff_unlink(spuriousname); free(spuriousname);
 	    }
 	    checked = 'S';
 	} else if ( ch1=='S' && ch2=='p' && ch3=='l' && ch4=='i' ) {
@@ -1195,9 +1165,9 @@ SplineFont *_ReadSplineFont(FILE *file, const char *filename, enum openflags ope
 	    sf = SFReadTTF(fullname,0,openflags);
     } else if ( strmatch(fullname+strlen(strippedname)-4, ".svg")==0 && checked!='S' ) {
 	    sf = SFReadSVG(fullname,0);
-    } else if ( strmatch(fullname+strlen(fullname)-4, ".ufo")==0 && checked!='u' ||
-		 strmatch(fullname+strlen(fullname)-5, ".ufo2")==0 && checked!='u' ||
-		 strmatch(fullname+strlen(fullname)-5, ".ufo3")==0 && checked!='u' ) {
+    } else if (( strmatch(fullname+strlen(fullname)-4, ".ufo")==0 ||
+		 strmatch(fullname+strlen(fullname)-5, ".ufo2")==0  ||
+		 strmatch(fullname+strlen(fullname)-5, ".ufo3")==0 ) && checked!='u' ) {
 	    sf = SFReadUFO(fullname,0);
     } else if ( strmatch(fullname+strlen(fullname)-4, ".bdf")==0 && checked!='b' ) {
 	    sf = SFFromBDF(fullname,0,false);
@@ -1254,7 +1224,7 @@ SplineFont *_ReadSplineFont(FILE *file, const char *filename, enum openflags ope
 	    if ( wasarchived ) {
 	        norm->origname = NULL;
 	        free(norm->filename); norm->filename = NULL;
-	        norm->new = true;
+	        norm->isnew = true;
 	    } else if ( sf->chosenname!=NULL && strippedname==fname ) {
 	        norm->origname = malloc(strlen(fname)+strlen(sf->chosenname)+8);
 	        strcpy(norm->origname,fname);
@@ -1287,7 +1257,7 @@ SplineFont *_ReadSplineFont(FILE *file, const char *filename, enum openflags ope
     if ( chosenname!=NULL )
 	    free(chosenname);
     if ( tmpfn!=NULL ) {
-	    unlink(tmpfn);
+	    ff_unlink(tmpfn);
 	    free(tmpfn);
     }
     if ( wasarchived )
@@ -1308,13 +1278,6 @@ SplineFont *_ReadSplineFont(FILE *file, const char *filename, enum openflags ope
 
 SplineFont *ReadSplineFont(const char *filename,enum openflags openflags) {
 return( _ReadSplineFont(NULL,filename,openflags));
-}
-
-char *ToAbsolute(char *filename) {
-    char buffer[1025];
-
-    GFileGetAbsoluteName(filename,buffer,sizeof(buffer));
-return( copy(buffer));
 }
 
 SplineFont *LoadSplineFont(const char *filename,enum openflags openflags) {
@@ -1363,7 +1326,7 @@ return( NULL );
     sf = NULL;
     sf = FontWithThisFilename(fname);
     if ( sf==NULL && *fname!='/' )
-	fname = tobefreed2 = ToAbsolute(fname);
+	fname = tobefreed2 = GFileGetAbsoluteName(fname);
     if ( sf==NULL )
 	sf = ReadSplineFont(fname,openflags);
 
@@ -1762,7 +1725,7 @@ return( do_max ? -1e23 : 1e23 );		/* We didn't find any glyphs */
 
     /* Do we have a BlueValues entry? */
     /* If so, snap height to the closest alignment zone (bottom of the zone) */
-    if ( sf->private!=NULL && (blues = PSDictHasEntry(sf->private,do_max ? "BlueValues" : "OtherBlues"))!=NULL ) {
+    if ( sf->private_dict!=NULL && (blues = PSDictHasEntry(sf->private_dict,do_max ? "BlueValues" : "OtherBlues"))!=NULL ) {
 	while ( *blues==' ' || *blues=='[' ) ++blues;
 	/* Must get at least this close, else we'll just use what we found */
 	bestheight = result; bestdiff = (sf->ascent+sf->descent)/100.0;
@@ -1849,7 +1812,7 @@ static void arraystring(char *buffer,real *array,int cnt) {
     *buffer++ = ']'; *buffer='\0';
 }
 
-static void SnapSet(struct psdict *private,real stemsnap[12], real snapcnt[12],
+static void SnapSet(struct psdict *private_dict,real stemsnap[12], real snapcnt[12],
 	char *name1, char *name2, int which ) {
     int i, mi;
     char buffer[211];
@@ -1862,15 +1825,15 @@ static void SnapSet(struct psdict *private,real stemsnap[12], real snapcnt[12],
 return;
     if ( which<2 ) {
 	sprintf( buffer, "[%d]", (int) stemsnap[mi]);
-	PSDictChangeEntry(private,name1,buffer);
+	PSDictChangeEntry(private_dict,name1,buffer);
     }
     if ( which==0 || which==2 ) {
 	arraystring(buffer,stemsnap,12);
-	PSDictChangeEntry(private,name2,buffer);
+	PSDictChangeEntry(private_dict,name2,buffer);
     }
 }
 
-int SFPrivateGuess(SplineFont *sf,int layer, struct psdict *private,char *name, int onlyone) {
+int SFPrivateGuess(SplineFont *sf,int layer, struct psdict *private_dict,char *name, int onlyone) {
     real bluevalues[14], otherblues[10];
     real snapcnt[12];
     real stemsnap[12];
@@ -1885,36 +1848,36 @@ int SFPrivateGuess(SplineFont *sf,int layer, struct psdict *private,char *name, 
 	FindBlues(sf,layer,bluevalues,otherblues);
 	if ( !onlyone || strcmp(name,"BlueValues")==0 ) {
 	    arraystring(buffer,bluevalues,14);
-	    PSDictChangeEntry(private,"BlueValues",buffer);
+	    PSDictChangeEntry(private_dict,"BlueValues",buffer);
 	}
 	if ( !onlyone || strcmp(name,"OtherBlues")==0 ) {
 	    if ( otherblues[0]!=0 || otherblues[1]!=0 ) {
 		arraystring(buffer,otherblues,10);
-		PSDictChangeEntry(private,"OtherBlues",buffer);
+		PSDictChangeEntry(private_dict,"OtherBlues",buffer);
 	    } else
-		PSDictRemoveEntry(private, "OtherBlues");
+		PSDictRemoveEntry(private_dict, "OtherBlues");
 	}
     } else if ( strcmp(name,"StdHW")==0 || strcmp(name,"StemSnapH")==0 ) {
 	FindHStems(sf,stemsnap,snapcnt);
-	SnapSet(private,stemsnap,snapcnt,"StdHW","StemSnapH",
+	SnapSet(private_dict,stemsnap,snapcnt,"StdHW","StemSnapH",
 		!onlyone ? 0 : strcmp(name,"StdHW")==0 ? 1 : 0 );
     } else if ( strcmp(name,"StdVW")==0 || strcmp(name,"StemSnapV")==0 ) {
 	FindVStems(sf,stemsnap,snapcnt);
-	SnapSet(private,stemsnap,snapcnt,"StdVW","StemSnapV",
+	SnapSet(private_dict,stemsnap,snapcnt,"StdVW","StemSnapV",
 		!onlyone ? 0 : strcmp(name,"StdVW")==0 ? 1 : 0);
     } else if ( strcmp(name,"BlueScale")==0 ) {
 	bigreal val = -1;
-	if ( PSDictFindEntry(private,"BlueValues")!=-1 ) {
+	if ( PSDictFindEntry(private_dict,"BlueValues")!=-1 ) {
 	    /* Can guess BlueScale if we've got a BlueValues */
-	    val = BlueScaleFigureForced(private,NULL,NULL);
+	    val = BlueScaleFigureForced(private_dict,NULL,NULL);
 	}
 	if ( val==-1 ) val = .039625;
 	sprintf(buffer,"%g", (double) val );
-	PSDictChangeEntry(private,"BlueScale",buffer);
+	PSDictChangeEntry(private_dict,"BlueScale",buffer);
     } else if ( strcmp(name,"BlueShift")==0 ) {
-	PSDictChangeEntry(private,"BlueShift","7");
+	PSDictChangeEntry(private_dict,"BlueShift","7");
     } else if ( strcmp(name,"BlueFuzz")==0 ) {
-	PSDictChangeEntry(private,"BlueFuzz","1");
+	PSDictChangeEntry(private_dict,"BlueFuzz","1");
     } else if ( strcmp(name,"ForceBold")==0 ) {
 	int isbold = false;
 	if ( sf->weight!=NULL &&
@@ -1926,11 +1889,11 @@ int SFPrivateGuess(SplineFont *sf,int layer, struct psdict *private,char *name, 
 	    isbold = true;
 	if ( sf->pfminfo.pfmset && sf->pfminfo.weight>=700 )
 	    isbold = true;
-	PSDictChangeEntry(private,"ForceBold",isbold ? "true" : "false" );
+	PSDictChangeEntry(private_dict,"ForceBold",isbold ? "true" : "false" );
     } else if ( strcmp(name,"LanguageGroup")==0 ) {
-	PSDictChangeEntry(private,"LanguageGroup","0" );
+	PSDictChangeEntry(private_dict,"LanguageGroup","0" );
     } else if ( strcmp(name,"ExpansionFactor")==0 ) {
-	PSDictChangeEntry(private,"ExpansionFactor","0.06" );
+	PSDictChangeEntry(private_dict,"ExpansionFactor","0.06" );
     } else
 	ret = false;
 

@@ -31,6 +31,7 @@
 #include "fontforgeui.h"
 #include "fvfonts.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "lookups.h"
 #include "splinefill.h"
 #include "splineutil.h"
@@ -43,7 +44,9 @@
 
 extern GBox _ggadget_Default_Box;
 #define ACTIVE_BORDER   (_ggadget_Default_Box.active_border)
-#define MAIN_FOREGROUND (_ggadget_Default_Box.main_foreground)
+
+GResFont kernclass_font = GRESFONT_INIT("400 12pt " MONO_UI_FAMILIES);
+Color kernclass_classfgcol = 0x006080;
 
 typedef struct kernclassdlg {
     struct kernclasslistdlg *kcld;
@@ -54,7 +57,7 @@ typedef struct kernclassdlg {
     char **seconds_names;
     int *firsts_flags;
     int *seconds_flags;
-    int16 *offsets;
+    int16_t *offsets;
     int *offsets_flags;
     DeviceTable *adjusts;
     DeviceTable active_adjust;		/* The one that is currently active */
@@ -410,7 +413,7 @@ void KCD_DrawGlyph(GWindow pixmap,int x,int baseline,BDFChar *bdfc,int mag) {
 	base.image_type = it_mono;
 	clut.clut_len = 2;
 	clut.clut[0] = GDrawGetDefaultBackground(NULL);
-	clut.clut[1] = 0x000000;
+	clut.clut[1] = GDrawGetDefaultBackground(NULL);
     } else {
 	int scale, l;
 	Color fg, bg;
@@ -444,12 +447,12 @@ static int KCD_RightToLeft(KernClassDlg *kcd) {
 return( kcd->subtable->lookup->lookup_flags&pst_r2l );
 
     if ( kcd->scf!=NULL ) {
-	uint32 script = SCScriptFromUnicode(kcd->scf);
+	uint32_t script = SCScriptFromUnicode(kcd->scf);
 	if ( script!=DEFAULT_SCRIPT )
 return( ScriptIsRightToLeft( script ));
     }
     if ( kcd->scs!=NULL ) {
-	uint32 script = SCScriptFromUnicode(kcd->scs);
+	uint32_t script = SCScriptFromUnicode(kcd->scs);
 	if ( script!=DEFAULT_SCRIPT )
 return( ScriptIsRightToLeft( script ));
     }
@@ -925,7 +928,7 @@ static void KCD_SetDevTab(KernClassDlg *kcd) {
 }
 
 static void KP_SelectSubtable(KernClassDlg *kcd,struct lookup_subtable *sub) {
-    int32 len;
+    int32_t len;
     GTextInfo **ti = GGadgetGetList(GWidgetGetControl(kcd->gw,CID_Subtable),&len);
     int i, new_pos = -1;
 
@@ -995,9 +998,9 @@ static void KPD_PairSearch(KernClassDlg *kcd) {
 	}
     }
     if ( kp==NULL && kcd->scf!=NULL ) {
-	int32 len;
+	int32_t len;
 	GTextInfo **ti = GGadgetGetList(GWidgetGetControl(kcd->gw,CID_Subtable),&len);
-	uint32 script = SCScriptFromUnicode(kcd->scf);
+	uint32_t script = SCScriptFromUnicode(kcd->scf);
 	int i;
 	struct lookup_subtable *sub = NULL;
 
@@ -1567,6 +1570,7 @@ static void KCD_Expose(KernClassDlg *kcd,GWindow pixmap,GEvent *event) {
     GRect *area = &event->u.expose.rect;
     GRect rect, select,r;
     GRect clip,old1,old2,old3;
+    Color fg = GDrawGetDefaultForeground(NULL);
     int len, i, j, x, y;
     char buf[100];
     int fcnt, scnt;
@@ -1609,11 +1613,10 @@ return;
     }
 
     for ( i=0 ; kcd->offtop+i<=kcd->first_cnt && (i-1)*kcd->kernh<kcd->height; ++i ) {
-	GDrawDrawLine(pixmap,kcd->xstart,kcd->ystart2+i*kcd->kernh,kcd->xstart+rect.width,kcd->ystart2+i*kcd->kernh,
-		    0x808080);
+	GDrawDrawLine(pixmap,kcd->xstart,kcd->ystart2+i*kcd->kernh,kcd->xstart+rect.width,kcd->ystart2+i*kcd->kernh,fg);
 	if ( i+kcd->offtop<kcd->first_cnt ) {
 	    int err = KCD_NameClass(kcd->sf,buf,sizeof(buf),fclasses[i+kcd->offtop].u.md_str);
-	    int fg = err ? 0xff0000 : 0x006080;
+	    int fg = err ? GDrawGetWarningForeground(NULL) : kernclass_classfgcol;
 	    len = GDrawGetText8Width(pixmap,buf,-1);
 	    if ( len<=kcd->kernw )
 		GDrawDrawText8(pixmap,kcd->xstart+(kcd->kernw-len)/2,kcd->ystart2+i*kcd->kernh+kcd->as+1,
@@ -1629,11 +1632,10 @@ return;
 	}
     }
     for ( i=0 ; kcd->offleft+i<=scnt && (i-1)*kcd->kernw<kcd->fullwidth; ++i ) {
-	GDrawDrawLine(pixmap,kcd->xstart2+i*kcd->kernw,kcd->ystart,kcd->xstart2+i*kcd->kernw,kcd->ystart+rect.height,
-		0x808080);
+	GDrawDrawLine(pixmap,kcd->xstart2+i*kcd->kernw,kcd->ystart,kcd->xstart2+i*kcd->kernw,kcd->ystart+rect.height,fg);
 	if ( i+kcd->offleft<kcd->second_cnt ) {
 	    int err = KCD_NameClass(kcd->sf,buf,sizeof(buf),sclasses[i+kcd->offleft].u.md_str);
-	    int fg = err ? 0xff0000 : 0x006080;
+	    int fg = err ? GDrawGetWarningForeground(NULL) : kernclass_classfgcol;
 	    len = GDrawGetText8Width(pixmap,buf,-1);
 	    if ( len<=kcd->kernw )
 		GDrawDrawText8(pixmap,kcd->xstart2+i*kcd->kernw+(kcd->kernw-len)/2,kcd->ystart+kcd->as+1,
@@ -1665,18 +1667,16 @@ return;
 	    sprintf( buf, "%d", kcd->offsets[(i+kcd->offtop)*kcd->second_cnt+j+kcd->offleft] );
 	    len = GDrawGetText8Width(pixmap,buf,-1);
 	    GDrawDrawText8(pixmap,x+kcd->kernw-3-len,y+kcd->as+1,
-		buf,-1,MAIN_FOREGROUND);
+		buf,-1,fg);
 	}
     }
 
-    GDrawDrawLine(pixmap,kcd->xstart,kcd->ystart2,kcd->xstart+rect.width,kcd->ystart2,
-	    0x000000);
-    GDrawDrawLine(pixmap,kcd->xstart2,kcd->ystart,kcd->xstart2,kcd->ystart+rect.height,
-	    0x000000);
+    GDrawDrawLine(pixmap,kcd->xstart,kcd->ystart2,kcd->xstart+rect.width,kcd->ystart2,fg);
+    GDrawDrawLine(pixmap,kcd->xstart2,kcd->ystart,kcd->xstart2,kcd->ystart+rect.height,fg);
     GDrawPopClip(pixmap,&old2);
     GDrawPopClip(pixmap,&old1);
     --rect.y; ++rect.height;		/* Makes accented letters show better */
-    GDrawDrawRect(pixmap,&rect,0x000000);
+    GDrawDrawRect(pixmap,&rect,fg);
     rect.y += rect.height;
     rect.x += rect.width;
     LogoExpose(pixmap,event,&rect,dm_fore);
@@ -1746,6 +1746,7 @@ static void KCD_HScroll(KernClassDlg *kcd,struct sbevent *sb) {
       case et_sb_thumbrelease:
         newpos = sb->pos;
       break;
+      case et_sb_halfup: case et_sb_halfdown: break;
     }
     if ( newpos + (kcd->width/kcd->kernw) >= kcd->second_cnt )
 	newpos = kcd->second_cnt - (kcd->width/kcd->kernw);
@@ -1806,6 +1807,7 @@ static void KCD_VScroll(KernClassDlg *kcd,struct sbevent *sb) {
       case et_sb_thumbrelease:
         newpos = sb->pos;
       break;
+      case et_sb_halfup: case et_sb_halfdown: break;
     }
     if ( newpos + (kcd->height/kcd->kernh) >= kcd->first_cnt )
 	newpos = kcd->first_cnt - (kcd->height/kcd->kernh);
@@ -1836,6 +1838,7 @@ return( false );
 	kcd->subwidth = event->u.resize.size.width;
 	GDrawRequestExpose(gw,NULL,false);
       break;
+      default: break;
     }
 return( true );
 }
@@ -1893,8 +1896,10 @@ return( false );
 	    else
 		KCD_VScroll(kcd,&event->u.control.u.sb);
 	  break;
+	  default: break;
 	}
       break;
+      default: break;
     }
 return( true );
 }
@@ -2135,9 +2140,9 @@ static void KCD_FinishEdit(GGadget *g,int r, int c, int wasnew) {
 	autokern = GGadgetIsChecked(GWidgetGetControl(kcd->gw,CID_Autokern));
 	if ( is_first ) {
             // offsets and adjusts are mappings between the characters in the first and second lists.
-	    kcd->offsets = realloc(kcd->offsets,(kcd->first_cnt+1)*kcd->second_cnt*sizeof(int16));
+	    kcd->offsets = realloc(kcd->offsets,(kcd->first_cnt+1)*kcd->second_cnt*sizeof(int16_t));
 	    memset(kcd->offsets+kcd->first_cnt*kcd->second_cnt,
-		    0, kcd->second_cnt*sizeof(int16));
+		    0, kcd->second_cnt*sizeof(int16_t));
             // adjusts are resolution-specific.
 	    kcd->adjusts = realloc(kcd->adjusts,(kcd->first_cnt+1)*kcd->second_cnt*sizeof(DeviceTable));
 	    memset(kcd->adjusts+kcd->first_cnt*kcd->second_cnt,
@@ -2162,10 +2167,10 @@ static void KCD_FinishEdit(GGadget *g,int r, int c, int wasnew) {
 	} else {
             // The procedure for expanding offsets varies here, adding a column, since it is necessary to leave a space on each row for the new column.
             {
-	    int16 *new = malloc(kcd->first_cnt*(kcd->second_cnt+1)*sizeof(int16));
+	    int16_t *new = malloc(kcd->first_cnt*(kcd->second_cnt+1)*sizeof(int16_t));
 	        for ( i=0; i<kcd->first_cnt; ++i ) {
 		    memcpy(new+i*(kcd->second_cnt+1),kcd->offsets+i*kcd->second_cnt,
-			    kcd->second_cnt*sizeof(int16));
+			    kcd->second_cnt*sizeof(int16_t));
 		    new[i*(kcd->second_cnt+1)+kcd->second_cnt] = 0;
 	        }
 	        free( kcd->offsets );
@@ -2262,7 +2267,7 @@ static void KCD_RowMotion(GGadget *g,int oldr, int newr) {
 
     if ( is_first ) {
 	for ( i=0; i<kcd->second_cnt; ++i ) {
-	    int16 off = kcd->offsets[oldr*kcd->second_cnt + i];
+	    int16_t off = kcd->offsets[oldr*kcd->second_cnt + i];
 	    kcd->offsets[oldr*kcd->second_cnt + i] = kcd->offsets[newr*kcd->second_cnt + i];
 	    kcd->offsets[newr*kcd->second_cnt + i] = off;
 	    tempdt = kcd->adjusts[oldr*kcd->second_cnt + i];
@@ -2270,7 +2275,6 @@ static void KCD_RowMotion(GGadget *g,int oldr, int newr) {
 	    kcd->adjusts[newr*kcd->second_cnt + i] = tempdt;
 	    // Group kerning.
 	    if (kcd->offsets_flags) {
-	      int offflag = kcd->offsets_flags[oldr*kcd->second_cnt + i];
 	      kcd->offsets_flags[oldr*kcd->second_cnt + i] = kcd->offsets_flags[newr*kcd->second_cnt + i];
 	      kcd->offsets_flags[newr*kcd->second_cnt + i] = off;
 	    }
@@ -2288,7 +2292,7 @@ static void KCD_RowMotion(GGadget *g,int oldr, int newr) {
 	}
     } else {
 	for ( i=0; i<kcd->first_cnt; ++i ) {
-	    int16 off = kcd->offsets[i*kcd->second_cnt + oldr];
+	    int16_t off = kcd->offsets[i*kcd->second_cnt + oldr];
 	    kcd->offsets[i*kcd->second_cnt + oldr] = kcd->offsets[i*kcd->second_cnt + newr];
 	    kcd->offsets[i*kcd->second_cnt + newr] = off;
 	    tempdt = kcd->adjusts[i*kcd->second_cnt + oldr];
@@ -2296,7 +2300,6 @@ static void KCD_RowMotion(GGadget *g,int oldr, int newr) {
 	    kcd->adjusts[i*kcd->second_cnt + newr] = tempdt;
 	    // Group kerning.
 	    if (kcd->offsets_flags) {
-	      int offflag = kcd->offsets_flags[i*kcd->second_cnt + oldr];
 	      kcd->offsets_flags[i*kcd->second_cnt + oldr] = kcd->offsets_flags[i*kcd->second_cnt + newr];
 	      kcd->offsets_flags[i*kcd->second_cnt + newr] = off;
 	    }
@@ -2335,7 +2338,7 @@ static void KCD_DeleteClass(GGadget *g,int whichclass) {
 	for ( i=whichclass+1; i<rows; ++i ) {
 	    memmove(kcd->offsets+(i-1)*kcd->second_cnt,
 		    kcd->offsets+i*kcd->second_cnt,
-		    kcd->second_cnt*sizeof(int16));
+		    kcd->second_cnt*sizeof(int16_t));
 	    memmove(kcd->adjusts+(i-1)*kcd->second_cnt,
 		    kcd->adjusts+i*kcd->second_cnt,
 		    kcd->second_cnt*sizeof(DeviceTable));
@@ -2347,7 +2350,7 @@ static void KCD_DeleteClass(GGadget *g,int whichclass) {
 	    }
 	}
 	// Group kerning.
-	kcd->offsets = realloc(kcd->offsets, (kcd->first_cnt-1)*kcd->second_cnt*sizeof(int16));
+	kcd->offsets = realloc(kcd->offsets, (kcd->first_cnt-1)*kcd->second_cnt*sizeof(int16_t));
 	kcd->adjusts = realloc(kcd->adjusts, (kcd->first_cnt-1)*kcd->second_cnt*sizeof(DeviceTable));
 	kcd->offsets_flags = realloc(kcd->offsets_flags, (kcd->first_cnt-1)*kcd->second_cnt*sizeof(int));
 	if (kcd->firsts_names) {
@@ -2361,7 +2364,7 @@ static void KCD_DeleteClass(GGadget *g,int whichclass) {
 
 	-- kcd->first_cnt;
     } else {
-	int16 *newoffs = malloc(kcd->first_cnt*(kcd->second_cnt-1)*sizeof(int16));
+	int16_t *newoffs = malloc(kcd->first_cnt*(kcd->second_cnt-1)*sizeof(int16_t));
 	DeviceTable *newadj = malloc(kcd->first_cnt*(kcd->second_cnt-1)*sizeof(DeviceTable));
 	int *newoffflags = NULL;
 	if (kcd->offsets_flags != NULL) newoffflags = malloc(kcd->first_cnt*(kcd->second_cnt-1)*sizeof(int));
@@ -2780,11 +2783,9 @@ void KernClassD(KernClass *kc, SplineFont *sf, int layer, int isv) {
     KernClassDlg *kcd;
     int i, j, kc_width, vi;
     int as, ds, ld, sbsize;
-    FontRequest rq;
     static unichar_t kernw[] = { '-', '1', '2', '3', '4', '5', 0 };
     GWindow gw;
     char titlebuf[300];
-    static GFont *font;
     char sepbuf[40], mkbuf[40];
     struct matrixinit firstmi, secondmi;
 
@@ -2806,8 +2807,8 @@ return;
 
     kcd->first_cnt = kc->first_cnt;
     kcd->second_cnt = kc->second_cnt;
-    kcd->offsets = malloc(kc->first_cnt*kc->second_cnt*sizeof(int16));
-    memcpy(kcd->offsets,kc->offsets,kc->first_cnt*kc->second_cnt*sizeof(int16));
+    kcd->offsets = malloc(kc->first_cnt*kc->second_cnt*sizeof(int16_t));
+    memcpy(kcd->offsets,kc->offsets,kc->first_cnt*kc->second_cnt*sizeof(int16_t));
     kcd->adjusts = malloc(kc->first_cnt*kc->second_cnt*sizeof(DeviceTable));
     memcpy(kcd->adjusts,kc->adjusts,kc->first_cnt*kc->second_cnt*sizeof(DeviceTable));
     for ( i=0; i<kcd->first_cnt*kcd->second_cnt; ++i ) {
@@ -2870,15 +2871,7 @@ return;
 
     kc_width = GDrawPixelsToPoints(NULL,pos.width*100/GGadgetScale(100));
 
-    if ( font==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.point_size = 12;
-	rq.weight = 400;
-	rq.utf8_family_name = MONO_UI_FAMILIES;
-	font = GDrawInstanciateFont(gw,&rq);
-	font = GResourceFindFont("KernClass.Font",font);
-    }
-    kcd->font = font;
+    kcd->font = kernclass_font.fi;
     GDrawWindowFontMetrics(gw,kcd->font,&as,&ds,&ld);
     kcd->fh = as+ds; kcd->as = as;
     GDrawSetFont(gw,kcd->font);
@@ -3188,7 +3181,7 @@ return( true );
 }
 
 static int KCL_Delete(GGadget *g, GEvent *e) {
-    int32 len; int i,j;
+    int32_t len; int i,j;
     GTextInfo **old, **new;
     GGadget *list;
     KernClassListDlg *kcld;
@@ -3563,7 +3556,7 @@ KernClass *SFFindKernClass(SplineFont *sf,SplineChar *first,SplineChar *last,
     if (allow_zero) pcnt *= 2;
     for ( i=0; i<=pcnt; ++i ) {
 	for ( kc=sf->kerns; kc!=NULL; kc=kc->next ) {
-	    uint8 kspecd = kc->firsts[0] != NULL;
+	    uint8_t kspecd = kc->firsts[0] != NULL;
 	    f = KCFindName(first->name,kc->firsts ,kc->first_cnt ,i % 2);
 	    l = KCFindName(last->name ,kc->seconds,kc->second_cnt,i % 2);
 	    if ( f!=-1 && l!=-1 && ( kspecd || f!=0 || l!=0 )  ) {
@@ -3585,7 +3578,7 @@ KernClass *SFFindVKernClass(SplineFont *sf,SplineChar *first,SplineChar *last,
     if (allow_zero) pcnt *= 2;
     for ( i=0; i<=pcnt; ++i ) {
 	for ( kc=sf->vkerns; kc!=NULL; kc=kc->next ) {
-	    uint8 kspecd = kc->firsts[0] != NULL;
+	    uint8_t kspecd = kc->firsts[0] != NULL;
 	    f = KCFindName(first->name,kc->firsts ,kc->first_cnt ,i % 2);
 	    l = KCFindName(last->name ,kc->seconds,kc->second_cnt,i % 2);
 	    if ( f!=-1 && l!=-1 && ( kspecd || f!=0 || l!=0 ) ) {

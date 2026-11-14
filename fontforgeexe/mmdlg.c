@@ -176,7 +176,7 @@ static int OrderedPositions(MMSet *mm,int instance_count, int isapple) {
     /* For a 1 axis system, check that the positions are ordered */
     int i;
 
-    if ( mm->positions[0]!=isapple?-1:0 )		/* must start at 0 */
+    if ( mm->positions[0]!=(isapple?-1:0) )		/* must start at 0 */
 return( false );
     if ( mm->positions[(instance_count-1)*4]!=1 )	/* and end at 1 */
 return( false );
@@ -205,7 +205,7 @@ return( uc_copy(""));
 return( uc_copy( buffer ));
 }
 
-static real DoDelta(int16 **deltas,int pt,int is_y,real *blends,int instance_count) {
+static real DoDelta(int16_t **deltas,int pt,int is_y,real *blends,int instance_count) {
     real diff = 0;
     int j;
 
@@ -218,7 +218,7 @@ return( diff );
 
 static void DistortChar(SplineFont *sf,MMSet *mm,int gid,real *blends) {
     int i,j,ptcnt;
-    int16 **deltas;
+    int16_t **deltas;
     SplineSet *ss;
     SplinePoint *sp;
     RefChar *ref;
@@ -284,7 +284,7 @@ return;
 static void DistortCvt(struct ttf_table *cvt,MMSet *mm,real *blends) {
     int i,j,ptcnt;
     real diff;
-    int16 **deltas;
+    int16_t **deltas;
 
     deltas = CvtFindDeltas(mm,&ptcnt);
     if ( deltas==NULL )
@@ -1100,7 +1100,7 @@ static void SetMasterToAxis(MMW *mmw, int initial) {
     isadobe = GGadgetIsChecked(GWidgetGetControl(mmw->subwins[mmw_counts],CID_Adobe));
     if ( cnt!=mmw->old_axis_count || isadobe!=mmw->old_adobe ) {
 	GGadget *list = GWidgetGetControl(mmw->subwins[mmw_counts],CID_MasterCount);
-	int32 len;
+	int32_t len;
 	GTextInfo **ti = GGadgetGetList(list,&len);
 	if ( isadobe ) {
 	    for ( i=0; i<MmMax; ++i )
@@ -1194,7 +1194,7 @@ static void MMDetachOld(SplineFont *sf) {
 static void MMW_Close(MMW *mmw) {
     int i;
     GGadget *list = GWidgetGetControl(mmw->subwins[mmw_named],CID_NamedDesigns);
-    int32 len;
+    int32_t len;
     GTextInfo **ti = GGadgetGetList(list,&len);
 
     for ( i=0; i<len; ++i )
@@ -1632,7 +1632,7 @@ return( NULL );
 	pt[-1] = ']';
 	ustyle = PickNameFromMacName(mmw->old->named_instances[i].names);
 	ti[i].bg = ti[i].fg = COLOR_DEFAULT;
-	ti[i].text = malloc((strlen(buffer)+3+strlen(ustyle))*sizeof(unichar_t));
+	ti[i].text = calloc(strlen(buffer)+3+c_strlen(ustyle), sizeof(unichar_t));
 	utf82u_strcpy(ti[i].text,ustyle);
 	uc_strcat(ti[i].text," ");
 	uc_strcat(ti[i].text,buffer);
@@ -1737,7 +1737,7 @@ static void MMW_DesignsSetup(MMW *mmw) {
 
 static void MMW_ParseNamedStyles(MMSet *setto,MMW *mmw) {
     GGadget *list = GWidgetGetControl(mmw->subwins[mmw_named],CID_NamedDesigns);
-    int32 i,j,len;
+    int32_t i,j,len;
     GTextInfo **ti = GGadgetGetList(list,&len);
     unichar_t *upt, *end;
 
@@ -1762,9 +1762,9 @@ static void MMW_ParseNamedStyles(MMSet *setto,MMW *mmw) {
 
 static void MMW_DoOK(MMW *mmw) {
     real weights[AppleMmMax+1];
-    real fbt;
+    real fbt = 0.;
     int err = false;
-    char *familyname, *fn, *origname=NULL;
+    char *familyname, *fn=NULL, *origname=NULL;
     int i,j;
     MMSet *setto, *dlgmm;
     FontView *fv = NULL;
@@ -1844,8 +1844,8 @@ continue;
 		mmw->old->instances[j] = NULL;
 	    }
 	if ( mmw->old->normal!=NULL ) {
-	    oldprivate = mmw->old->normal->private;
-	    mmw->old->normal->private = NULL;
+	    oldprivate = mmw->old->normal->private_dict;
+	    mmw->old->normal->private_dict = NULL;
 	    MMDetachOld(mmw->old->normal);
 	    mmw->old->normal = NULL;
 	}
@@ -1908,15 +1908,15 @@ continue;
     MMMatchGlyphs(setto);
     if ( setto->normal==NULL ) {
 	setto->normal = MMNewFont(setto,-1,familyname);
-	setto->normal->private = oldprivate;
+	setto->normal->private_dict = oldprivate;
     }
     if ( !isapple ) {
 	if ( fbt>0 && fbt<=1 ) {
 	    char buffer[20];
 	    sprintf(buffer,"%g", (double) fbt );
 	    if ( oldprivate==NULL )
-		setto->normal->private = calloc(1,sizeof(struct psdict));
-	    PSDictChangeEntry(setto->normal->private,"ForceBoldThreshold",buffer);
+		setto->normal->private_dict = calloc(1,sizeof(struct psdict));
+	    PSDictChangeEntry(setto->normal->private_dict,"ForceBoldThreshold",buffer);
 	}
     }
     if ( !isapple ) {
@@ -2024,7 +2024,7 @@ return;
 		    mmw->mm->positions[i*4+2] = ((j/9)%3==0) ? -1: ((j/9)%3==1) ? 0 : 1;
 		    mmw->mm->positions[i*4+3] = ((j/27)%3==0) ? -1: ((j/27)%3==1) ? 0 : 1;
 		}
-		/* Place the default psuedo-instance last */
+		/* Place the default pseudo-instance last */
 		mmw->mm->positions[i*4  ] = 0;
 		mmw->mm->positions[i*4+1] = 0;
 		mmw->mm->positions[i*4+2] = 0;
@@ -2281,7 +2281,7 @@ static int MMW_NamedDelete(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
 	GWindow gw = GGadgetGetWindow(g);
 	GGadget *list = GWidgetGetControl(gw,CID_NamedDesigns);
-	int32 i,len;
+	int32_t i,len;
 	GTextInfo **ti = GGadgetGetList(list,&len);
 	for ( i=0; i<len; ++i ) {
 	    if ( ti[i]->selected ) {
@@ -2298,7 +2298,7 @@ return( true );
 
 static int MMW_NamedSel(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_listselected ) {
-	int32 len;
+	int32_t len;
 	GTextInfo **ti = GGadgetGetList(g,&len);
 	GWindow gw = GGadgetGetWindow(g);
 	int i, sel_cnt=0;
@@ -3086,7 +3086,7 @@ void MMWizard(MMSet *mm) {
     ogcd[k++].creator = GLabelCreate;
 
     if ( mmw.old!=NULL &&
-	    (pt = PSDictHasEntry(mmw.old->normal->private,"ForceBoldThreshold"))!=NULL )
+	    (pt = PSDictHasEntry(mmw.old->normal->private_dict,"ForceBoldThreshold"))!=NULL )
 	olabels[k].text = (unichar_t *) pt;
     else
 	olabels[k].text = (unichar_t *) ".3";

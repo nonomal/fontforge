@@ -33,6 +33,7 @@
 #include "fvfonts.h"
 #include "gfile.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "lookups.h"
 #include "sfd.h"
 #include "sfundo.h"
@@ -43,6 +44,7 @@
 #include "ttf.h"
 #include "ustring.h"
 #include "utype.h"
+#include "gtk/simple_dialogs.hpp"
 
 #include <locale.h>
 #include <math.h>
@@ -56,6 +58,9 @@ void SFUntickAllPSTandKern(SplineFont *sf);
 int kernsLength( KernPair *kp );
 
 static int DEBUG = 1;
+GResFont kernformat_font = GRESFONT_INIT("400 12pt " SANS_UI_FAMILIES);
+GResFont kernformat_boldfont = GRESFONT_INIT("700 12pt " SANS_UI_FAMILIES);
+Color fi_originlinescol = 0x808080;
 
 /* ************************************************************************** */
 /* ******************************* UI routines ****************************** */
@@ -196,6 +201,7 @@ GTextInfo scripts[] = {
     { (unichar_t *) N_("Script|Batak"), NULL, 0, 0, (void *) CHR('b','a','t','k'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Bengali"), NULL, 0, 0, (void *) CHR('b','e','n','g'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Bengali2"), NULL, 0, 0, (void *) CHR('b','n','g','2'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Beria Erfe"), NULL, 0, 0, (void *) CHR('b','e','r','f'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Bhaiksuki"), NULL, 0, 0, (void *) CHR('b','h','k','s'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Bopomofo"), NULL, 0, 0, (void *) CHR('b','o','p','o'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) NU_("Brāhmī"), NULL, 0, 0, (void *) CHR('b','r','a','h'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -209,19 +215,24 @@ GTextInfo scripts[] = {
     { (unichar_t *) N_("Chakma"), NULL, 0, 0, (void *) CHR('c','a','k','m'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Cham"), NULL, 0, 0, (void *) CHR('c','h','a','m'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Cherokee"), NULL, 0, 0, (void *) CHR('c','h','e','r'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Script|Chorasmian"), NULL, 0, 0, (void *) CHR('c','h','r','s'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("CJK Ideographic"), NULL, 0, 0, (void *) CHR('h','a','n','i'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Coptic"), NULL, 0, 0, (void *) CHR('c','o','p','t'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Cypriot syllabary"), NULL, 0, 0, (void *) CHR('c','p','r','t'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Cypro-Minoan"), NULL, 0, 0, (void *) CHR('c','p','m','n'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Cyrillic"), NULL, 0, 0, (void *) CHR('c','y','r','l'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Default"), NULL, 0, 0, (void *) CHR('D','F','L','T'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Deseret (Mormon)"), NULL, 0, 0, (void *) CHR('d','s','r','t'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Devanagari"), NULL, 0, 0, (void *) CHR('d','e','v','a'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Devanagari2"), NULL, 0, 0, (void *) CHR('d','e','v','2'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Dives Akuru"), NULL, 0, 0, (void *) CHR('d','i','a','k'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Dogra"), NULL, 0, 0, (void *) CHR('d','o','g','r'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Duployan"), NULL, 0, 0, (void *) CHR('d','u','p','l'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Egyptian Hieroglyphs"), NULL, 0, 0, (void *) CHR('e','g','y','p'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Elbasan"), NULL, 0, 0, (void *) CHR('e','l','b','a'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Elymaic"), NULL, 0, 0, (void *) CHR('e','l','y','m'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Ethiopic"), NULL, 0, 0, (void *) CHR('e','t','h','i'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Garay"), NULL, 0, 0, (void *) CHR('g','a','r','a'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Georgian"), NULL, 0, 0, (void *) CHR('g','e','o','r'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Glagolitic"), NULL, 0, 0, (void *) CHR('g','l','a','g'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Gothic"), NULL, 0, 0, (void *) CHR('g','o','t','h'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -232,6 +243,7 @@ GTextInfo scripts[] = {
     { (unichar_t *) N_("Gunjala Gondi"), NULL, 0, 0, (void *) CHR('g','o','n','g'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Gurmukhi"), NULL, 0, 0, (void *) CHR('g','u','r','u'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Gurmukhi2"), NULL, 0, 0, (void *) CHR('g','u','r','2'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Gurung Khema"), NULL, 0, 0, (void *) CHR('g','u','k','h'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Hangul Jamo"), NULL, 0, 0, (void *) CHR('j','a','m','o'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Hangul"), NULL, 0, 0, (void *) CHR('h','a','n','g'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Hanifi Rohingya"), NULL, 0, 0, (void *) CHR('r','o','h','g'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -246,11 +258,14 @@ GTextInfo scripts[] = {
     { (unichar_t *) N_("Kaithi"), NULL, 0, 0, (void *) CHR('k','t','h','i'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Kannada"), NULL, 0, 0, (void *) CHR('k','n','d','a'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Kannada2"), NULL, 0, 0, (void *) CHR('k','n','d','2'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Script|Kawi"), NULL, 0, 0, (void *) CHR('k','a','w','i'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kayah Li"), NULL, 0, 0, (void *) CHR('k','a','l','i'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Kharosthi"), NULL, 0, 0, (void *) CHR('k','h','a','r'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Khitan Small Script"), NULL, 0, 0, (void *) CHR('k','i','t','s'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Khmer"), NULL, 0, 0, (void *) CHR('k','h','m','r'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Khojki"), NULL, 0, 0, (void *) CHR('k','h','o','j'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Khudawadi"), NULL, 0, 0, (void *) CHR('s','i','n','d'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Kirat Rai"), NULL, 0, 0, (void *) CHR('k','r','a','i'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Lao"), NULL, 0, 0, (void *) CHR('l','a','o',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Latin"), NULL, 0, 0, (void *) CHR('l','a','t','n'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) NU_("Lepcha (Róng)"), NULL, 0, 0, (void *) CHR('l','e','p','c'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -268,7 +283,7 @@ GTextInfo scripts[] = {
     { (unichar_t *) N_("Manichaean"), NULL, 0, 0, (void *) CHR('m','a','n','i'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Marchen"), NULL, 0, 0, (void *) CHR('m','a','r','c'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Masaram Gondi"), NULL, 0, 0, (void *) CHR('g','o','n','m'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
-    { (unichar_t *) N_("Mathematical Alphanumeric Symbols"), NULL, 0, 0, (void *) CHR('m','a','t','h'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Mathematical text layout"), NULL, 0, 0, (void *) CHR('m','a','t','h'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Medefaidrin"), NULL, 0, 0, (void *) CHR('m','e','d','f'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Meetei Mayek"), NULL, 0, 0, (void *) CHR('m','t','e','i'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Mende Kikakui"), NULL, 0, 0, (void *) CHR('m','e','n','d'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -280,14 +295,19 @@ GTextInfo scripts[] = {
     { (unichar_t *) N_("Mro"), NULL, 0, 0, (void *) CHR('m','r','o','o'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Multani"), NULL, 0, 0, (void *) CHR('m','u','l','t'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Musical"), NULL, 0, 0, (void *) CHR('m','u','s','c'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
-    { (unichar_t *) N_("Script|Myanmar"), NULL, 0, 0, (void *) CHR('m','y','m','2'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Script|Myanmar"), NULL, 0, 0, (void *) CHR('m','y','m','r'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Script|Myanmar2"), NULL, 0, 0, (void *) CHR('m','y','m','2'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("N'Ko"), NULL, 0, 0, (void *) CHR('n','k','o',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Nabataean"), NULL, 0, 0, (void *) CHR('n','b','a','t'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Nag Mundari"), NULL, 0, 0, (void *) CHR('n','a','g','m'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Nandinagari"), NULL, 0, 0, (void *) CHR('n','a','n','d'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("New Tai Lue"), NULL, 0, 0, (void *) CHR('t','a','l','u'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Newa"), NULL, 0, 0, (void *) CHR('n','e','w','a'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Nushu"), NULL, 0, 0, (void *) CHR('n','s','h','u'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Nyiakeng Puachue Hmong"), NULL, 0, 0, (void *) CHR('h','m','n','p'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Ogham"), NULL, 0, 0, (void *) CHR('o','g','a','m'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Ol Chiki"), NULL, 0, 0, (void *) CHR('o','l','c','k'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Ol Onal"), NULL, 0, 0, (void *) CHR('o','n','a','o'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Old Hungarian"), NULL, 0, 0, (void *) CHR('h','u','n','g'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Old Italic (Etruscan, Oscan, etc.)"), NULL, 0, 0, (void *) CHR('i','t','a','l'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Old North Arabian"), NULL, 0, 0, (void *) CHR('n','a','r','b'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -296,6 +316,7 @@ GTextInfo scripts[] = {
     { (unichar_t *) N_("Old Sogdian"), NULL, 0, 0, (void *) CHR('s','o','g','o'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Old South Arabian"), NULL, 0, 0, (void *) CHR('s','a','r','b'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Old Turkic"), NULL, 0, 0, (void *) CHR('o','r','k','h'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Old Uyghur"), NULL, 0, 0, (void *) CHR('o','u','g','r'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Oriya"), NULL, 0, 0, (void *) CHR('o','r','y','a'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Oriya2"), NULL, 0, 0, (void *) CHR('o','r','y','2'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Osage"), NULL, 0, 0, (void *) CHR('o','s','g','e'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -305,7 +326,6 @@ GTextInfo scripts[] = {
     { (unichar_t *) N_("Pau Cin Hau"), NULL, 0, 0, (void *) CHR('p','a','u','c'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Phags-pa"), NULL, 0, 0, (void *) CHR('p','h','a','g'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Phoenician"), NULL, 0, 0, (void *) CHR('p','h','n','x'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
-    { (unichar_t *) N_("Pollard Phonetic"), NULL, 0, 0, (void *) CHR('p','l','r','d'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Psalter Pahlavi"), NULL, 0, 0, (void *) CHR('p','h','l','p'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Rejang"), NULL, 0, 0, (void *) CHR('r','j','n','g'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Runic"), NULL, 0, 0, (void *) CHR('r','u','n','r'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -313,6 +333,7 @@ GTextInfo scripts[] = {
     { (unichar_t *) N_("Sharada"), NULL, 0, 0, (void *) CHR('s','h','r','d'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Shavian"), NULL, 0, 0, (void *) CHR('s','h','a','w'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Siddham"), NULL, 0, 0, (void *) CHR('s','i','d','d'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Script|Sidetic"), NULL, 0, 0, (void *) CHR('s','i','d','t'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Sutton SignWriting"), NULL, 0, 0, (void *) CHR('s','g','n','w'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Sinhala"), NULL, 0, 0, (void *) CHR('s','i','n','h'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Sogdian"), NULL, 0, 0, (void *) CHR('s','o','g','d'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -320,6 +341,7 @@ GTextInfo scripts[] = {
     { (unichar_t *) N_("Soyombo"), NULL, 0, 0, (void *) CHR('s','o','y','o'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Sumero-Akkadian Cuneiform"), NULL, 0, 0, (void *) CHR('x','s','u','x'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Sundanese"), NULL, 0, 0, (void *) CHR('s','u','n','d'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Script|Sunuwar"), NULL, 0, 0, (void *) CHR('s','u','n','u'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Syloti Nagri"), NULL, 0, 0, (void *) CHR('s','y','l','o'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Syriac"), NULL, 0, 0, (void *) CHR('s','y','r','c'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Tagalog"), NULL, 0, 0, (void *) CHR('t','g','l','g'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -327,7 +349,9 @@ GTextInfo scripts[] = {
     { (unichar_t *) N_("Tai Le"), NULL, 0, 0, (void *) CHR('t','a','l','e'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tai Tham"), NULL, 0, 0, (void *) CHR('l','a','n','a'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tai Viet"), NULL, 0, 0, (void *) CHR('t','a','v','t'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Script|Tai Yo"), NULL, 0, 0, (void *) CHR('t','a','y','o'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Takri"), NULL, 0, 0, (void *) CHR('t','a','k','r'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Tangsa"), NULL, 0, 0, (void *) CHR('t','n','s','a'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Tamil"), NULL, 0, 0, (void *) CHR('t','a','m','l'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Tamil2"), NULL, 0, 0, (void *) CHR('t','m','l','2'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tangut"), NULL, 0, 0, (void *) CHR('t','a','n','g'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -338,19 +362,28 @@ GTextInfo scripts[] = {
     { (unichar_t *) N_("Script|Tibetan"), NULL, 0, 0, (void *) CHR('t','i','b','t'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tifinagh (Berber)"), NULL, 0, 0, (void *) CHR('t','f','n','g'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tirhuta"), NULL, 0, 0, (void *) CHR('t','i','r','h'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Todhri"), NULL, 0, 0, (void *) CHR('t','o','d','r'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Tolong Siki"), NULL, 0, 0, (void *) CHR('t','o','l','s'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Toto"), NULL, 0, 0, (void *) CHR('t','o','t','o'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Tulu-Tigalari"), NULL, 0, 0, (void *) CHR('t','u','t','g'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Ugaritic"), NULL, 0, 0, (void *) CHR('u','g','a','r'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Vai"), NULL, 0, 0, (void *) CHR('v','a','i',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Vithkuqi"), NULL, 0, 0, (void *) CHR('v','i','t','h'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Script|Wancho"), NULL, 0, 0, (void *) CHR('w','c','h','o'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Warang Citi"), NULL, 0, 0, (void *) CHR('w','a','r','a'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Script|Yezidi"), NULL, 0, 0, (void *) CHR('y','e','z','i'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Script|Yi"), NULL, 0, 0, (void *) CHR('y','i',' ',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Zanabazar Square"), NULL, 0, 0, (void *) CHR('z','a','n','b'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     GTEXTINFO_EMPTY
 };
 
 GTextInfo languages[] = {
+    { (unichar_t *) N_("Eastern Abenaki"), NULL, 0, 0, (void *) CHR('A','A','Q',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Abaza"), NULL, 0, 0, (void *) CHR('A','B','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Abkhazian"), NULL, 0, 0, (void *) CHR('A','B','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Acholi"), NULL, 0, 0, (void *) CHR('A','C','H',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Achi"), NULL, 0, 0, (void *) CHR('A','C','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Cypriot Arabic"), NULL, 0, 0, (void *) CHR('A','C','Y',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Adyghe"), NULL, 0, 0, (void *) CHR('A','D','Y',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Afrikaans"), NULL, 0, 0, (void *) CHR('A','F','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Afar"), NULL, 0, 0, (void *) CHR('A','F','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -372,6 +405,8 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Assamese"), NULL, 0, 0, (void *) CHR('A','S','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Asturian"), NULL, 0, 0, (void *) CHR('A','S','T',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Athapaskan languages"), NULL, 0, 0, (void *) CHR('A','T','H',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Gros Ventre"), NULL, 0, 0, (void *) CHR('A','T','S',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Avatime"), NULL, 0, 0, (void *) CHR('A','V','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Avar"), NULL, 0, 0, (void *) CHR('A','V','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Awadhi"), NULL, 0, 0, (void *) CHR('A','W','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Aymara"), NULL, 0, 0, (void *) CHR('A','Y','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -388,6 +423,7 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Lang|Berber"), NULL, 0, 0, (void *) CHR('B','B','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Bench"), NULL, 0, 0, (void *) CHR('B','C','H',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Bible Cree"), NULL, 0, 0, (void *) CHR('B','C','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) NU_("Emberá-Baudó"), NULL, 0, 0, (void *) CHR('B','D','C',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Bandjalang"), NULL, 0, 0, (void *) CHR('B','D','Y',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Belarussian"), NULL, 0, 0, (void *) CHR('B','E','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Bemba"), NULL, 0, 0, (void *) CHR('B','E','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -428,6 +464,8 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Medumba"), NULL, 0, 0, (void *) CHR('B','Y','V',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kaqchikel"), NULL, 0, 0, (void *) CHR('C','A','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Catalan"), NULL, 0, 0, (void *) CHR('C','A','T',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Cayuga"), NULL, 0, 0, (void *) CHR('C','A','Y',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Chimila"), NULL, 0, 0, (void *) CHR('C','B','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Zamboanga Chavacano"), NULL, 0, 0, (void *) CHR('C','B','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Chinantec"), NULL, 0, 0, (void *) CHR('C','C','H','N'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Cebuano"), NULL, 0, 0, (void *) CHR('C','E','B',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -446,7 +484,9 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Cheyenne"), NULL, 0, 0, (void *) CHR('C','H','Y',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Western Cham"), NULL, 0, 0, (void *) CHR('C','J','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Eastern Cham"), NULL, 0, 0, (void *) CHR('C','J','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) NU_("Emberá-Chamí"), NULL, 0, 0, (void *) CHR('C','M','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Comorian"), NULL, 0, 0, (void *) CHR('C','M','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Comox"), NULL, 0, 0, (void *) CHR('C','O','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Coptic"), NULL, 0, 0, (void *) CHR('C','O','P',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Cornish"), NULL, 0, 0, (void *) CHR('C','O','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Corsican"), NULL, 0, 0, (void *) CHR('C','O','S',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -458,7 +498,10 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Church Slavonic"), NULL, 0, 0, (void *) CHR('C','S','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Czech"), NULL, 0, 0, (void *) CHR('C','S','Y',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Chittagonian"), NULL, 0, 0, (void *) CHR('C','T','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) NU_("Emberá-Catío"), NULL, 0, 0, (void *) CHR('C','T','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Wayanad Chetti"), NULL, 0, 0, (void *) CHR('C','T','T',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("San Blas Kuna"), NULL, 0, 0, (void *) CHR('C','U','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Dagbani"), NULL, 0, 0, (void *) CHR('D','A','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Danish"), NULL, 0, 0, (void *) CHR('D','A','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Dargwa"), NULL, 0, 0, (void *) CHR('D','A','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Dayi"), NULL, 0, 0, (void *) CHR('D','A','X',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -486,6 +529,7 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Efik"), NULL, 0, 0, (void *) CHR('E','F','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Greek"), NULL, 0, 0, (void *) CHR('E','L','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Eastern Maninkakan"), NULL, 0, 0, (void *) CHR('E','M','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) NU_("Northern Emberá"), NULL, 0, 0, (void *) CHR('E','M','P',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("English"), NULL, 0, 0, (void *) CHR('E','N','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Erzya"), NULL, 0, 0, (void *) CHR('E','R','Z',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Spanish"), NULL, 0, 0, (void *) CHR('E','S','P',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -538,6 +582,7 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Lang|Gujarati"), NULL, 0, 0, (void *) CHR('G','U','J',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Gusii"), NULL, 0, 0, (void *) CHR('G','U','Z',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Haitian"), NULL, 0, 0, (void *) CHR('H','A','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Haida"), NULL, 0, 0, (void *) CHR('H','A','I','0'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Halam"), NULL, 0, 0, (void *) CHR('H','A','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Harauti"), NULL, 0, 0, (void *) CHR('H','A','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Hausa"), NULL, 0, 0, (void *) CHR('H','A','U',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -545,17 +590,21 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Haya"), NULL, 0, 0, (void *) CHR('H','A','Y',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Hazaragi"), NULL, 0, 0, (void *) CHR('H','A','Z',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Hammer-Banna"), NULL, 0, 0, (void *) CHR('H','B','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Heiltsuk"), NULL, 0, 0, (void *) CHR('H','E','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Herero"), NULL, 0, 0, (void *) CHR('H','E','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Hiligaynon"), NULL, 0, 0, (void *) CHR('H','I','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Hindi"), NULL, 0, 0, (void *) CHR('H','I','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("High Mari"), NULL, 0, 0, (void *) CHR('H','M','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("A-Hmao"), NULL, 0, 0, (void *) CHR('H','M','D',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Hmong"), NULL, 0, 0, (void *) CHR('H','M','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Hiri Motu"), NULL, 0, 0, (void *) CHR('H','M','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Hmong Shuat"), NULL, 0, 0, (void *) CHR('H','M','Z',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Hindko"), NULL, 0, 0, (void *) CHR('H','N','D',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Ho"), NULL, 0, 0, (void *) CHR('H','O',' ',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Harari"), NULL, 0, 0, (void *) CHR('H','R','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Croatian"), NULL, 0, 0, (void *) CHR('H','R','V',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Hungarian"), NULL, 0, 0, (void *) CHR('H','U','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Halkomelem"), NULL, 0, 0, (void *) CHR('H','U','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Armenian"), NULL, 0, 0, (void *) CHR('H','Y','E',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Armenian East"), NULL, 0, 0, (void *) CHR('H','Y','E','0'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Iban"), NULL, 0, 0, (void *) CHR('I','B','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -569,10 +618,12 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Indonesian"), NULL, 0, 0, (void *) CHR('I','N','D',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Ingush"), NULL, 0, 0, (void *) CHR('I','N','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Inuktitut"), NULL, 0, 0, (void *) CHR('I','N','U',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Nunavik Inuktitut"), NULL, 0, 0, (void *) CHR('I','N','U','K'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Inupiat"), NULL, 0, 0, (void *) CHR('I','P','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("IPA usage"), NULL, 0, 0, (void *) CHR('I','P','P','H'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Irish"), NULL, 0, 0, (void *) CHR('I','R','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Irish Traditional"), NULL, 0, 0, (void *) CHR('I','R','T',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Irula"), NULL, 0, 0, (void *) CHR('I','R','U',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Icelandic"), NULL, 0, 0, (void *) CHR('I','S','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Inari Sami"), NULL, 0, 0, (void *) CHR('I','S','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Italian"), NULL, 0, 0, (void *) CHR('I','T','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -582,6 +633,7 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Lang|Javanese"), NULL, 0, 0, (void *) CHR('J','A','V',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lojban"), NULL, 0, 0, (void *) CHR('J','B','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Krymchak"), NULL, 0, 0, (void *) CHR('J','C','T',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Judeo-Tat"), NULL, 0, 0, (void *) CHR('J','D','T',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Yiddish"), NULL, 0, 0, (void *) CHR('J','I','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Ladino"), NULL, 0, 0, (void *) CHR('J','U','D',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Jula"), NULL, 0, 0, (void *) CHR('J','U','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -592,12 +644,15 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Lang|Kannada"), NULL, 0, 0, (void *) CHR('K','A','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Karachay"), NULL, 0, 0, (void *) CHR('K','A','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Georgian"), NULL, 0, 0, (void *) CHR('K','A','T',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Kawi"), NULL, 0, 0, (void *) CHR('K','A','W',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kazakh"), NULL, 0, 0, (void *) CHR('K','A','Z',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) NU_("Kadiwéu"), NULL, 0, 0, (void *) CHR('K','B','C',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Makonde"), NULL, 0, 0, (void *) CHR('K','D','E',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kabuverdianu"), NULL, 0, 0, (void *) CHR('K','E','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kebena"), NULL, 0, 0, (void *) CHR('K','E','B',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kekchi"), NULL, 0, 0, (void *) CHR('K','E','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Khutsuri Georgian"), NULL, 0, 0, (void *) CHR('K','G','E',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Kube"), NULL, 0, 0, (void *) CHR('K','G','F',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Khakass"), NULL, 0, 0, (void *) CHR('K','H','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Khanty-Kazim"), NULL, 0, 0, (void *) CHR('K','H','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Khmer"), NULL, 0, 0, (void *) CHR('K','H','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -610,11 +665,13 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Kisii"), NULL, 0, 0, (void *) CHR('K','I','S',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kirmanjki"), NULL, 0, 0, (void *) CHR('K','I','U',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Southern Kiwai"), NULL, 0, 0, (void *) CHR('K','J','D',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Khinalug"), NULL, 0, 0, (void *) CHR('K','J','J',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Eastern Pwo Karen"), NULL, 0, 0, (void *) CHR('K','J','P',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Bumthangkha"), NULL, 0, 0, (void *) CHR('K','J','Z',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kokni"), NULL, 0, 0, (void *) CHR('K','K','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kalmyk"), NULL, 0, 0, (void *) CHR('K','L','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kamba"), NULL, 0, 0, (void *) CHR('K','M','B',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) NU_("Kâte"), NULL, 0, 0, (void *) CHR('K','M','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kumaoni"), NULL, 0, 0, (void *) CHR('K','M','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Komo"), NULL, 0, 0, (void *) CHR('K','M','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Komso"), NULL, 0, 0, (void *) CHR('K','M','S',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -641,6 +698,7 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Ripuarian"), NULL, 0, 0, (void *) CHR('K','S','H','0'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Khasi"), NULL, 0, 0, (void *) CHR('K','S','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kildin Sami"), NULL, 0, 0, (void *) CHR('K','S','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Khamyang"), NULL, 0, 0, (void *) CHR('K','S','U',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("S'gaw Karen"), NULL, 0, 0, (void *) CHR('K','S','W',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kuanyama"), NULL, 0, 0, (void *) CHR('K','U','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kui"), NULL, 0, 0, (void *) CHR('K','U','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -649,6 +707,8 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Kurdish"), NULL, 0, 0, (void *) CHR('K','U','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kurukh"), NULL, 0, 0, (void *) CHR('K','U','U',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kuy"), NULL, 0, 0, (void *) CHR('K','U','Y',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Geba Karen"), NULL, 0, 0, (void *) CHR('K','V','Q',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Kwak'wala"), NULL, 0, 0, (void *) CHR('K','W','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Koryak"), NULL, 0, 0, (void *) CHR('K','Y','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Western Kayah"), NULL, 0, 0, (void *) CHR('K','Y','U',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Ladin"), NULL, 0, 0, (void *) CHR('L','A','D',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -660,11 +720,13 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Laz"), NULL, 0, 0, (void *) CHR('L','A','Z',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("L-Cree"), NULL, 0, 0, (void *) CHR('L','C','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Ladakhi"), NULL, 0, 0, (void *) CHR('L','D','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Lelemi"), NULL, 0, 0, (void *) CHR('L','E','F',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lezgi"), NULL, 0, 0, (void *) CHR('L','E','Z',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Ligurian"), NULL, 0, 0, (void *) CHR('L','I','J',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Limburgish"), NULL, 0, 0, (void *) CHR('L','I','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lingala"), NULL, 0, 0, (void *) CHR('L','I','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Lisu"), NULL, 0, 0, (void *) CHR('L','I','S',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Liv"), NULL, 0, 0, (void *) CHR('L','I','V',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lampung"), NULL, 0, 0, (void *) CHR('L','J','P',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Laki"), NULL, 0, 0, (void *) CHR('L','K','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Low Mari"), NULL, 0, 0, (void *) CHR('L','M','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -672,6 +734,7 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Lombard"), NULL, 0, 0, (void *) CHR('L','M','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lomwe"), NULL, 0, 0, (void *) CHR('L','M','W',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Loma"), NULL, 0, 0, (void *) CHR('L','O','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Lipo"), NULL, 0, 0, (void *) CHR('L','P','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Luri"), NULL, 0, 0, (void *) CHR('L','R','C',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lower Sorbian"), NULL, 0, 0, (void *) CHR('L','S','B',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lule Sami"), NULL, 0, 0, (void *) CHR('L','S','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -682,6 +745,7 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Ganda"), NULL, 0, 0, (void *) CHR('L','U','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Luyia"), NULL, 0, 0, (void *) CHR('L','U','H',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Luo"), NULL, 0, 0, (void *) CHR('L','U','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Lushootseed"), NULL, 0, 0, (void *) CHR('L','U','T',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Latvian"), NULL, 0, 0, (void *) CHR('L','V','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Madura"), NULL, 0, 0, (void *) CHR('M','A','D',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Magahi"), NULL, 0, 0, (void *) CHR('M','A','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -702,6 +766,7 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Mandar"), NULL, 0, 0, (void *) CHR('M','D','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Me'en"), NULL, 0, 0, (void *) CHR('M','E','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Meru"), NULL, 0, 0, (void *) CHR('M','E','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Mano"), NULL, 0, 0, (void *) CHR('M','E','V',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Pattani Malay"), NULL, 0, 0, (void *) CHR('M','F','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Morisyen"), NULL, 0, 0, (void *) CHR('M','F','E',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Minangkabau"), NULL, 0, 0, (void *) CHR('M','I','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -723,6 +788,7 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Moksha"), NULL, 0, 0, (void *) CHR('M','O','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Moldavian"), NULL, 0, 0, (void *) CHR('M','O','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Mon"), NULL, 0, 0, (void *) CHR('M','O','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Thailand Mon"), NULL, 0, 0, (void *) CHR('M','O','N','T'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Moroccan"), NULL, 0, 0, (void *) CHR('M','O','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Mossi"), NULL, 0, 0, (void *) CHR('M','O','S',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Maori"), NULL, 0, 0, (void *) CHR('M','R','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -758,18 +824,22 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Dutch"), NULL, 0, 0, (void *) CHR('N','L','D',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Nimadi"), NULL, 0, 0, (void *) CHR('N','O','E',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Nogai"), NULL, 0, 0, (void *) CHR('N','O','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Numanggang"), NULL, 0, 0, (void *) CHR('N','O','P',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Norwegian"), NULL, 0, 0, (void *) CHR('N','O','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Novial"), NULL, 0, 0, (void *) CHR('N','O','V',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Northern Sami"), NULL, 0, 0, (void *) CHR('N','S','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Northern Sotho"), NULL, 0, 0, (void *) CHR('N','S','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Northern Tai"), NULL, 0, 0, (void *) CHR('N','T','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Esperanto"), NULL, 0, 0, (void *) CHR('N','T','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Nuu-chah-nulth"), NULL, 0, 0, (void *) CHR('N','U','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Nyamwezi"), NULL, 0, 0, (void *) CHR('N','Y','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Norwegian Nynorsk"), NULL, 0, 0, (void *) CHR('N','Y','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Mbembe Tigon"), NULL, 0, 0, (void *) CHR('N','Z','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Occitan"), NULL, 0, 0, (void *) CHR('O','C','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Oji-Cree"), NULL, 0, 0, (void *) CHR('O','C','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Ojibway"), NULL, 0, 0, (void *) CHR('O','J','B',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Oneida"), NULL, 0, 0, (void *) CHR('O','N','E',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Onondaga"), NULL, 0, 0, (void *) CHR('O','N','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Odia"), NULL, 0, 0, (void *) CHR('O','R','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Oromo"), NULL, 0, 0, (void *) CHR('O','R','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Ossetian"), NULL, 0, 0, (void *) CHR('O','S','S',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -790,6 +860,7 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Norfolk"), NULL, 0, 0, (void *) CHR('P','I','H',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Filipino"), NULL, 0, 0, (void *) CHR('P','I','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Palaung"), NULL, 0, 0, (void *) CHR('P','L','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) NU_("Pilagá"), NULL, 0, 0, (void *) CHR('P','L','G','0'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Polish"), NULL, 0, 0, (void *) CHR('P','L','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Piemontese"), NULL, 0, 0, (void *) CHR('P','M','S',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Western Panjabi"), NULL, 0, 0, (void *) CHR('P','N','B',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -810,6 +881,7 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("R-Cree"), NULL, 0, 0, (void *) CHR('R','C','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Rejang"), NULL, 0, 0, (void *) CHR('R','E','J',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Riang"), NULL, 0, 0, (void *) CHR('R','I','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Rohingya"), NULL, 0, 0, (void *) CHR('R','H','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tarifit"), NULL, 0, 0, (void *) CHR('R','I','F',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Ritarungo"), NULL, 0, 0, (void *) CHR('R','I','T',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Arakwal"), NULL, 0, 0, (void *) CHR('R','K','W',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -831,8 +903,10 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Sicilian"), NULL, 0, 0, (void *) CHR('S','C','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Scots"), NULL, 0, 0, (void *) CHR('S','C','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("North Slavey"), NULL, 0, 0, (void *) CHR('S','C','S',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Seneca"), NULL, 0, 0, (void *) CHR('S','E','E',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Sekota"), NULL, 0, 0, (void *) CHR('S','E','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Selkup"), NULL, 0, 0, (void *) CHR('S','E','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Small Flowery Miao"), NULL, 0, 0, (void *) CHR('S','F','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Old Irish"), NULL, 0, 0, (void *) CHR('S','G','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Sango"), NULL, 0, 0, (void *) CHR('S','G','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Samogitian"), NULL, 0, 0, (void *) CHR('S','G','S',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -841,6 +915,9 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Sibe"), NULL, 0, 0, (void *) CHR('S','I','B',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Sidamo"), NULL, 0, 0, (void *) CHR('S','I','D',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Silte Gurage"), NULL, 0, 0, (void *) CHR('S','I','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Epena"), NULL, 0, 0, (void *) CHR('S','J','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Pite Sami"), NULL, 0, 0, (void *) CHR('S','J','E',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Ume Sami"), NULL, 0, 0, (void *) CHR('S','J','U',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Skolt Sami"), NULL, 0, 0, (void *) CHR('S','K','S',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Slovak"), NULL, 0, 0, (void *) CHR('S','K','Y',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Slavey"), NULL, 0, 0, (void *) CHR('S','L','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -862,6 +939,7 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Serer"), NULL, 0, 0, (void *) CHR('S','R','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("South Slavey"), NULL, 0, 0, (void *) CHR('S','S','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Southern Sami"), NULL, 0, 0, (void *) CHR('S','S','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Straits Salish"), NULL, 0, 0, (void *) CHR('S','T','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Saterland Frisian"), NULL, 0, 0, (void *) CHR('S','T','Q',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Sukuma"), NULL, 0, 0, (void *) CHR('S','U','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Sundanese"), NULL, 0, 0, (void *) CHR('S','U','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -882,8 +960,11 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Tabasaran"), NULL, 0, 0, (void *) CHR('T','A','B',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tajiki"), NULL, 0, 0, (void *) CHR('T','A','J',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Tamil"), NULL, 0, 0, (void *) CHR('T','A','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Tamasheq"), NULL, 0, 0, (void *) CHR('T','A','Q',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tatar"), NULL, 0, 0, (void *) CHR('T','A','T',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Tobo"), NULL, 0, 0, (void *) CHR('T','B','V',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("TH-Cree"), NULL, 0, 0, (void *) CHR('T','C','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) NU_("Emberá-Tadó"), NULL, 0, 0, (void *) CHR('T','D','C',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Dehong Dai"), NULL, 0, 0, (void *) CHR('T','D','D',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Telugu"), NULL, 0, 0, (void *) CHR('T','E','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tetum"), NULL, 0, 0, (void *) CHR('T','E','T',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -893,10 +974,16 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Tigrinya"), NULL, 0, 0, (void *) CHR('T','G','Y',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Thai"), NULL, 0, 0, (void *) CHR('T','H','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tahitian"), NULL, 0, 0, (void *) CHR('T','H','T',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Thompson"), NULL, 0, 0, (void *) CHR('T','H','P',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Tahaggart Tamahaq"), NULL, 0, 0, (void *) CHR('T','H','V',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Tayart Tamajeq"), NULL, 0, 0, (void *) CHR('T','H','Z',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Lang|Tibetan"), NULL, 0, 0, (void *) CHR('T','I','B',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tiv"), NULL, 0, 0, (void *) CHR('T','I','V',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Tai Laing"), NULL, 0, 0, (void *) CHR('T','J','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Turkmen"), NULL, 0, 0, (void *) CHR('T','K','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Tlingit"), NULL, 0, 0, (void *) CHR('T','L','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tamashek"), NULL, 0, 0, (void *) CHR('T','M','H',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Talysh"), NULL, 0, 0, (void *) CHR('T','L','Y',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Temne"), NULL, 0, 0, (void *) CHR('T','M','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tswana"), NULL, 0, 0, (void *) CHR('T','N','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tundra Enets"), NULL, 0, 0, (void *) CHR('T','N','E',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -907,18 +994,22 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Turkish"), NULL, 0, 0, (void *) CHR('T','R','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tsonga"), NULL, 0, 0, (void *) CHR('T','S','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tshangla"), NULL, 0, 0, (void *) CHR('T','S','J',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Tawallammat Tamajaq"), NULL, 0, 0, (void *) CHR('T','T','Q',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Turoyo Aramaic"), NULL, 0, 0, (void *) CHR('T','U','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
-    { (unichar_t *) N_("Tumbuka"), NULL, 0, 0, (void *) CHR('T','U','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
-    { (unichar_t *) N_("Tulu"), NULL, 0, 0, (void *) CHR('T','U','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Tulu"), NULL, 0, 0, (void *) CHR('T','U','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Tumbuka"), NULL, 0, 0, (void *) CHR('T','U','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Tuscarora"), NULL, 0, 0, (void *) CHR('T','U','S',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tuvin"), NULL, 0, 0, (void *) CHR('T','U','V',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tuvalu"), NULL, 0, 0, (void *) CHR('T','V','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Twi"), NULL, 0, 0, (void *) CHR('T','W','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) NU_("Tày"), NULL, 0, 0, (void *) CHR('T','Y','Z',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tamazight"), NULL, 0, 0, (void *) CHR('T','Z','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Tzotzil"), NULL, 0, 0, (void *) CHR('T','Z','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Udi"), NULL, 0, 0, (void *) CHR('U','D','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Udmurt"), NULL, 0, 0, (void *) CHR('U','D','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Ukrainian"), NULL, 0, 0, (void *) CHR('U','K','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Umbundu"), NULL, 0, 0, (void *) CHR('U','M','B',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Uralic Phonetic Alphabet"), NULL, 0, 0, (void *) CHR('U','P','P','H'), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Urdu"), NULL, 0, 0, (void *) CHR('U','R','D',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Upper Sorbian"), NULL, 0, 0, (void *) CHR('U','S','B',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Uyghur"), NULL, 0, 0, (void *) CHR('U','Y','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -931,24 +1022,34 @@ GTextInfo languages[] = {
     { (unichar_t *) N_("Wa"), NULL, 0, 0, (void *) CHR('W','A',' ',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Wagdi"), NULL, 0, 0, (void *) CHR('W','A','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Waray-Waray"), NULL, 0, 0, (void *) CHR('W','A','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Wakhi"), NULL, 0, 0, (void *) CHR('W','B','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Waci Gbe"), NULL, 0, 0, (void *) CHR('W','C','I',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("West-Cree"), NULL, 0, 0, (void *) CHR('W','C','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Wendat"), NULL, 0, 0, (void *) CHR('W','D','T',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Welsh"), NULL, 0, 0, (void *) CHR('W','E','L',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Wolof"), NULL, 0, 0, (void *) CHR('W','L','F',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Walloon"), NULL, 0, 0, (void *) CHR('W','L','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Mewati"), NULL, 0, 0, (void *) CHR('W','T','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Wyandot"), NULL, 0, 0, (void *) CHR('W','Y','N',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) NU_("Lü"), NULL, 0, 0, (void *) CHR('X','B','D',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Xhosa"), NULL, 0, 0, (void *) CHR('X','H','S',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Minjangbal"), NULL, 0, 0, (void *) CHR('X','J','B',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Khengkha"), NULL, 0, 0, (void *) CHR('X','K','F',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Soga"), NULL, 0, 0, (void *) CHR('X','O','G',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Kpelle (Liberia)"), NULL, 0, 0, (void *) CHR('X','P','E',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Bette Kuruma"), NULL, 0, 0, (void *) CHR('X','U','B',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Jennu Kuruma"), NULL, 0, 0, (void *) CHR('X','U','J',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Sakha"), NULL, 0, 0, (void *) CHR('Y','A','K',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Yao"), NULL, 0, 0, (void *) CHR('Y','A','O',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Yapese"), NULL, 0, 0, (void *) CHR('Y','A','P',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Yoruba"), NULL, 0, 0, (void *) CHR('Y','B','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Y-Cree"), NULL, 0, 0, (void *) CHR('Y','C','R',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Gepo"), NULL, 0, 0, (void *) CHR('Y','G','P',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Yi Classic"), NULL, 0, 0, (void *) CHR('Y','I','C',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Yi Modern"), NULL, 0, 0, (void *) CHR('Y','I','M',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Aluo"), NULL, 0, 0, (void *) CHR('Y','N','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Havasupai-Walapai-Yavapai"), NULL, 0, 0, (void *) CHR('Y','U','F',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
+    { (unichar_t *) N_("Wuding-Luquan Yi"), NULL, 0, 0, (void *) CHR('Y','W','Q',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Zealandic"), NULL, 0, 0, (void *) CHR('Z','E','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Standard Moroccan Tamazight"), NULL, 0, 0, (void *) CHR('Z','G','H',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
     { (unichar_t *) N_("Zhuang"), NULL, 0, 0, (void *) CHR('Z','H','A',' '), NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0'},
@@ -963,13 +1064,13 @@ GTextInfo languages[] = {
     GTEXTINFO_EMPTY
 };
 
-static char *LK_LangsDlg(GGadget *, int r, int c);
+static char *LK_GTKLangsDlg(GGadget *, int r, int c);
 static char *LK_ScriptsDlg(GGadget *, int r, int c);
 static struct col_init scriptci[] = {
 /* GT: English uses "script" to mean a general writing system (latin, greek, kanji) */
 /* GT: and the cursive handwriting style. Here we mean the general writing system. */
     { me_stringchoicetag , NULL, scripts, NULL, N_("writing system|Script") },
-    { me_funcedit, LK_LangsDlg, NULL, NULL, N_("Language(s)") },
+    { me_funcedit, LK_GTKLangsDlg, NULL, NULL, N_("Language(s)") },
     COL_INIT_EMPTY
 };
 static struct col_init featureci[] = {
@@ -977,6 +1078,15 @@ static struct col_init featureci[] = {
     { me_funcedit, LK_ScriptsDlg, NULL, NULL, N_("Script(s) & Language(s)") },
     COL_INIT_EMPTY
 };
+
+int cmp_item_by_name(const void *a, const void *b) {
+    /* TODO: strcmp() doesn't consider linguistic comparison, e.g. putting
+       accented and non-accented character together. Consider using
+       g_utf8_collate() with an appropriate locale. */
+    int res = strcmp((const char *)((const GTextInfo *)a)->text,
+                     (const char *)((const GTextInfo *)b)->text);
+    return res;
+}
 
 void LookupUIInit(void) {
     static int done = false;
@@ -994,6 +1104,13 @@ return;
 	    if ( needswork[j][i].text!=NULL )
 		needswork[j][i].text = (unichar_t *) S_((char *) needswork[j][i].text);
     }
+
+    /* Sort scripts and languages by localized name */
+    size_t n_scripts = sizeof(scripts) / sizeof(scripts[0]) - 1;    
+    qsort(scripts, n_scripts, sizeof(GTextInfo), cmp_item_by_name);
+    size_t n_languages = sizeof(languages) / sizeof(languages[0]) - 1;    
+    qsort(languages, n_languages, sizeof(GTextInfo), cmp_item_by_name);
+
     LookupInit();
 
     featureci[0].title = S_(featureci[0].title);
@@ -1028,181 +1145,18 @@ struct lookup_dlg {
     char *scriptret;
 };
 
-static int langs_e_h(GWindow gw, GEvent *event) {
-    int *done = GDrawGetUserData(gw);
-
-    if ( event->type==et_close ) {
-	*done = true;
-    } else if ( event->type==et_char ) {
-	if ( event->u.chr.keysym == GK_F1 || event->u.chr.keysym == GK_Help ) {
-	    help("ui/dialogs/lookups.html", "#lookups-scripts-dlg");
-return( true );
-	}
-return( false );
-    } else if ( event->type==et_controlevent && event->u.control.subtype == et_buttonactivate ) {
-	switch ( GGadgetGetCid(event->u.control.g)) {
-	  case CID_OK:
-	    *done = 2;
-	  break;
-	  case CID_Cancel:
-	    *done = true;
-	  break;
-	}
-    }
-return( true );
-}
-
-static char *LK_LangsDlg(GGadget *g, int r, int c) {
-    int rows, i;
+static char *LK_GTKLangsDlg(GGadget *g, int r, int c) {
+    LanguageRec lang_recs[sizeof(languages) / sizeof(languages[0])];
+    int rows;
     struct matrix_data *strings = GMatrixEditGet(g, &rows);
-    char *langstr = strings[2*r+c].u.md_str, *pt, *start;
-    unsigned char tagstr[4], warnstr[8];
-    uint32 tag;
-    int warn_cnt = 0;
-    int j,done=0;
-    GWindowAttrs wattrs;
-    GGadgetCreateData gcd[5], *varray[6], *harray[7], boxes[3];
-    GTextInfo label[5];
-    GRect pos;
-    GWindow gw;
-    int32 len;
-    GTextInfo **ti;
-    char *ret;
+    char *langstr = strings[2*r+c].u.md_str;
 
-    for ( i=0; languages[i].text!=NULL; ++i )
-	languages[i].selected = false;
-
-    for ( start= langstr; *start; ) {
-	memset(tagstr,' ',sizeof(tagstr));
-	for ( pt=start, j=0; *pt!='\0' && *pt!=','; ++pt, ++j ) {
-	    if ( j<4 )
-		tagstr[j] = *pt;
-	}
-	if ( *pt==',' ) ++pt;
-	tag = (tagstr[0]<<24) | (tagstr[1]<<16) | (tagstr[2]<<8) | tagstr[3];
-	for ( i=0; languages[i].text!=NULL; ++i )
-	    if ( languages[i].userdata == (void *) (intpt) tag ) {
-		languages[i].selected = true;
-	break;
-	    }
-	if ( languages[i].text==NULL ) {
-	    ++warn_cnt;
-	    memcpy(warnstr,tagstr,4);
-	    warnstr[4] = '\0';
-	}
-	start = pt;
-    }
-    if ( warn_cnt!=0 ) {
-	if ( warn_cnt==1 )
-	    ff_post_error(_("Unknown Language"),_("The language, '%s', is not in the list of known languages and will be omitted"), warnstr );
-	else
-	    ff_post_error(_("Unknown Language"),_("Several language tags, including '%s', are not in the list of known languages and will be omitted"), warnstr );
+    for (int i=0; i < sizeof(languages) / sizeof(languages[0]); ++i ) {
+        lang_recs[i].name = (const char*)languages[i].text;
+	lang_recs[i].tag = (uint32_t)(intptr_t)languages[i].userdata;
     }
 
-	memset(&wattrs,0,sizeof(wattrs));
-	wattrs.mask = wam_events|wam_cursor|wam_utf8_wtitle|wam_undercursor|wam_isdlg|wam_restrict;
-	wattrs.event_masks = ~(1<<et_charup);
-	wattrs.restrict_input_to_me = 1;
-	wattrs.undercursor = 1;
-	wattrs.cursor = ct_pointer;
-	wattrs.utf8_window_title =  _("Language List");
-	wattrs.is_dlg = true;
-	pos.x = pos.y = 0;
-	pos.width = GGadgetScale(GDrawPointsToPixels(NULL,150));
-	pos.height = GDrawPointsToPixels(NULL,193);
-	gw = GDrawCreateTopWindow(NULL,&pos,langs_e_h,&done,&wattrs);
-
-	memset(&gcd,0,sizeof(gcd));
-	memset(&boxes,0,sizeof(boxes));
-	memset(&label,0,sizeof(label));
-
-	i = 0;
-	gcd[i].gd.pos.x = 10; gcd[i].gd.pos.y = 5;
-	gcd[i].gd.pos.height = 12*12+6;
-	gcd[i].gd.flags = gg_enabled|gg_visible|gg_list_alphabetic|gg_list_multiplesel;
-	gcd[i].gd.u.list = languages;
-	gcd[i].gd.cid = 0;
-	gcd[i].gd.popup_msg = _(
-	    "Select as many languages as needed\n"
-	    "Hold down the control key when clicking\n"
-	    "to make disjoint selections.");
-	varray[0] = &gcd[i]; varray[1] = NULL;
-	gcd[i++].creator = GListCreate;
-
-	gcd[i].gd.pos.x = 15-3; gcd[i].gd.pos.y = gcd[i-1].gd.pos.y+gcd[i-1].gd.pos.height+5;
-	gcd[i].gd.pos.width = -1; gcd[i].gd.pos.height = 0;
-	gcd[i].gd.flags = gg_visible | gg_enabled | gg_but_default;
-	label[i].text = (unichar_t *) _("_OK");
-	label[i].text_is_1byte = true;
-	label[i].text_in_resource = true;
-	gcd[i].gd.mnemonic = 'O';
-	gcd[i].gd.label = &label[i];
-	gcd[i].gd.cid = CID_OK;
-	harray[0] = GCD_Glue; harray[1] = &gcd[i]; harray[2] = GCD_Glue;
-	gcd[i++].creator = GButtonCreate;
-
-	gcd[i].gd.pos.x = -15; gcd[i].gd.pos.y = gcd[i-1].gd.pos.y+3;
-	gcd[i].gd.pos.width = -1; gcd[i].gd.pos.height = 0;
-	gcd[i].gd.flags = gg_visible | gg_enabled | gg_but_cancel;
-	label[i].text = (unichar_t *) _("_Cancel");
-	label[i].text_is_1byte = true;
-	label[i].text_in_resource = true;
-	gcd[i].gd.label = &label[i];
-	gcd[i].gd.mnemonic = 'C';
-	gcd[i].gd.cid = CID_Cancel;
-	harray[3] = GCD_Glue; harray[4] = &gcd[i]; harray[5] = GCD_Glue; harray[6] = NULL;
-	gcd[i++].creator = GButtonCreate;
-
-	boxes[2].gd.flags = gg_enabled|gg_visible;
-	boxes[2].gd.u.boxelements = harray;
-	boxes[2].creator = GHBoxCreate;
-	varray[2] = &boxes[2]; varray[3] = NULL; varray[4] = NULL;
-
-	boxes[0].gd.pos.x = boxes[0].gd.pos.y = 2;
-	boxes[0].gd.flags = gg_enabled|gg_visible;
-	boxes[0].gd.u.boxelements = varray;
-	boxes[0].creator = GHVGroupCreate;
-
-	GGadgetsCreate(gw,boxes);
-	GHVBoxSetExpandableRow(boxes[0].ret,0);
-	GHVBoxSetExpandableCol(boxes[2].ret,gb_expandgluesame);
-	GHVBoxFitWindow(boxes[0].ret);
-
-    GDrawSetVisible(gw,true);
- retry:
-    while ( !done )
-	GDrawProcessOneEvent(NULL);
-    ret = NULL;
-    ti = GGadgetGetList(gcd[0].ret,&len);
-    if ( done==2 ) {
-	int lcnt=0;
-	for ( i=0; i<len; ++i ) {
-	    if ( ti[i]->selected )
-		++lcnt;
-	}
-	if ( lcnt==0 ) {
-	    ff_post_error(_("Language Missing"),_("You must select at least one language.\nUse the \"Default\" language if nothing else fits."));
-	    done = 0;
- goto retry;
-	}
-	ret = malloc(5*lcnt+1);
-	*ret = '\0';
-	pt = ret;
-	for ( i=0; i<len; ++i ) {
-	    if ( done==2 && ti[i]->selected ) {
-		uint32 tag = (uint32) (intpt) (ti[i]->userdata);
-		*pt++ = tag>>24;
-		*pt++ = tag>>16;
-		*pt++ = tag>>8;
-		*pt++ = tag&0xff;
-		*pt++ = ',';
-	    }
-	}
-	if ( pt!=ret )
-	    pt[-1] = '\0';
-    }
-    GDrawDestroyWindow(gw);
-return( ret );
+    return language_list_dialog(GGadgetGetWindow(g), lang_recs, langstr);
 }
 
 static void LK_NewScript(GGadget *g,int row) {
@@ -1479,7 +1433,7 @@ static FeatureScriptLangList *LK_ParseFL(struct matrix_data *strings, int rows )
     FeatureScriptLangList *fl, *fhead, *flast;
     struct scriptlanglist *sl, *slast;
     unsigned char foo[4];
-    uint32 *langs=NULL;
+    uint32_t *langs=NULL;
     int lmax=0, lcnt=0;
     int feature, setting;
 
@@ -1522,7 +1476,7 @@ static FeatureScriptLangList *LK_ParseFL(struct matrix_data *strings, int rows )
 		    memset(foo,' ',sizeof(foo));
 		    for ( j=0,pt=start; *pt!='}' && *pt!=',' && *pt!='\0'; foo[j++] = *pt++ );
 		    if ( lcnt>=lmax )
-			langs = realloc(langs,(lmax+=20)*sizeof(uint32));
+			langs = realloc(langs,(lmax+=20)*sizeof(uint32_t));
 		    langs[lcnt++] = (foo[0]<<24) | (foo[1]<<16) | (foo[2]<<8) | foo[3];
 		    start =  ( *pt==',' ) ? pt+1 : pt;
 		}
@@ -1530,7 +1484,7 @@ static FeatureScriptLangList *LK_ParseFL(struct matrix_data *strings, int rows )
 		for ( j=0; j<lcnt && j<MAX_LANG; ++j )
 		    sl->langs[j] = langs[j];
 		if ( lcnt>MAX_LANG ) {
-		    sl->morelangs = malloc((lcnt-MAX_LANG)*sizeof(uint32));
+		    sl->morelangs = malloc((lcnt-MAX_LANG)*sizeof(uint32_t));
 		    for ( ; j<lcnt; ++j )
 			sl->morelangs[j-MAX_LANG] = langs[j];
 		}
@@ -1562,7 +1516,7 @@ static void LK_FinishEdit(GGadget *g,int row, int col, int wasnew) {
 	int old_type = otl->lookup_type;
 	FeatureScriptLangList *oldfl = otl->features;
 
-	otl->lookup_type = (intpt) GGadgetGetListItemSelected(GWidgetGetControl(ld->gw,CID_LookupType))->userdata;
+	otl->lookup_type = (intptr_t) GGadgetGetListItemSelected(GWidgetGetControl(ld->gw,CID_LookupType))->userdata;
 	otl->features = LK_ParseFL(strings,rows);
 	NameOTLookup(otl,ld->sf);
 	GGadgetSetTitle8(GWidgetGetControl(ld->gw,CID_LookupName),otl->lookup_name);
@@ -1583,7 +1537,7 @@ static void LK_NewFeature(GGadget *g,int row) {
     /*  Neither of those has been set yet. */
     /* So... give them everything we can think of. They can remove stuff */
     /*  which is inappropriate */
-    uint32 scripts[20], script, *langs;
+    uint32_t scripts[20], script, *langs;
     int scnt = 0, i, l;
     int gid, k;
     char *buf;
@@ -1666,7 +1620,7 @@ static void LKMatrixInit(struct matrixinit *mi,OTLookup *otl) {
 			    sl->script>>8, sl->script );
 		    bpos+=5;
 		    for ( j=0; j<sl->lang_cnt; ++j ) {
-			uint32 tag = j<MAX_LANG ? sl->langs[j] : sl->morelangs[j-MAX_LANG];
+			uint32_t tag = j<MAX_LANG ? sl->langs[j] : sl->morelangs[j-MAX_LANG];
 			sprintf( buf+bpos, "%c%c%c%c,", tag>>24, tag>>16,
 				tag>>8, tag );
 			bpos+=5;
@@ -1716,7 +1670,7 @@ static GTextInfo *SFMarkClassList(SplineFont *sf,int class) {
     ti[0].selected = class==0;
     for ( i=1; i<sf->mark_class_cnt; ++i ) {
 	ti[i].text = (unichar_t *) copy(sf->mark_class_names[i]);
-	ti[i].userdata = (void *) (intpt) i;
+	ti[i].userdata = (void *) (intptr_t) i;
 	ti[i].text_is_1byte = true;
 	if ( i==class ) ti[i].selected = true;
     }
@@ -1733,11 +1687,11 @@ static GTextInfo *SFMarkSetList(SplineFont *sf,int set) {
     i = sf->mark_set_cnt;
     ti = calloc(i+4,sizeof( GTextInfo ));
     ti[0].text = utf82u_copy( _("All"));
-    ti[0].userdata = (void *) (intpt) -1;
+    ti[0].userdata = (void *) (intptr_t) -1;
     ti[0].selected = set==-1;
     for ( i=0; i<sf->mark_set_cnt; ++i ) {
 	ti[i+1].text = (unichar_t *) copy(sf->mark_set_names[i]);
-	ti[i+1].userdata = (void *) (intpt) i;
+	ti[i+1].userdata = (void *) (intptr_t) i;
 	ti[i+1].text_is_1byte = true;
 	if ( i==set ) ti[i+1].selected = true;
     }
@@ -1808,7 +1762,7 @@ return( true );
 static int LK_TypeChanged(GGadget *g, GEvent *e) {
 
     if ( e->type==et_controlevent && e->u.control.subtype == et_listselected ) {
-	int lookup_type = (intpt) GGadgetGetListItemSelected(g)->userdata;
+	int lookup_type = (intptr_t) GGadgetGetListItemSelected(g)->userdata;
 	struct lookup_dlg *ld = GDrawGetUserData(GGadgetGetWindow(g));
 	GTextInfo *ti = FeatureListFromLookupType( lookup_type );
 	GMatrixEditSetColumnChoices( GWidgetGetControl(ld->gw,CID_LookupFeatures), 0, ti );
@@ -1826,7 +1780,7 @@ static int Lookup_OK(GGadget *g, GEvent *e) {
 
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
 	struct lookup_dlg *ld = GDrawGetUserData(GGadgetGetWindow(g));
-	int lookup_type = (intpt) GGadgetGetListItemSelected(GWidgetGetControl(ld->gw,CID_LookupType))->userdata;
+	int lookup_type = (intptr_t) GGadgetGetListItemSelected(GWidgetGetControl(ld->gw,CID_LookupType))->userdata;
 	int rows, i, isgpos;
 	struct matrix_data *strings = GMatrixEditGet(GWidgetGetControl(ld->gw,CID_LookupFeatures), &rows);
 	char *pt, *start, *name;
@@ -1910,8 +1864,8 @@ return(true);
 	if ( GGadgetIsChecked(GWidgetGetControl(ld->gw,CID_Lookup_IgnBase)) ) flags |= pst_ignorebaseglyphs;
 	if ( GGadgetIsChecked(GWidgetGetControl(ld->gw,CID_Lookup_IgnLig)) ) flags |= pst_ignoreligatures;
 	if ( GGadgetIsChecked(GWidgetGetControl(ld->gw,CID_Lookup_IgnMark)) ) flags |= pst_ignorecombiningmarks;
-	flags |= ((intpt) GGadgetGetListItemSelected(GWidgetGetControl(ld->gw,CID_Lookup_ProcessMark))->userdata)<<8;
-	set = ((intpt) GGadgetGetListItemSelected(GWidgetGetControl(ld->gw,CID_Lookup_ProcessSet))->userdata);
+	flags |= ((intptr_t) GGadgetGetListItemSelected(GWidgetGetControl(ld->gw,CID_Lookup_ProcessMark))->userdata)<<8;
+	set = ((intptr_t) GGadgetGetListItemSelected(GWidgetGetControl(ld->gw,CID_Lookup_ProcessSet))->userdata);
 	if ( set!=-1 )
 	    flags |= pst_usemarkfilteringset | (set<<16);
 
@@ -2339,7 +2293,7 @@ static int AnchorClassD_ShowAnchors(GGadget *g, GEvent *e) {
 
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
 	struct matrix_data *classes;
-	int32 class_cnt;
+	int32_t class_cnt;
 	int row;
 	AnchorClass *ac;
 
@@ -2371,7 +2325,7 @@ static int AC_OK(GGadget *g, GEvent *e) {
 
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
 	struct matrix_data *classes;
-	int32 class_cnt;
+	int32_t class_cnt;
 	int i,j;
 	AnchorClass *ac, *acnext, *actest;
 
@@ -2486,6 +2440,7 @@ return( false );
       break;
       case et_resize:
       break;
+      default: break;
     }
 return( true );
 }
@@ -2650,13 +2605,13 @@ struct sortinfo {
 			        /* finished sorting */
     SplineChar *sc;		/* The glyph itself */
     SplineChar *base;		/* The base of Agrave would be A */
-    uint32 script;
+    uint32_t script;
 };
 
 static void SortPrep(PSTKernDlg *pstkd, struct matrix_data *md, struct sortinfo *si) {
 
     si->glyphname = md->u.md_str;
-    md->u.md_ival = (intpt) si;
+    md->u.md_ival = (intptr_t) si;
 
     si->sc = SFGetChar(pstkd->sf,-1,si->glyphname);
     if ( si->sc==NULL )
@@ -3095,8 +3050,8 @@ static void PSTKD_AddKP(void *data,SplineChar *left, SplineChar *right, int off)
 	/* If the user has already got this combination in the lookup */
 	/*  then don't add a new guess, and don't override the old */
 	if ( psts[i*cols+0].u.md_str!=NULL && psts[i*cols+1].u.md_str!=NULL &&
-	    strcmp(psts[i*cols+0].u.md_str,first->name)==0 &&
-	    strcmp(psts[i*cols+1].u.md_str,second->name)==0 )
+	    strcmp(psts[i*cols+0].u.md_str,SCNameUniStr(first))==0 &&
+	    strcmp(psts[i*cols+1].u.md_str,SCNameUniStr(second))==0 )
 return;
     }
 
@@ -3104,8 +3059,8 @@ return;
     if ( i >= pstkd->rows )
 	pstkd->psts = psts = realloc(psts,(pstkd->rows += 100)*cols*sizeof(struct matrix_data));
     memset(psts+i*cols,0,cols*sizeof(struct matrix_data));
-    psts[i*cols+0].u.md_str = copy(first->name);
-    psts[i*cols+1].u.md_str = copy(second->name);
+    psts[i*cols+0].u.md_str = SCNameUniStr(first);
+    psts[i*cols+1].u.md_str = SCNameUniStr(second);
     if ( pstkd->sub->lookup->lookup_flags & pst_r2l )
 	psts[i*cols+PAIR_DX_ADV1].u.md_ival = psts[i*cols+PAIR_DX1].u.md_ival = off;
     /* else if ( pstkd->sub->vertical_kerning ) */	/* We don't do vertical stuff */
@@ -3195,7 +3150,7 @@ static void PSTKD_DoHideUnused(PSTKernDlg *pstkd) {
     GGadget *pstk = GWidgetGetControl(pstkd->gw,CID_PSTList);
     int rows, cols = GMatrixEditGetColCnt(pstk);
     struct matrix_data *old = GMatrixEditGet(pstk,&rows);
-    uint8 cols_used[20];
+    uint8_t cols_used[20];
     int r, col, startc, tot;
 
     startc = ( pstkd->sub->lookup->lookup_type == gpos_single ) ? 1 : 2;
@@ -3408,16 +3363,16 @@ return;		/* Couldn't parse the numeric kerning info */
     } else if ( pstkd->sub->lookup->lookup_flags&pst_r2l ) {
 	xorig = 9*size.width/10;
 	yorig = pstkd->sf->ascent*size.height/(pstkd->sf->ascent+pstkd->sf->descent);
-	GDrawDrawLine(pixmap,xorig+vr1.h_adv_off-vr1.xoff,0,xorig+vr1.h_adv_off-vr1.xoff,size.height, 0x808080);
-	GDrawDrawLine(pixmap,0,yorig,size.width,yorig, 0x808080);
+	GDrawDrawLine(pixmap,xorig+vr1.h_adv_off-vr1.xoff,0,xorig+vr1.h_adv_off-vr1.xoff,size.height, fi_originlinescol);
+	GDrawDrawLine(pixmap,0,yorig,size.width,yorig, fi_originlinescol);
 	xorig /= mag; yorig /= mag;
 	PSTKern_DrawGlyph(pixmap,xorig-bc1->width,yorig-vr1.yoff, bc1, mag);
 	PSTKern_DrawGlyph(pixmap,xorig-bc1->width-bc2->width-vr2.h_adv_off-vr2.xoff-vr1.xoff,yorig-vr2.yoff, bc2, mag);
     } else {
 	xorig = size.width/10;
 	yorig = pstkd->sf->ascent*size.height/(pstkd->sf->ascent+pstkd->sf->descent);
-	GDrawDrawLine(pixmap,xorig,0,xorig,size.height, 0x808080);
-	GDrawDrawLine(pixmap,0,yorig,size.width,yorig, 0x808080);
+	GDrawDrawLine(pixmap,xorig,0,xorig,size.height, fi_originlinescol);
+	GDrawDrawLine(pixmap,0,yorig,size.width,yorig, fi_originlinescol);
 	xorig /= mag; yorig /= mag;
 	PSTKern_DrawGlyph(pixmap,xorig+vr1.xoff,yorig-vr1.yoff, bc1, mag);
 	PSTKern_DrawGlyph(pixmap,xorig+bc1->width+vr1.h_adv_off+vr2.xoff,yorig-vr2.yoff, bc2, mag);
@@ -3512,6 +3467,7 @@ return( true );
       case et_mousedown: case et_mouseup: case et_mousemove:
 	PSTKern_Mouse(GDrawGetUserData(gw),event);
 return( true );
+      default: break;
     }
 return( true );
 }
@@ -3749,7 +3705,7 @@ static int PSTKD_AutoKern(GGadget *g, GEvent *e) {
 	SplineChar **list, *sc;
 	FeatureScriptLangList *features = pstkd->sub->lookup->features, *testf;
 	struct scriptlanglist *scripts;
-	uint32 *scripttags;
+	uint32_t *scripttags;
 
 	pstkd->cols = GMatrixEditGetColCnt(pstk);
 	pstkd->psts = MDCopy(old,rows,cols);
@@ -3763,7 +3719,7 @@ static int PSTKD_AutoKern(GGadget *g, GEvent *e) {
 	    ff_post_error(_("No scripts"),_("There are no scripts bound to features bound to this lookup. So nothing happens." ));
 return(true);
 	}
-	scripttags = malloc((cnt+1)*sizeof(uint32));
+	scripttags = malloc((cnt+1)*sizeof(uint32_t));
 	for ( testf=features,cnt=0; testf!=NULL; testf=testf->next ) {
 	    for ( scripts=testf->scripts; scripts!=NULL; scripts=scripts->next ) {
 		for ( i=0; i<cnt; ++i )
@@ -3777,7 +3733,7 @@ return(true);
 
 	list = malloc((sf->glyphcnt+1)*sizeof(SplineChar *));
 	for ( i=0; scripttags[i]!=0; ++i ) {
-	    uint32 script = scripttags[i];
+	    uint32_t script = scripttags[i];
 
 	    for ( cnt=gid=0; gid<sf->glyphcnt; ++gid ) {
 		if ( (sc = sf->glyphs[gid])!=NULL &&
@@ -4008,7 +3964,7 @@ char* SFDCreateUndoForLookup( SplineFont *sf, int lookup_type )
     int gid = 0;
     SplineChar *sc = 0;
     PST *pst = 0;
-    FILE* sfd = MakeTemporaryFile();
+    FILE* sfd = GFileTmpfile();
     SFD_DumpLookup( sfd, sf );
     for ( gid=0; gid<sf->glyphcnt; ++gid )
     {
@@ -4093,11 +4049,11 @@ static char* SFDTrimUndoOldToNew( SplineFont *sf, char* oldstr, char* newstr ) {
 
     /* open temporary files */
     FILE *of, *nf, *retf;
-    if ( !(retf=MakeTemporaryFile()) )
+    if ( !(retf=GFileTmpfile()) )
 	    goto error0SFDTrimUndoOldToNew;
-    if ( !(of=MakeTemporaryFile()) )
+    if ( !(of=GFileTmpfile()) )
 	    goto error1SFDTrimUndoOldToNew;
-    if ( !(nf=MakeTemporaryFile()) )
+    if ( !(nf=GFileTmpfile()) )
 	    goto error2SFDTrimUndoOldToNew;
 
     int glyphsWithUndoInfoCount = 0;
@@ -4452,7 +4408,7 @@ return( true );
 	}
 
 	/* compare the updated data to the snapshot we took before and
-	 * trim the undo operation of superfluious data
+	 * trim the undo operation of superfluous data
 	 */
 	if( oldsfd ) {
 
@@ -4760,6 +4716,7 @@ return( false );
       break;
       case et_resize:
       break;
+      default: break;
     }
 return( true );
 }
@@ -5606,15 +5563,16 @@ return( true );
 return( GGadgetDispatchEvent(active_fv->vsb,event));
     }
 
+    Color fg = GDrawGetDefaultForeground(NULL);
     switch ( event->type ) {
       case et_expose:
 	FVDrawInfo(active_fv,pixmap,event);
 	GDrawSetFont(pixmap, kf->first_fv->notactive? kf->plain : kf->bold );
 	GDrawDrawText8(pixmap,10,kf->mbh+kf->first_fv->infoh+kf->as,
-		_("Select glyphs for the first part of the kern pair"),-1,0x000000);
+		_("Select glyphs for the first part of the kern pair"),-1,fg);
 	GDrawSetFont(pixmap, kf->second_fv->notactive? kf->plain : kf->bold );
 	GDrawDrawText8(pixmap,10,kf->label2_y+kf->as,
-		_("Select glyphs for the second part of the kern pair"),-1,0x000000);
+		_("Select glyphs for the second part of the kern pair"),-1,fg);
       break;
       case et_char:
 	kf_charEvent(&kf->base,event);
@@ -5632,6 +5590,7 @@ return(false);
       case et_resize:
         kf_sizeSet(kf,pixmap);
       break;
+      default: break;
     }
 return( true );
 }
@@ -5783,6 +5742,7 @@ static int kf_e_h(GWindow gw, GEvent *event) {
       case et_char:
 return( false );
       break;
+      default: break;
     }
 return( true );
 }
@@ -5798,9 +5758,7 @@ static int kern_format_dlg( SplineFont *sf, int def_layer,
     struct kf_dlg kf;
     int i,j, guts_row;
     /* Returns are 0=>Pairs, 1=>Classes, 2=>Cancel */
-    FontRequest rq;
     int as, ds, ld;
-    static GFont *plainfont = NULL, *boldfont=NULL;
 
     if ( sub->separation==0 && !sub->kerning_by_touch ) {
 	sub->separation = sf->width_separation;
@@ -5834,19 +5792,8 @@ static int kern_format_dlg( SplineFont *sf, int def_layer,
     pos.height = 100;
     kf.gw = GDrawCreateTopWindow(NULL,&pos,kf_e_h,&kf,&wattrs);
 
-    if ( plainfont==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = 12;
-	rq.weight = 400;
-	plainfont = GDrawInstanciateFont(NULL,&rq);
-	plainfont = GResourceFindFont("KernFormat.Font",plainfont);
-	GDrawDecomposeFont(plainfont, &rq);
-	rq.weight = 700;
-	boldfont = GDrawInstanciateFont(NULL,&rq);
-	boldfont = GResourceFindFont("KernFormat.BoldFont",boldfont);
-    }
-    kf.plain = plainfont; kf.bold = boldfont;
+    kf.plain = kernformat_font.fi;
+    kf.bold = kernformat_boldfont.fi;
     GDrawWindowFontMetrics(kf.gw,kf.plain,&as,&ds,&ld);
     kf.fh = as+ds; kf.as = as;
 
@@ -6191,7 +6138,7 @@ return;
 	    sub->kc->first_cnt = sub->kc->second_cnt = 1;
 	    sub->kc->firsts = calloc(1,sizeof(char *));
 	    sub->kc->seconds = calloc(1,sizeof(char *));
-	    sub->kc->offsets = calloc(1,sizeof(int16));
+	    sub->kc->offsets = calloc(1,sizeof(int16_t));
 	    sub->kc->adjusts = calloc(1,sizeof(DeviceTable));
 		/* Need to fix for Hebrew !!!! */
 	    if ( results.autobuild )
@@ -6218,7 +6165,7 @@ return;
 /******************************************************************************/
 /***************************   Add/Remove Language   **************************/
 /******************************************************************************/
-static uint32 StrNextLang(char **_pt) {
+static uint32_t StrNextLang(char **_pt) {
     unsigned char *pt = (unsigned char *) *_pt;
     unsigned char tag[4];
     int i;
@@ -6237,12 +6184,12 @@ return( 0xffffffff );
 return( (tag[0]<<24) | (tag[1]<<16) | (tag[2]<<8) | tag[3] );
 }
 
-static void lk_AddRm(struct lkdata *lk,int add_lang,uint32 script, char *langs) {
+static void lk_AddRm(struct lkdata *lk,int add_lang,uint32_t script, char *langs) {
     int i,l;
     OTLookup *otl;
     FeatureScriptLangList *fl;
     struct scriptlanglist *sl;
-    uint32 lang;
+    uint32_t lang;
     char *pt;
 
     for ( i=0; i<lk->cnt; ++i ) {
@@ -6261,13 +6208,13 @@ static void lk_AddRm(struct lkdata *lk,int add_lang,uint32 script, char *langs) 
 			if ( sl->lang_cnt<MAX_LANG ) {
 			    sl->langs[sl->lang_cnt++] = lang;
 			} else {
-			    sl->morelangs = realloc(sl->morelangs,(++sl->lang_cnt-MAX_LANG)*sizeof(uint32));
+			    sl->morelangs = realloc(sl->morelangs,(++sl->lang_cnt-MAX_LANG)*sizeof(uint32_t));
 			    sl->morelangs[sl->lang_cnt-MAX_LANG-1] = lang;
 			}
 		    } else if ( !add_lang && l>=0 ) {
 			--sl->lang_cnt;
 			while ( l<sl->lang_cnt ) {
-			    uint32 nlang = l+1>=MAX_LANG ? sl->morelangs[l+1-MAX_LANG] : sl->langs[l+1];
+			    uint32_t nlang = l+1>=MAX_LANG ? sl->morelangs[l+1-MAX_LANG] : sl->langs[l+1];
 			    if ( l>=MAX_LANG )
 				sl->morelangs[l-MAX_LANG] = nlang;
 			    else
@@ -6303,7 +6250,7 @@ static int ARL_OK(GGadget *g, GEvent *e) {
 	char *langs, *pt;
 	int i;
 	unsigned char tag[4];
-	uint32 script_tag, lang;
+	uint32_t script_tag, lang;
 
 	memset(tag,' ',4);
 	spt = _GGadgetGetTitle(GWidgetGetControl(arl->gw,CID_ScriptTag));
@@ -6352,7 +6299,7 @@ static int ARL_TagChanged(GGadget *g, GEvent *e) {
 	int len;
 	GTextInfo **ti = GGadgetGetList(g,&len);
 	char tag[8];
-	uint32 tagval = (intpt) (ti[which]->userdata);
+	uint32_t tagval = (intptr_t) (ti[which]->userdata);
 
 	tag[0] = tagval>>24;
 	tag[1] = tagval>>16;
@@ -6373,28 +6320,29 @@ return( false );
       case et_close:
 	arl->done = true;
       break;
+      default: break;
     }
 return( true );
 }
 
 static GTextInfo *ScriptListOfFont(SplineFont *sf) {
-    uint32 *ourscripts = SFScriptsInLookups(sf,-1);
+    uint32_t *ourscripts = SFScriptsInLookups(sf);
     int i,j;
     GTextInfo *ti;
     char tag[8];
 
     if ( ourscripts==NULL || ourscripts[0]==0 ) {
 	free(ourscripts);
-	ourscripts = malloc(2*sizeof(uint32));
+	ourscripts = malloc(2*sizeof(uint32_t));
 	ourscripts[0] = DEFAULT_SCRIPT;
 	ourscripts[1] = 0;
     }
     for ( i=0; ourscripts[i]!=0; ++i );
     ti = calloc(i+1,sizeof(GTextInfo));
     for ( i=0; ourscripts[i]!=0; ++i ) {
-	ti[i].userdata = (void *) (intpt) ourscripts[i];
+	ti[i].userdata = (void *) (intptr_t) ourscripts[i];
 	for ( j=0; scripts[j].text!=NULL; ++j) {
-	    if ( scripts[j].userdata == (void *) (intpt) ourscripts[i])
+	    if ( scripts[j].userdata == (void *) (intptr_t) ourscripts[i])
 	break;
 	}
 	if ( scripts[j].text!=NULL )
@@ -6660,7 +6608,7 @@ static int MRD_SuffixChange(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_textchanged ) {
 	MassRenameDlg *mrd = GDrawGetUserData(GGadgetGetWindow(g));
 	char *suffix = GGadgetGetTitle8(g);
-	int32 len;
+	int32_t len;
 	int i;
 	GTextInfo **ti = GGadgetGetList(GWidgetGetControl(mrd->gw,CID_SubTable),&len);
 	struct lookup_subtable *sub;
@@ -6681,7 +6629,7 @@ return( true );
 }
 
 static void MRD_SelectSubtable(MassRenameDlg *mrd,struct lookup_subtable *sub) {
-    int32 len;
+    int32_t len;
     GTextInfo **ti = GGadgetGetList(GWidgetGetControl(mrd->gw,CID_SubTable),&len);
     int i, no_pos = -1;
 
@@ -6734,6 +6682,7 @@ return( false );
       case et_close:
 	mrd->done = true;
       break;
+      default: break;
     }
 return( true );
 }

@@ -29,6 +29,7 @@
 #define FONTFORGE_INTL_H
 
 #include <fontforge-config.h>
+#include <stdbool.h>
 
 #if !defined( HAVE_LIBINTL_H )
 
@@ -70,7 +71,16 @@
 /* For messages in the shortcuts domain */
 #define H_(str)		(str)
 
-extern void GResourceUseGetText(void);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 char *sgettext(const char *msgid);
+void gettext_locale(char *buffer, int size);
+bool gettext_locale_is_rtl();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* FONTFORGE_INTL_H */

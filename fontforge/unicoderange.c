@@ -51,7 +51,7 @@ struct rangeinfo *SFUnicodeRanges(SplineFont *sf, int include_empty) {
 /* Return NULL if out of memory to hold rangeinfo[cnt]. */
     int cnt, num_planes, num_blocks;
     int i, gid;
-    int32 j;
+    int32_t j;
     struct rangeinfo *ri;
     const struct unicode_range *planes, *blocks;
 
@@ -59,7 +59,7 @@ struct rangeinfo *SFUnicodeRanges(SplineFont *sf, int include_empty) {
     blocks = uniname_blocks(&num_blocks);
     cnt = 2 + num_planes + num_blocks;
 
-    ri = calloc(cnt + 1, sizeof(*ri));
+    ri = (struct rangeinfo*) calloc(cnt + 1, sizeof(*ri));
     if (ri == NULL) {
         NoMoreMemMessage();
         return NULL;
@@ -92,7 +92,7 @@ struct rangeinfo *SFUnicodeRanges(SplineFont *sf, int include_empty) {
             } else if (!isunicodepointassigned(ch)) {
                 /* glyphs attached to code points which have not been assigned in */
                 /*  the version of unicode I know about */
-                ++ri[num_planes = num_blocks + 1].cnt;
+                ++ri[num_planes + num_blocks + 1].cnt;
             }
         }
     }
@@ -113,11 +113,10 @@ struct rangeinfo *SFUnicodeRanges(SplineFont *sf, int include_empty) {
 return( ri );
 }
 
-const char *UnicodeRange(int32 unienc) {
+const char *UnicodeRange(int32_t unienc) {
 /* Return the best name that describes this Unicode value */
     const struct unicode_range* block;
-    if (isunicodepointassigned(unienc) &&
-        (block = uniname_block(unienc)) != NULL) {
+    if ((block = uniname_block(unienc)) != NULL) {
         return block->name;
     }
     return "Unencoded Unicode";

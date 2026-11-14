@@ -293,7 +293,7 @@ const char *ff_ttf_instrnames[] = {
     "MIRP1f"
 };
 
-uint8 *_IVParse(SplineFont *sf, char *text, int *len,
+uint8_t *_IVParse(SplineFont *sf, char *text, int *len,
 	void (*IVError)(void *,char *, int), void *iv) {
     short numberstack[256];
     int npos=0, nread, i;
@@ -301,7 +301,7 @@ uint8 *_IVParse(SplineFont *sf, char *text, int *len,
     char *pt;
     char *end, *bend, *brack;
     int icnt=0, imax=strlen(text)/2, val, temp;
-    uint8 *instrs = malloc(imax);
+    uint8_t *instrs = (uint8_t*) malloc(imax);
 
     for ( pt = text; *pt ; ++pt ) {
 	npos = 0;
@@ -489,11 +489,11 @@ return( realloc(instrs,icnt==0?1:icnt));	/* some versions of realloc abort on 0 
 
 int instr_typify(struct instrdata *id) {
     int i, len = id->instr_cnt, cnt, j, lh;
-    uint8 *instrs = id->instrs;
-    uint8 *bts;
+    uint8_t *instrs = id->instrs;
+    uint8_t *bts;
 
     if ( id->bts==NULL )
-	id->bts = malloc(len+1);
+	id->bts = (uint8_t*) malloc(len+1);
     bts = id->bts;
     for ( i=lh=0; i<len; ++i ) {
 	bts[i] = bt_instr;
@@ -538,7 +538,7 @@ char *__IVUnParseInstrs(InstrBase *iv) {
     char *ubuf, *pt;
     int i,l;
 
-    pt = ubuf = iv->offset = iv->scroll = malloc((iv->instrdata->instr_cnt*20+1));
+    pt = ubuf = iv->offset = iv->scroll = (char*) malloc((iv->instrdata->instr_cnt*20+1));
     for ( i=l=0; i<iv->instrdata->instr_cnt; ++i ) {
 	if ( iv->lpos == l )
 	    iv->scroll = pt;
@@ -560,7 +560,7 @@ char *__IVUnParseInstrs(InstrBase *iv) {
 return( ubuf );
 }
 
-char *_IVUnParseInstrs(uint8 *instrs,int instr_cnt) {
+char *_IVUnParseInstrs(uint8_t *instrs,int instr_cnt) {
     struct instrbase iv;
     struct instrdata id;
     char *ret;

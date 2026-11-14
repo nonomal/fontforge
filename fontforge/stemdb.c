@@ -69,8 +69,8 @@ struct st {
 static int GetBlueFuzz(SplineFont *sf) {
     char *str, *end;
 
-    if ( sf == NULL || sf->private == NULL || 
-	(str=PSDictHasEntry( sf->private,"BlueFuzz" )) == NULL || !isdigit( str[0] ))
+    if ( sf == NULL || sf->private_dict == NULL || 
+	(str=PSDictHasEntry( sf->private_dict,"BlueFuzz" )) == NULL || !isdigit( str[0] ))
 return 1;
 return strtod( str, &end );
 }
@@ -447,12 +447,22 @@ static int line_pt_cmp( const void *_p1, const void *_p2 ) {
     struct linedata *line;
     double ppos1=0,ppos2=0;
     
+    /* Pick a line shared by both points, considering both arguments so
+     * that the comparison is symmetric: with an asymmetric comparator
+     * qsort() has undefined behaviour and the resulting ordering depends
+     * on uninitialised memory (non-reproducible output). */
     if ( (*pd1)->prevline != NULL && 
 	( (*pd1)->prevline == (*pd2)->prevline || (*pd1)->prevline == (*pd2)->nextline ))
 	line = (*pd1)->prevline;
     else if ( (*pd1)->nextline != NULL && 
 	( (*pd1)->nextline == (*pd2)->prevline || (*pd1)->nextline == (*pd2)->nextline ))
 	line = (*pd1)->nextline;
+    else if ( (*pd2)->prevline != NULL && 
+	( (*pd2)->prevline == (*pd1)->prevline || (*pd2)->prevline == (*pd1)->nextline ))
+	line = (*pd2)->prevline;
+    else if ( (*pd2)->nextline != NULL && 
+	( (*pd2)->nextline == (*pd1)->prevline || (*pd2)->nextline == (*pd1)->nextline ))
+	line = (*pd2)->nextline;
     else
 return( 0 );
 
@@ -767,7 +777,7 @@ static int FindMatchingHVEdge( struct glyphdata *gd,struct pointdata *pd,
     /*  to the side a tiny bit and hope that doesn't matter */
     if ( is_next==2 ) {
 	/* Consider the case of the bottom of the circumflex (or a chevron) */
-	/*  Think of it as a flattend breve. It is symetrical and we want to */
+	/*  Think of it as a flattened breve. It is symetrical and we want to */
 	/*  note the vertical distance between the two points that define */
 	/*  the bottom, so treat them as a funky stem */
 	/*                 \ \     / /              */
@@ -811,7 +821,10 @@ return( 0 );
 	winding += nw;
     }
     if ( space[i]==NULL ) {
-	fprintf( stderr, "FindMatchinHVEdge didn't\n" );
+	if ( gd->sc )
+	    fprintf( stderr, "FindMatchingHVEdge didn't: 0x%X, '%s'\n", gd->sc->unicodeenc, gd->sc->name );
+	else
+	    fprintf( stderr, "FindMatchingHVEdge didn't: unknown glyph\n" );
 return( 0 );
     }
 
@@ -1193,7 +1206,7 @@ static BasePoint MiddleUnit( BasePoint *unit1, BasePoint *unit2 ) {
 return( ret );
 }
 
-static uint8 IsStubOrIntersection( struct glyphdata *gd, BasePoint *dir1, 
+static uint8_t IsStubOrIntersection( struct glyphdata *gd, BasePoint *dir1, 
     struct pointdata *pd1, struct pointdata *pd2, int is_next1, int is_next2 ) {
     int i;
     int exc=0;
@@ -1357,7 +1370,7 @@ static void SwapEdges( struct glyphdata *gd,struct stemdata *stem ) {
     }
 }
 
-static int StemFitsHV( struct stemdata *stem,int is_x,uint8 mask ) {
+static int StemFitsHV( struct stemdata *stem,int is_x,uint8_t mask ) {
     int i,cnt;
     double loff,roff;
     double lmin=0,lmax=0,rmin=0,rmax=0;
@@ -1706,10 +1719,8 @@ static struct stemdata *FindStem( struct glyphdata *gd,struct pointdata *pd,
     
     int i, cove, test_left, hv, stemcnt;
     struct stemdata *stem;
-    SplinePoint *match;
     BasePoint newdir;
 
-    match = pd2->sp;
     stemcnt = ( is_next2 ) ? pd2->nextcnt : pd2->prevcnt;
     
     for ( i=0; i<stemcnt; i++ ) {
@@ -1819,7 +1830,7 @@ return( stem );
 }
 
 static int ParallelToDir( struct pointdata *pd,int checknext,BasePoint *dir,
-    BasePoint *opposite,SplinePoint *basesp,uint8 is_stub ) {
+    BasePoint *opposite,SplinePoint *basesp,uint8_t is_stub ) {
     
     BasePoint n, o, *base = &basesp->me;
     SplinePoint *sp;
@@ -1953,7 +1964,7 @@ return( hv );
 }
 
 static struct stemdata *TestStem( struct glyphdata *gd,struct pointdata *pd,
-    BasePoint *dir,SplinePoint *match,int is_next,int is_next2,int require_existing,uint8 is_stub,int eidx ) {
+    BasePoint *dir,SplinePoint *match,int is_next,int is_next2,int require_existing,uint8_t is_stub,int eidx ) {
     struct pointdata *pd2;
     struct stemdata *stem, *destem;
     struct stem_chunk *chunk;
@@ -2320,7 +2331,7 @@ static int BuildStem( struct glyphdata *gd,struct pointdata *pd,int is_next,
     struct linedata *line;
     struct pointdata *testpd, *topd, *frompd;
     int tp, fp, t_needs_recalc=false, ret=0;
-    uint8 tstub=0, fstub=0;
+    uint8_t tstub=0, fstub=0;
     BasePoint opposite;
     struct stemdata *stem=NULL;
 
@@ -2365,7 +2376,7 @@ return( 0 );
     /* But do that only for colinear spline segments and ensure that there are  */
     /* no bends between two splines. */
     if ( !tp && ( !fp || t > 0.5 ) &&
-	topd->colinear && &other->to->next != NULL ) {
+	topd->colinear && topt->next != NULL ) {
 	testpt = topt->next->to; 
 	testpd = &gd->points[testpt->ptindex];
 	BasePoint *initdir = &topd->prevunit;
@@ -2381,7 +2392,7 @@ return( 0 );
 	if ( tp ) t_needs_recalc = true;
     }
     if ( !fp && ( !fp || t < 0.5 ) &&
-	frompd->colinear && &other->from->prev != NULL ) {
+	frompd->colinear && frompt->prev != NULL ) {
 	testpt = frompt->prev->from; 
 	testpd = &gd->points[testpt->ptindex];
 	BasePoint *initdir = &frompd->prevunit;
@@ -2493,7 +2504,6 @@ static struct stemdata *DiagonalCornerStem( struct glyphdata *gd,
     struct pointdata *pfrom = NULL, *pto = NULL, *pd2 = NULL, *pd3=NULL;
     double width, length;
     struct stemdata *stem;
-    struct stem_chunk *chunk;
 
     pfrom = &gd->points[other->from->ptindex];
     pto = &gd->points[other->to->ptindex];
@@ -2526,10 +2536,10 @@ return( NULL );
     stem = FindOrMakeHVStem(gd,pd,pd2,pd->symetrical_h,require_existing);
     
     if ( pd3 == NULL && stem != NULL )
-	chunk = AddToStem( gd,stem,pd,pd2,2,2,2 );
+	AddToStem( gd,stem,pd,pd2,2,2,2 );
     else if ( stem != NULL ) {
-	chunk = AddToStem( gd,stem,pd,pd2,2,2,3 );
-	chunk = AddToStem( gd,stem,pd,pd3,2,2,3 );
+	AddToStem( gd,stem,pd,pd2,2,2,3 );
+	AddToStem( gd,stem,pd,pd3,2,2,3 );
     }
 return( stem );
 }
@@ -2575,11 +2585,16 @@ static int stem_cmp( const void *_p1, const void *_p2 ) {
     struct stemdata * const *st1 = _p1, * const *st2 = _p2;
     double start1, end1, start2, end2;
     
+    /* Sort each stem along an axis determined by that stem's own
+     * orientation, so that the comparison is symmetric */
     if ( fabs( (*st1)->unit.x ) > fabs( (*st1)->unit.y )) {
 	start1 = (*st1)->right.y; end1 = (*st1)->left.y;
-	start2 = (*st2)->right.y; end2 = (*st2)->left.y;
     } else {
 	start1 = (*st1)->left.x; end1 = (*st1)->right.x;
+    }
+    if ( fabs( (*st2)->unit.x ) > fabs( (*st2)->unit.y )) {
+	start2 = (*st2)->right.y; end2 = (*st2)->left.y;
+    } else {
 	start2 = (*st2)->left.x; end2 = (*st2)->right.x;
     }
 	
@@ -3026,7 +3041,7 @@ static int WalkSpline( struct glyphdata *gd, struct pointdata *pd,int gonext,
 	    ( nsp->me.y - base->y )*stem->l_to_r.y;
     /* Some splines have tiny control points and are almost flat */
     /*  think of them as lines then rather than treating them as curves */
-    /*  figure out how long they remain within a few orthoganal units of */
+    /*  figure out how long they remain within a few orthogonal units of */
     /*  the point */
     /* We used to check the distance between a control point and a spline */
     /* and consider the segment "flat" if this distance is smaller than   */
@@ -3142,7 +3157,7 @@ static int AddLineSegment( struct stemdata *stem,struct segment *space,int cnt,
     int scurved = false, ecurved = false, c, hv;
     SplinePoint *sp, *psp, *nsp;
     double b;
-    uint8 extr;
+    uint8_t extr;
     
     if ( pd==NULL || (sp = pd->sp)==NULL || sp->ticked ||
 	    sp->next==NULL || sp->prev==NULL )
@@ -4016,7 +4031,7 @@ static void FindRefPointsNew( struct glyphdata *gd,struct stemdata *stem ) {
     struct pointdata *lmost1, *lmost2, *rmost1, *rmost2;
     double llen, prevllen, rlen, prevrlen;
     SplinePoint *sp, *tsp;
-    uint8 *lextr, *rextr;
+    uint8_t *lextr, *rextr;
 
     is_x = (int) rint( stem->unit.y );
     lpos = ((real *) &stem->left.x)[!is_x];
@@ -4123,7 +4138,7 @@ static void FindRefPointsNew( struct glyphdata *gd,struct stemdata *stem ) {
 
 static void NormalizeStem( struct glyphdata *gd,struct stemdata *stem ) {
     int i;
-    int is_x, lval, rval, val, lset, rset, best;
+    int lval, rval, val, lset, rset, best;
     double loff=0, roff=0;
     BasePoint lold, rold;
     SplinePoint *lbest, *rbest;
@@ -4132,7 +4147,6 @@ static void NormalizeStem( struct glyphdata *gd,struct stemdata *stem ) {
     /* First sort the stem chunks by their coordinates */
     if ( IsUnitHV( &stem->unit,true )) {
 	qsort( stem->chunks,stem->chunk_cnt,sizeof( struct stem_chunk ),chunk_cmp );
-	is_x = (int) rint( stem->unit.y );
 
 	/* For HV stems we have to check all chunks once more in order */
 	/* to figure out "left" and "right" positions most typical */
@@ -4530,7 +4544,6 @@ static void CheckForGhostHints( struct glyphdata *gd ) {
     /*  ghost hints. The bottom hint has height -21, and the top -20 */
     BlueData *bd = &gd->bd;
     struct stemdata *stem;
-    struct stem_chunk *chunk;
     struct pointdata *pd;
     real base;
     int i, j, leftfound, rightfound, has_h, peak, fuzz;
@@ -4597,10 +4610,10 @@ static void CheckForGhostHints( struct glyphdata *gd ) {
 		peak = IsSplinePeak( gd,pd,false,false,7 );
 		if ( peak > 0 ) {
 		    stem = FindOrMakeGhostStem( gd,pd->sp,j,20 );
-		    chunk = AddToStem( gd,stem,pd,NULL,2,false,false );
+		    AddToStem( gd,stem,pd,NULL,2,false,false );
 		} else if ( peak < 0 ) {
 		    stem = FindOrMakeGhostStem( gd,pd->sp,j,21 );
-		    chunk = AddToStem( gd,stem,NULL,pd,2,false,false );
+		    AddToStem( gd,stem,NULL,pd,2,false,false );
 		}
 	    }
 	}
@@ -5231,7 +5244,7 @@ static void LookForMasterHVStem( struct stemdata *stem,BlueData *bd ) {
 /* with the "master" of the stem it overlaps (or any other stems), then */
 /* this dependency is unneeded and processing it in the autoinstructor  */
 /* can even lead to undesired effects. Unfortunately we can't prevent   */
-/* detecting such dependecies in LookForMasterHVStem(), because we      */
+/* detecting such dependencies in LookForMasterHVStem(), because we      */
 /* need to know the whole stem hierarchy first. So look for undesired   */
 /* dependencies and clean them now */
 static void ClearUnneededDeps( struct stemdata *stem ) {
@@ -5404,9 +5417,9 @@ static void AddSerifOrBall( struct glyphdata *gd,
     struct stemdata *master,struct stemdata *slave,int lbase,int is_ball ) {
     
     struct dependent_serif *tserif;
-    struct pointdata *spd, *bpd=NULL;
+    struct pointdata *spd;
     double width, min, max;
-    int i, j, refidx, scnt, next;
+    int i, j, scnt, next;
     
     if ( lbase ) {
 	width = fabs(
@@ -5439,9 +5452,7 @@ static void AddSerifOrBall( struct glyphdata *gd,
     }
     if ( i<master->serif_cnt )
 return;
-    
-    refidx = ( lbase ) ? master->leftidx : master->rightidx;
-    if ( refidx != -1 ) bpd = &gd->points[refidx];
+
     master->serifs = realloc(
 	master->serifs,( scnt+1 )*sizeof( struct dependent_serif ));
     master->serifs[scnt].stem = slave;

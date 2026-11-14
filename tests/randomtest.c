@@ -25,14 +25,18 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <fontforge-config.h>
+
+#include "gfile.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _MSC_VER
 #include <strings.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 #include <dirent.h>
 #include <math.h>
 #include <signal.h>
@@ -172,7 +176,7 @@ static void FindFonts(char **fontdirs,char **extensions) {
     struct dirent *ent;
     int i, max;
     char buffer[1025];
-    struct stat statb;
+    off_t filesize;
 
     max = 0;
     fcnt = 0;
@@ -186,7 +190,8 @@ exit(1);
 
 	while ( (ent = readdir(examples))!=NULL ) {
 	    snprintf(buffer,sizeof(buffer),"%s/%s", fontdirs[i], ent->d_name );
-	    if ( stat(buffer,&statb)==-1 || S_ISDIR(statb.st_mode))
+	    filesize = GFileGetSize(buffer);
+	    if ( filesize==-1 || GFileIsDir(buffer))
 	continue;
 	    if ( extensions==NULL || extmatch(buffer,extensions)) {
 		if ( fcnt>=max ) {
@@ -198,7 +203,7 @@ exit(1);
 		    }
 		}
 		fontlist[fcnt].name = strdup(buffer);
-		fontlist[fcnt].len = statb.st_size;
+		fontlist[fcnt].len = filesize;
 		figurefiletype(&fontlist[fcnt]);
 		++fcnt;
 	    }
@@ -448,7 +453,7 @@ exit( 1 );
 	    command = argv[++i];
 #endif
 	} else {
-	    fprintf( stderr, "%s [options]\tGenerate random erroneous fonts and attmpt to parse them\n", argv[0] );
+	    fprintf( stderr, "%s [options]\tGenerate random erroneous fonts and attempt to parse them\n", argv[0] );
 	    fprintf( stderr, "\t--dir <path-spec>\tAdds <path-spec> to list of dirs searched for fonts\n" );
 	    fprintf( stderr, "\t--ext <extension>\tAdds <extension> to list of extension indicating fonts\n" );
 	    fprintf( stderr, "\t--all \t\tAll non-directory files are assumed to be fonts\n" );

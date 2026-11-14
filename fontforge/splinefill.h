@@ -5,6 +5,10 @@
 #include "gimage.h"
 #include "splinefont.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 enum piecemeal_flags { pf_antialias=1, pf_bbsized=2, pf_ft_nohints=4, pf_ft_recontext=8 };
 
 extern BDFChar *BDFPieceMeal(BDFFont *bdf, int index);
@@ -23,8 +27,7 @@ extern GClut *_BDFClut(int linear_scale);
 extern int BDFDepth(BDFFont *bdf);
 extern int GradientHere(bigreal scale, DBounds *bbox, int iy, int ix, struct gradient *grad, struct pattern *pat, int defgrey);
 extern void BCCompressBitmap(BDFChar *bdfc);
-extern void BCRegularizeBitmap(BDFChar *bdfc);
-extern void BCRegularizeGreymap(BDFChar *bdfc);
+extern void BCRegularizeBitmap(BDFChar *bdfc, int bitsperpixel);
 extern void BDFCAntiAlias(BDFChar *bc, int linear_scale);
 extern void BDFCharFree(BDFChar *bdfc);
 extern void BDFFontFree(BDFFont *bdf);
@@ -32,5 +35,9 @@ extern void BDFPropsFree(BDFFont *bdf);
 extern void FindEdgesSplineSet(SplinePointList *spl, EdgeList *es, int ignore_clip);
 extern void FreeEdges(EdgeList *es);
 extern void PatternPrep(SplineChar *sc, struct brush *brush, bigreal scale);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* FONTFORGE_SPLINEFILL_H */

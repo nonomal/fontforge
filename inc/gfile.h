@@ -30,11 +30,34 @@
 
 #include "basics.h"
 
-/* For mode_t */
+#include <stdio.h>
+#include <time.h>
+
+/* For stat compatibility - must include sys/types.h before sys/stat.h */
 #include <sys/types.h>
+#include <sys/stat.h>
+
+/* For mode_t (not defined by MSVC) */
+#ifdef _MSC_VER
+typedef unsigned short mode_t;
+#endif
+
+#ifdef _MSC_VER
+typedef struct __stat64 ff_stat_t;
+#define ff_stat(p, b) _stat64(p, b)
+#define ff_fstat(f, b) _fstat64(f, b)
+#else
+typedef struct stat ff_stat_t;
+#define ff_stat(p, b) stat(p, b)
+#define ff_fstat(f, b) fstat(f, b)
+#endif
 
 /* home directories for fontforge */
 enum { Cache, Config, Data };
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 int mkdir_p(const char *path, mode_t mode);
 
@@ -45,8 +68,7 @@ extern char* GFileGetHomeDir(void);
 extern unichar_t* u_GFileGetHomeDir(void);
 
 extern char *GFileRemoveExtension(char *path);
-extern char *GFileGetAbsoluteName(const char *name, char *result, size_t rsiz);
-extern char *GFileMakeAbsoluteName(char *name);
+extern char *GFileGetAbsoluteName(const char *name);
 extern char *GFileBuildName(char *dir,char *fname,char *buffer,size_t size);
 extern char *GFileReplaceName(char *oldname,char *fname,char *buffer,size_t size);
 /**
@@ -58,7 +80,7 @@ extern char *GFileReplaceName(char *oldname,char *fname,char *buffer,size_t size
  *
  * The return value is a pointer either being the same as path or a
  * pointer into the string that path points to. So no memory is
- * allocated by this function and the return value is dependant on the
+ * allocated by this function and the return value is dependent on the
  * 'path' string you passed in.
  */ 
 extern char *GFileNameTail(const char *oldname);
@@ -77,8 +99,7 @@ extern int GFileRemove(const char *path, int recursive);
 extern int GFileMkDir(const char *name, int mode);
 extern int GFileRmDir(const char *name);
 extern int GFileUnlink(const char *name);
-extern char *_GFile_find_program_dir(char *prog);
-extern unichar_t *u_GFileGetAbsoluteName(unichar_t *name, unichar_t *result, int rsiz);
+extern char* GFileMimeType(const char *path);
 extern unichar_t *u_GFileBuildName(unichar_t *dir,unichar_t *fname,unichar_t *buffer,int size);
 extern unichar_t *u_GFileReplaceName(unichar_t *oldname,unichar_t *fname,unichar_t *buffer,int size);
 extern unichar_t *u_GFileNameTail(const unichar_t *oldname);
@@ -94,16 +115,18 @@ extern int u_GFileMkDir(unichar_t *name);
 extern int u_GFileRmDir(unichar_t *name);
 extern int u_GFileUnlink(unichar_t *name);
 extern off_t GFileGetSize(char *name);
+extern off_t GFileGetSizeF(FILE *file);
+extern time_t GFileGetMTime(const char *name);
+extern time_t GFileGetMTimeF(FILE *file);
 extern char *GFileReadAll(char *name);
 extern int   GFileWriteAll(char *filepath, char *data);
-extern void  FindProgDir(char *prog);
-extern char *getShareDir(void);
-extern char *getLocaleDir(void);
-extern char *getPixmapDir(void);
-extern char *getHelpDir(void);
-extern char *getUserHomeDir(void);
+extern void  FindProgRoot(const char *prog);
+extern const char *getShareDir();
+extern const char *getLocaleDir(void);
+extern const char *getPixmapDir(void);
+extern const char *getHelpDir(void);
+extern const char *getUserHomeDir(void);
 extern char *getFontForgeUserDir(int dir);
-extern const char *getTempDir(void);
 
 /**
  * This is the full path of ~ on OSX and Linux
@@ -140,8 +163,8 @@ extern char *GFileDirName(const char *path);
  **/
 extern char* getLibexecDir_NonWindows(void);
 
-
-
-
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* FONTFORGE_GFILE_H */

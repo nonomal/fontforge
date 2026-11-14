@@ -80,7 +80,7 @@ static void GListClose(GList *l) {
 static int GListTopInWindow(GList *gl,int last) {
     /* If we want to display last at the bottom of our list, then what line */
     /*  do we display at the top? */
-    int32 height = gl->g.inner.height, temp;
+    int32_t height = gl->g.inner.height, temp;
     int l;
 
     for ( l=last; l>=0; --l ) {
@@ -95,7 +95,7 @@ return( 0 );
 static int GListLinesInWindow(GList *gl,int first) {
     /* Ok, the first line displayed is "first", how many others do we have */
     /*  room for? */
-    int32 height = gl->g.inner.height, temp;
+    int32_t height = gl->g.inner.height, temp;
     int l, lcnt=0;
 
     for ( l=first; l<gl->ltot; ++l ) {
@@ -154,7 +154,7 @@ return( true );
 return( false );
 }
 
-static int32 GListGetFirstSelPos(GGadget *g) {
+static int32_t GListGetFirstSelPos(GGadget *g) {
     int i;
     GList *gl = (GList *) g;
 
@@ -165,7 +165,7 @@ return( i );
 return( -1 );
 }
 
-static void GListSelect(GGadget *g, int32 pos, int32 sel) {
+static void GListSelect(GGadget *g, int32_t pos, int32_t sel) {
     GList *gl = (GList *) g;
     int i;
 
@@ -189,7 +189,7 @@ return;
     }
 }
 
-static void GListSelectOne(GGadget *g, int32 pos) {
+static void GListSelectOne(GGadget *g, int32_t pos) {
     GList *gl = (GList *) g;
 
     GListClearSel(gl);
@@ -201,7 +201,7 @@ static void GListSelectOne(GGadget *g, int32 pos) {
     }
 }
 
-static int32 GListIsItemSelected(GGadget *g, int32 pos) {
+static int32_t GListIsItemSelected(GGadget *g, int32_t pos) {
     GList *gl = (GList *) g;
 
     if ( pos>=gl->ltot )
@@ -331,14 +331,14 @@ static int GListAdjustPos(GGadget *g,int pos) {
 return( newoff );
 }
 
-static void GListShowPos(GGadget *g,int32 pos) {
+static void GListShowPos(GGadget *g,int32_t pos) {
     GList *gl = (GList *) g;
     int newoff = GListAdjustPos(g,pos);
     if ( newoff!=gl->loff )
 	GListScrollBy(gl,newoff-gl->loff,0);
 }
 
-static void GListScrollToText(GGadget *g,const unichar_t *text,int32 sel) {
+static void GListScrollToText(GGadget *g,const unichar_t *text,int32_t sel) {
     GList *gl = (GList *) g;
     int pos;
 
@@ -412,7 +412,7 @@ static int GListFindXMax(GList *gl) {
 return( width );
 }
 
-static void GListSetList(GGadget *g,GTextInfo **ti,int32 docopy) {
+static void GListSetList(GGadget *g,GTextInfo **ti,int32_t docopy) {
     GList *gl = (GList *) g;
     int same;
 
@@ -434,13 +434,13 @@ static void GListClear(GGadget *g) {
     GListSetList(g,NULL,true);
 }
 
-static GTextInfo **GListGetList(GGadget *g,int32 *len) {
+static GTextInfo **GListGetList(GGadget *g,int32_t *len) {
     GList *gl = (GList *) g;
     if ( len!=NULL ) *len = gl->ltot;
 return( gl->ti );
 }
 
-static GTextInfo *GListGetListItem(GGadget *g,int32 pos) {
+static GTextInfo *GListGetListItem(GGadget *g,int32_t pos) {
     GList *gl = (GList *) g;
     if ( pos<0 || pos>=gl->ltot )
 return( NULL );
@@ -478,7 +478,7 @@ return( false );
 	if ( y+gl->hmax > event->u.expose.rect.y )
 	    y += GTextInfoDraw(pixmap,g->inner.x-gl->xoff,y,gl->ti[l],
 		    gl->font,gl->ti[l]->disabled?dfg:fg,g->box->active_border,
-		    ymax);
+		    ymax, -1, -1);
 	else if ( gl->sameheight )
 	    y += gl->hmax;
 	else
@@ -606,7 +606,7 @@ return( true );
 
 static int glist_key(GGadget *g, GEvent *event) {
     GList *gl = (GList *) g;
-    uint16 keysym = event->u.chr.keysym;
+    uint16_t keysym = event->u.chr.keysym;
     int sofar_pos = gl->sofar_pos;
     int loff, xoff, sel=-1;
     int refresh = false;
@@ -815,14 +815,14 @@ static void glist_redraw(GGadget *g) {
     _ggadget_redraw(g);
 }
 
-static void glist_move(GGadget *g, int32 x, int32 y ) {
+static void glist_move(GGadget *g, int32_t x, int32_t y ) {
     GList *gl = (GList *) g;
     if ( gl->vsb!=NULL )
 	_ggadget_move((GGadget *) (gl->vsb),x+(gl->vsb->g.r.x-g->r.x),y);
     _ggadget_move(g,x,y);
 }
 
-static void glist_resize(GGadget *g, int32 width, int32 height ) {
+static void glist_resize(GGadget *g, int32_t width, int32_t height ) {
     GList *gl = (GList *) g;
     if ( gl->vsb!=NULL ) {
 	int oldwidth = gl->vsb->g.r.x+gl->vsb->g.r.width-g->r.x;
@@ -860,7 +860,7 @@ static void GListGetDesiredSize(GGadget *g,GRect *outer, GRect *inner) {
     int bp = GBoxBorderWidth(gl->g.base,gl->g.box);
     int i;
 
-    /* can't deal with eliptical scrolling lists nor diamond ones. Just rects and roundrects */
+    /* can't deal with elliptical scrolling lists nor diamond ones. Just rects and roundrects */
     if ( g->desired_width<=0 ) {
 	GListFindXMax(gl);
 
@@ -950,8 +950,7 @@ struct gfuncs GList_funcs = {
 };
 
 static GBox list_box = GBOX_EMPTY; /* Don't initialize here */;
-static FontInstance *list_font = NULL;
-static int glist_inited = false;
+GResFont list_font = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
 
 static GTextInfo list_choices[] = {
     { (unichar_t *) "1", NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
@@ -959,15 +958,16 @@ static GTextInfo list_choices[] = {
     { (unichar_t *) "3", NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
     GTEXTINFO_EMPTY
 };
-static GGadgetCreateData list_gcd[] = {
+GGadgetCreateData list_gcd[] = {
     { GListCreate, { { 0, 0, 0, 36 }, NULL, 0, 0, 0, 0, 0, &list_choices[0], { list_choices }, gg_visible, NULL, NULL }, NULL, NULL },
     { GListCreate, { { 0, 0, 0, 36 }, NULL, 0, 0, 0, 0, 0, &list_choices[0], { list_choices }, gg_visible|gg_enabled, NULL, NULL }, NULL, NULL }
 };
 static GGadgetCreateData *tarray[] = { GCD_Glue, &list_gcd[0], GCD_Glue, &list_gcd[1], GCD_Glue, NULL, NULL };
 static GGadgetCreateData listhvbox =
     { GHVGroupCreate, { { 2, 2, 0, 0 }, NULL, 0, 0, 0, 0, 0, NULL, { (GTextInfo *) tarray }, gg_visible|gg_enabled, NULL, NULL }, NULL, NULL };
-static GResInfo glist_ri = {
-    NULL, &ggadget_ri,NULL, NULL,
+extern GResInfo gscrollbar_ri;
+GResInfo glist_ri = {
+    &gscrollbar_ri, &ggadget_ri,NULL, NULL,
     &list_box,
     &list_font,
     &listhvbox,
@@ -977,20 +977,14 @@ static GResInfo glist_ri = {
     "GList",
     "Gdraw",
     false,
+    false,
     box_foreground_border_outer,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
     NULL
 };
-
-static void GListInit() {
-    _GGadgetCopyDefaultBox(&list_box);
-    list_box.flags |= box_foreground_border_outer;
-    list_font = _GGadgetInitDefaultBox("GList.",&list_box,NULL);
-    glist_inited = true;
-}
 
 static void GListFit(GList *gl) {
     int bp = GBoxBorderWidth(gl->g.base,gl->g.box);
@@ -1010,11 +1004,10 @@ static void GListFit(GList *gl) {
 static GList *_GListCreate(GList *gl, struct gwindow *base, GGadgetData *gd,void *data, GBox *def) {
     int same;
 
-    if ( !glist_inited )
-	GListInit();
+    GResEditDoInit(&glist_ri);
     gl->g.funcs = &GList_funcs;
     _GGadget_Create(&gl->g,base,gd,data,def);
-    gl->font = list_font;
+    gl->font = list_font.fi;
     gl->g.takes_input = gl->g.takes_keyboard = true; gl->g.focusable = true;
 
     if ( !(gd->flags & gg_list_internal ) ) {
@@ -1095,14 +1088,13 @@ static void GListPopupFigurePos(GGadget *owner,GTextInfo **ti,GRect *pos) {
     int bp;
     GPoint pt;
 
-    if ( !glist_inited )
-	GListInit();
+    GResEditDoInit(&glist_ri);
     GDrawGetSize(GDrawGetRoot(GDrawGetDisplayOfWindow(owner->base)),&rootsize);
     maxh = 2*rootsize.height/3;
-    width = GTextInfoGetMaxWidth(owner->base,ti,list_font);
+    width = GTextInfoGetMaxWidth(owner->base,ti,list_font.fi);
     height = 0;
     for ( i=0; height<maxh && (ti[i]->text!=NULL || ti[i]->image!=NULL || ti[i]->line); ++i )
-	height += GTextInfoGetHeight(owner->base,ti[i],list_font);
+	height += GTextInfoGetHeight(owner->base,ti[i],list_font.fi);
     if ( ti[i]->text!=NULL || ti[i]->image!=NULL || ti[i]->line )	/* Need a scroll bar if more */
 	width += GDrawPointsToPixels(owner->base,_GScrollBar_Width) +
 		GDrawPointsToPixels(owner->base,1);
@@ -1203,15 +1195,4 @@ void GListSetSBAlwaysVisible(GGadget *g,int always) {
 
 void GListSetPopupCallback(GGadget *g,void (*callback)(GGadget *,int)) {
     ((GList *) g)->popup_callback = callback;
-}
-
-GResInfo *_GListRIHead(void) {
-    int as,ds,ld;
-
-    if ( !glist_inited )
-	GListInit();
-    /* bp = GBoxBorderWidth(GDrawGetRoot(NULL),&list_box);*/	/* This gives bizarre values */
-    GDrawWindowFontMetrics(GDrawGetRoot(NULL),list_font,&as, &ds, &ld);	/* I don't have a window yet... */
-    list_gcd[0].gd.pos.height = list_gcd[1].gd.pos.height = 2*(as+ds)+4;
-return( &glist_ri );
 }

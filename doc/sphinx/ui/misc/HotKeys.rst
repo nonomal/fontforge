@@ -46,6 +46,7 @@ yourself unless you want to make changes. The defaults are shown below:
 :Ctrl-O:            :ref:`Open <filemenu.Open>`
 :Ctrl-Shift-O:      :ref:`Remove Overlap <elementmenu.Remove>`
 :Ctrl-P:            :ref:`Print <filemenu.Print>`
+:Ctrl-Shift-P:      :ref:`Balance <elementmenu.Balance>`
 :Alt-Ctrl-P:        :doc:`Display </ui/dialogs/display>`
 :Ctrl-Q:            :ref:`Quit <filemenu.Quit>`
 :Ctrl-Shift-Q:      :ref:`Close <filemenu.Close>`
@@ -64,7 +65,9 @@ yourself unless you want to make changes. The defaults are shown below:
 :Ctrl-X:            :ref:`Cut <editmenu.Cut>`
 :Ctrl-Shift-X:      :ref:`Add Extrema <elementmenu.Add-Extrema>`
 :Ctrl-Y:            :ref:`Redo <editmenu.Redo>`
+:Ctrl-Shift-Y:      :ref:`Add Points Of Inflection <elementmenu.Add-Inflections>`
 :Ctrl-Z:            :ref:`Undo <editmenu.Undo>`
+:Ctrl-Shift-Z:      :ref:`Harmonize <elementmenu.Harmonize>`
 :Ctrl-\\:           :ref:`Transform <elementmenu.Transform>`
 :Ctrl-Shift-_:      :ref:`Round to Int <elementmenu.Round>`
 :Ctrl-1:            :ref:`Make First <pointmenu.Make-First>`
@@ -130,12 +133,6 @@ I am aware of the following significant differences:
   (And the Option key acts as a compose key in the same way it does on the Mac
   when not using X)
 * On Suns the meta (diamond) key is equivalent to the Alt modifier key.
-
-FontForge will attempt to guess what keyboard you are using and produce menus
-with hot-key indicators that match the host machine. If you are displaying on a
-different machine from the one you are running on the menu names may be wrong.
-You can fix this up with the :ref:`keyboard resource <xres.Keyboard>`, or the
--keyboard command line argument.
 
 
 Tool modifiers in the Outline Glyph Window

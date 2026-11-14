@@ -41,7 +41,7 @@ static void NOUI_IError(const char *format,...) {
     va_start(ap,format);
     fprintf(stderr, "Internal Error: " );
     vsnprintf(buffer,sizeof(buffer),format,ap);
-    str = utf82def_copy(buffer);
+    str = utf82def_copy_safe(buffer);
     fprintf(stderr,"%s",str);
     if ( str[strlen(str)-1]!='\n' )
 	putc('\n',stderr);
@@ -52,7 +52,7 @@ static void NOUI_IError(const char *format,...) {
 static void NOUI__LogError(const char *format,va_list ap) {
     char buffer[400], *str;
     vsnprintf(buffer,sizeof(buffer),format,ap);
-    str = utf82def_copy(buffer);
+    str = utf82def_copy_safe(buffer);
     fprintf(stderr,"%s",str);
     if ( str[strlen(str)-1]!='\n' )
 	putc('\n',stderr);
@@ -143,6 +143,10 @@ static void NOUI_plugin_dlg(void) {
 }
 #endif
 
+static int NOUI_ask_multi(const char *title, struct multi_dlg_spec *spec) {
+    return false;
+}
+
 static struct ui_interface noui_interface = {
     NOUI_IError,
     NOUI_post_error,
@@ -176,10 +180,11 @@ static struct ui_interface noui_interface = {
     NOUI_TTFNameIds,
     NOUI_MSLangString,
     NOUI_import_params_dlg,
-    NOUI_export_params_dlg
+    NOUI_export_params_dlg,
 #ifndef _NO_PYTHON
-    ,NOUI_plugin_dlg
+    NOUI_plugin_dlg,
 #endif
+    NOUI_ask_multi
 };
 struct ui_interface *ui_interface = &noui_interface;
 

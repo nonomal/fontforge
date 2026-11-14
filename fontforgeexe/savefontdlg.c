@@ -32,9 +32,7 @@
 #include "fontforgeui.h"
 #include "gfile.h"
 #include "gicons.h"
-#include "gio.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "macbinary.h"
 #include "mm.h"
 #include "namelist.h"
@@ -100,6 +98,7 @@ static int nfnt_warned = false, post_warned = false;
 #define CID_NativeKern		1118
 #define CID_TTF_OldKernMappedOnly 1119
 #define CID_TTF_FFTMTable	1120
+#define CID_TTF_LegacyRecommendedGlyphs	1121
 
 struct gfc_data {
     int done;
@@ -120,7 +119,7 @@ struct gfc_data {
     int sfnt_flags;		/*  important. We index into them */
   /* WAS otf_flags */
     int psotb_flags;		/*  don't reorder or put junk in between */
-    uint8 optset[3];
+    uint8_t optset[3];
     SplineFont *sf;
     EncMap *map;
     int layer;
@@ -165,8 +164,10 @@ static GTextInfo formattypes[] = {
     { (unichar_t *) N_("Unified Font Object (UFO3)"), NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
     { (unichar_t *) N_("Unified Font Object 2"), NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
     { (unichar_t *) N_("Unified Font Object 3"), NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
-    { (unichar_t *) N_("Web Open Font (WOFF)"), NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
-    { (unichar_t *) N_("Web Open Font (WOFF2)"), NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) N_("Web Open Font (WOFF TTF)"), NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) N_("Web Open Font (WOFF OTF)"), NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) N_("Web Open Font (WOFF2 TTF)"), NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
+    { (unichar_t *) N_("Web Open Font (WOFF2 OTF)"), NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
     { (unichar_t *) N_("No Outline Font"), NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },
     GTEXTINFO_EMPTY
 };
@@ -202,11 +203,11 @@ extern int oldbitmapstate;
 
 static const char *pfaeditflag = "SplineFontDB:";
 
-static int32 *ParseBitmapSizes(GGadget *g, int *err) {
+static int32_t *ParseBitmapSizes(GGadget *g, int *err) {
     const unichar_t *val = _GGadgetGetTitle(g), *pt; unichar_t *end, *end2;
     const char *msg = _("Pixel List"); // Before switching to C locale
     int i;
-    int32 *sizes;
+    int32_t *sizes;
 
     locale_t tmplocale; locale_t oldlocale; // Declare temporary locale storage.
     switch_to_c_locale(&tmplocale, &oldlocale); // Switch to the C locale temporarily and cache the old locale.
@@ -221,7 +222,7 @@ static int32 *ParseBitmapSizes(GGadget *g, int *err) {
 	pt = end+1;
 	end2 = NULL;
     }
-    sizes = malloc((i+1)*sizeof(int32));
+    sizes = malloc((i+1)*sizeof(int32_t));
 
     for ( i=0, pt = val; *pt!='\0' ; ) {
 	sizes[i]=rint(u_strtod(pt,&end));
@@ -255,7 +256,6 @@ static int OPT_PSHints(GGadget *g, GEvent *e) {
 	    int flags = (&d->ps_flags)[which];
 	    /*GGadgetSetEnabled(GWidgetGetControl(gw,CID_PS_HintSubs),true);*/
 	    GGadgetSetEnabled(GWidgetGetControl(gw,CID_PS_Flex),true);
-	    /*GGadgetSetChecked(GWidgetGetControl(gw,CID_PS_HintSubs),!(flags&ps_flag_nohintsubs));*/
 	    GGadgetSetChecked(GWidgetGetControl(gw,CID_PS_Flex),!(flags&ps_flag_noflex));
 	} else {
 	    /*GGadgetSetEnabled(GWidgetGetControl(gw,CID_PS_HintSubs),false);*/
@@ -308,16 +308,12 @@ return( false );
 		    d->ps_flags |= ps_flag_pfm;
 		if ( GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_TFM)) )
 		    d->ps_flags |= ps_flag_tfm;
-		/*if ( !GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_HintSubs)) )*/
-		    /*d->ps_flags |= ps_flag_nohintsubs;*/
 		if ( !GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_Flex)) )
 		    d->ps_flags |= ps_flag_noflex;
 		if ( !GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_Hints)) )
 		    d->ps_flags |= ps_flag_nohints;
 		if ( GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_Round)) )
 		    d->ps_flags |= ps_flag_round;
-		/*if ( GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_Restrict256)) )*/
-		    /*d->ps_flags |= ps_flag_restrict256;*/
 		if ( GGadgetIsChecked(GWidgetGetControl(gw,CID_FontLog)) )
 		    d->ps_flags |= ps_flag_outputfontlog;
 	    } else if ( d->sod_which==1 || d->sod_which==2 ) {	/* Open/TrueType */
@@ -358,8 +354,6 @@ return( false );
 		    d->sfnt_flags |= ps_flag_afm;
 		if ( GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_AFMmarks)) )
 		    d->sfnt_flags |= ps_flag_afmwithmarks;
-		/*if ( !GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_HintSubs)) )*/
-		    /*d->sfnt_flags |= ps_flag_nohintsubs;*/
 		if ( !GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_Flex)) )
 		    d->sfnt_flags |= ps_flag_noflex;
 		if ( !GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_Hints)) )
@@ -375,12 +369,12 @@ return( false );
 		    d->sfnt_flags |= ttf_flag_oldkernmappedonly;
 		if ( GGadgetIsChecked(GWidgetGetControl(gw,CID_TTF_NoMacNames)) )
 		    d->sfnt_flags |= ttf_flag_nomacnames;
+		if ( !GGadgetIsChecked(GWidgetGetControl(gw,CID_TTF_LegacyRecommendedGlyphs)) )
+		    d->sfnt_flags |= ttf_flag_nospecialnullcr;
 	    } else {				/* PS + OpenType Bitmap */
 		d->ps_flags = d->psotb_flags = 0;
 		if ( GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_AFMmarks)) )
 		     d->psotb_flags = d->ps_flags |= ps_flag_afmwithmarks;
-		/*if ( !GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_HintSubs)) )*/
-		     /*d->psotb_flags = d->ps_flags |= ps_flag_nohintsubs;*/
 		if ( !GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_Flex)) )
 		     d->psotb_flags = d->ps_flags |= ps_flag_noflex;
 		if ( !GGadgetIsChecked(GWidgetGetControl(gw,CID_PS_Hints)) )
@@ -414,6 +408,8 @@ return( false );
 		    d->psotb_flags |= ttf_flag_ofm;
 		if ( GGadgetIsChecked(GWidgetGetControl(gw,CID_TTF_NoMacNames)) )
 		    d->psotb_flags |= ttf_flag_nomacnames;
+		if ( !GGadgetIsChecked(GWidgetGetControl(gw,CID_TTF_LegacyRecommendedGlyphs)) )
+		    d->psotb_flags |= ttf_flag_nospecialnullcr;
 	    }
 	    d->sod_invoked = true;
 	}
@@ -433,9 +429,7 @@ static void OptSetDefaults(GWindow gw,struct gfc_data *d,int which,int iscid) {
     /* which==3 => generating an sfnt based bitmap only font with a postscript outline font */
 
     GGadgetSetChecked(GWidgetGetControl(gw,CID_PS_Hints),!(flags&ps_flag_nohints));
-    /*GGadgetSetChecked(GWidgetGetControl(gw,CID_PS_HintSubs),!(flags&ps_flag_nohintsubs));*/
     GGadgetSetChecked(GWidgetGetControl(gw,CID_PS_Flex),!(flags&ps_flag_noflex));
-    /*GGadgetSetChecked(GWidgetGetControl(gw,CID_PS_Restrict256),flags&ps_flag_restrict256);*/
     GGadgetSetChecked(GWidgetGetControl(gw,CID_PS_Round),flags&ps_flag_round);
 
     GGadgetSetChecked(GWidgetGetControl(gw,CID_PS_AFM),flags&ps_flag_afm);
@@ -478,6 +472,7 @@ static void OptSetDefaults(GWindow gw,struct gfc_data *d,int which,int iscid) {
     GGadgetSetChecked(GWidgetGetControl(gw,CID_NativeKern),flags&ttf_native_kern);
     GGadgetSetChecked(GWidgetGetControl(gw,CID_TTF_OldKernMappedOnly),flags&ttf_flag_oldkernmappedonly);
     GGadgetSetChecked(GWidgetGetControl(gw,CID_TTF_NoMacNames),flags&ttf_flag_nomacnames);
+    GGadgetSetChecked(GWidgetGetControl(gw,CID_TTF_LegacyRecommendedGlyphs),!(flags&ttf_flag_nospecialnullcr));
 
     GGadgetSetEnabled(GWidgetGetControl(gw,CID_PS_Hints),which!=1);
     GGadgetSetEnabled(GWidgetGetControl(gw,CID_PS_Flex),which!=1);
@@ -513,6 +508,7 @@ static void OptSetDefaults(GWindow gw,struct gfc_data *d,int which,int iscid) {
     
     GGadgetSetEnabled(GWidgetGetControl(gw,CID_TTF_OldKernMappedOnly),which!=0 );
     GGadgetSetEnabled(GWidgetGetControl(gw,CID_TTF_NoMacNames),which!=0 );
+    GGadgetSetChecked(GWidgetGetControl(gw,CID_TTF_LegacyRecommendedGlyphs),which!=0);
 
     d->optset[which] = true;
 }
@@ -521,13 +517,13 @@ static void OptSetDefaults(GWindow gw,struct gfc_data *d,int which,int iscid) {
 #define OPT_Height	233
 
 static void SaveOptionsDlg(struct gfc_data *d,int which,int iscid) {
-    int k,fontlog_k,group,group2;
+    int k,group,group2;
     GWindow gw;
     GWindowAttrs wattrs;
-    GGadgetCreateData gcd[36];
-    GTextInfo label[36];
+    GGadgetCreateData gcd[37];
+    GTextInfo label[37];
     GRect pos;
-    GGadgetCreateData *hvarray1[21], *hvarray2[44], *hvarray3[8], *harray[7], *varray[11];
+    GGadgetCreateData *hvarray1[21], *hvarray2[44], *hvarray3[10], *harray[7], *varray[11];
     GGadgetCreateData boxes[6];
 
     d->sod_done = false;
@@ -854,14 +850,13 @@ static void SaveOptionsDlg(struct gfc_data *d,int which,int iscid) {
     boxes[3].gd.label = (GTextInfo *) &gcd[group2-1];
     boxes[3].creator = GHVGroupCreate;
 
-    fontlog_k = k;
     gcd[k].gd.flags = gg_visible | gg_enabled;
     label[k].text = (unichar_t *) _("Output FONTLOG.txt");
     label[k].text_is_1byte = true;
     gcd[k].gd.popup_msg = _(
 	"The FONTLOG is a text file containing relevant information\n"
 	"about the font including such things as its changelog.\n"
-	"(A general template is available in the OFL FAQ on http://scripts.sil.org/OFL-FAQ_web)\n"
+	"(A general template is available in the OFL FAQ on https://openfontlicense.org/ofl-faq/)\n"
 	"Usage within an open font project is highly recommended but not required.\n"
 	"If your font already contains a fontlog table (see the Element->Font Info)\n"
 	"and you check this box, then the internal fontlog information will be\n"
@@ -901,9 +896,19 @@ static void SaveOptionsDlg(struct gfc_data *d,int which,int iscid) {
     gcd[k].gd.label = &label[k];
     gcd[k].gd.cid = CID_TTF_NoMacNames;
     gcd[k++].creator = GCheckBoxCreate;
-    hvarray3[5] = &gcd[k-1];
+    hvarray3[5] = &gcd[k-1]; hvarray3[6] = NULL;
 
-    hvarray3[6] = NULL; hvarray3[7] = NULL;
+    gcd[k].gd.pos.x = gcd[k-1].gd.pos.x; gcd[k].gd.pos.y = gcd[k-1].gd.pos.y;
+    gcd[k].gd.flags = gg_visible | gg_enabled;
+    label[k].text = (unichar_t *) _("Legacy recommended glyphs");
+    label[k].text_is_1byte = true;
+    gcd[k].gd.popup_msg = _("Make sure legacy (pre-OT 1.8) recommended glyphs, namely '.notdef', '.null' and 'nonmarkingreturn', exist at the beginning of the glyph order. Starting OpenType 1.8, only '.notdef' is mandatory.");
+    gcd[k].gd.label = &label[k];
+    gcd[k].gd.cid = CID_TTF_LegacyRecommendedGlyphs;
+    gcd[k++].creator = GCheckBoxCreate;
+    hvarray3[7] = &gcd[k-1];
+
+    hvarray3[8] = NULL; hvarray3[9] = NULL;
 
     boxes[4].gd.flags = gg_enabled|gg_visible;
     boxes[4].gd.u.boxelements = hvarray3;
@@ -1172,7 +1177,7 @@ return( -1 );
     }
 }
 
-static char *SearchDirForWernerFile(char *dir,char *filename) {
+static char *SearchDirForWernerFile(const char *dir,char *filename) {
     char buffer[1025], buf2[200];
     FILE *file;
     int good = 0;
@@ -1196,18 +1201,14 @@ static char *SearchDirForWernerFile(char *dir,char *filename) {
     return( NULL );
 }
 
-static enum fchooserret GFileChooserFilterWernerSFDs(GGadget *g,GDirEntry *ent,
-	const unichar_t *dir) {
+static enum fchooserret GFileChooserFilterWernerSFDs(GGadget *g,const struct gdirentry *ent,
+	const char *dir) {
     enum fchooserret ret = GFileChooserDefFilter(g,ent,dir);
     char buf2[200];
     FILE *file;
 
     if ( ret==fc_show && !ent->isdir ) {
-	char *filename = malloc(u_strlen(dir)+u_strlen(ent->name)+5);
-	cu_strcpy(filename,dir);
-	strcat(filename,"/");
-	cu_strcat(filename,ent->name);
-	file = fopen(filename,"r");
+	file = fopen(ent->fullpath,"r");
 	if ( file==NULL )
 	    ret = fc_hide;
 	else {
@@ -1216,7 +1217,6 @@ static enum fchooserret GFileChooserFilterWernerSFDs(GGadget *g,GDirEntry *ent,
 		ret = fc_hide;
 	    fclose(file);
 	}
-	free(filename);
     }
 return( ret );
 }
@@ -1321,10 +1321,10 @@ static void prepend_timestamp(struct gfc_data *d){
 static void DoSave(struct gfc_data *d,unichar_t *path) {
     int err=false;
     char *temp;
-    int32 *sizes=NULL;
+    int32_t *sizes=NULL;
     int iscid, i;
     struct sflist *sfs=NULL, *cur, *last=NULL;
-    static int psscalewarned=0, ttfscalewarned=0, psfnlenwarned=0;
+    static int psfnlenwarned=0;
     int flags;
     struct sflist *sfl;
     char **former;
@@ -1362,7 +1362,7 @@ return;
     }
 
     if ( d->family==gf_none )
-	layer = (intpt) GGadgetGetListItemSelected(GWidgetGetControl(d->gw,CID_Layers))->userdata;
+	layer = (intptr_t) GGadgetGetListItemSelected(GWidgetGetControl(d->gw,CID_Layers))->userdata;
 
     temp = u2def_copy(path);
     oldformatstate = GGadgetGetFirstListSelectedItem(d->pstype);
@@ -1406,12 +1406,14 @@ return;
     }
 
     if ( likecff || oldformatstate<=ff_cffcid ||
-	    (oldformatstate>=ff_otf && oldformatstate<=ff_otfciddfont)) {
-	if ( d->sf->ascent+d->sf->descent!=1000 && !psscalewarned ) {
-	    if ( gwwv_ask(_("Non-standard Em-Size"),(const char **) buts,0,1,_("The convention is that PostScript fonts should have an Em-Size of 1000. But this font has a size of %d. This is not an error, but you might consider altering the Em-Size with the Element->Font Info->General dialog.\nDo you wish to continue to generate your font in spite of this?"),
-		    d->sf->ascent+d->sf->descent)==1 )
-return;
-	    psscalewarned = true;
+	     (oldformatstate>=ff_otf && oldformatstate<=ff_otfciddfont) ||
+        oldformatstate==ff_woff_otf || oldformatstate==ff_woff2_otf) {
+	if ( d->sf->ascent+d->sf->descent!=1000 ) {
+	    LogError(_("The convention is that PostScript fonts should have an Em-Size of "
+		"1000. But this font has a size of %d. This is not an error, but "
+		"you might consider altering the Em-Size with the Element->Font "
+		"Info->General dialog."),
+		d->sf->ascent + d->sf->descent);
 	}
 	if ( (strlen(d->sf->fontname)>31 || (d->sf->familyname!=NULL && strlen(d->sf->familyname)>31)) && !psfnlenwarned ) {
 	    if ( gwwv_ask(_("Bad Font Name"),(const char **) buts,0,1,_("Some versions of Windows will refuse to install postscript fonts if the fontname is longer than 31 characters. Do you want to continue anyway?"))==1 )
@@ -1425,10 +1427,12 @@ return;
 	for ( bit=0x800000; bit!=0; bit>>=1 )
 	    if ( bit==val )
 	break;
-	if ( bit==0 && !ttfscalewarned ) {
-	    if ( gwwv_ask(_("Non-standard Em-Size"),(const char **) buts,0,1,_("The convention is that TrueType fonts should have an Em-Size which is a power of 2. But this font has a size of %d. This is not an error, but you might consider altering the Em-Size with the Element->Font Info->General dialog.\nDo you wish to continue to generate your font in spite of this?"),val)==1 )
-return;
-	    ttfscalewarned = true;
+	if ( bit==0 ) {
+	    LogError(_("The convention is that TrueType fonts should have an Em-Size which "
+		"is a power of 2. But this font has a size of %d. This is not an "
+		"error, but you might consider altering the Em-Size with the "
+		"Element->Font Info->General dialog."),
+		val);
 	}
     }
 
@@ -1489,7 +1493,7 @@ return;
 	    /* No point in validating type3 fonts */;
 	else if ( (old_validate = GGadgetIsChecked(d->validate))) {
 	    int vs = SFValidate(d->sf,layer,false);
-	    int mask = VSMaskFromFormat(d->sf,layer,oldformatstate);
+	    enum validation_state mask = VSMaskFromFormat(d->sf,layer,oldformatstate);
 	    int blues = ValidatePrivate(d->sf)& ~pds_missingblue;
 	    if ( (vs&mask) || blues!=0 ) {
 		const char *rsb[3];
@@ -1605,45 +1609,32 @@ return;
     d->ret = !err;
 }
 
-static void GFD_doesnt(GIOControl *gio) {
-    /* The filename the user chose doesn't exist, so everything is happy */
-    struct gfc_data *d = gio->userdata;
-    DoSave(d,gio->path);
-    GFileChooserReplaceIO(d->gfc,NULL);
-}
-
-static void GFD_exists(GIOControl *gio) {
-    /* The filename the user chose exists, ask user if s/he wants to overwrite */
-    struct gfc_data *d = gio->userdata;
-    char *temp;
-    const char *rcb[3];
-
-    rcb[2]=NULL;
-    rcb[0] =  _("_Replace");
-    rcb[1] =  _("_Cancel");
-
-    if ( gwwv_ask(_("File Exists"),rcb,0,1,_("File, %s, exists. Replace it?"),
-	    temp = u2utf8_copy(u_GFileNameTail(gio->path)))==0 ) {
-	DoSave(d,gio->path);
-    }
-    free(temp);
-    GFileChooserReplaceIO(d->gfc,NULL);
-}
-
 static void _GFD_SaveOk(struct gfc_data *d) {
     GGadget *tf;
     unichar_t *ret;
+	char *tmp;
     int formatstate = GGadgetGetFirstListSelectedItem(d->pstype);
+	bool save = true;
 
     GFileChooserGetChildren(d->gfc,NULL,NULL,&tf);
     if ( *_GGadgetGetTitle(tf)!='\0' ) {
 	ret = GGadgetGetTitle(d->gfc);
-	if ( formatstate!=ff_none )	/* are we actually generating an outline font? */
-	    GIOfileExists(GFileChooserReplaceIO(d->gfc,
-		    GIOCreate(ret,d,GFD_exists,GFD_doesnt)));
-	else
-	    GFD_doesnt(GIOCreate(ret,d,GFD_exists,GFD_doesnt));	/* No point in bugging the user if we aren't doing anything */
+	tmp = u2def_copy(ret);
+	/* No point in bugging the user if we aren't doing anything */
+	if (formatstate != ff_none && GFileExists(tmp)) {
+		const char *rcb[3];
+
+		rcb[2]=NULL;
+		rcb[0] =  _("_Replace");
+		rcb[1] =  _("_Cancel");
+
+		save = gwwv_ask(_("File Exists"),rcb,0,1,_("File, %s, exists. Replace it?"),tmp) == 0;
+	}
+	if (save) {
+		DoSave(d, ret);
+	}
 	free(ret);
+	free(tmp);
     }
 }
 
@@ -1676,14 +1667,12 @@ static void GFD_FigureWhich(struct gfc_data *d) {
 	which = 1;		/* truetype options */ /* type42 also */
     else
 	which = 2;		/* opentype options */
-    if ( fs==ff_woff || fs==ff_woff2 ) {
-	SplineFont *sf = d->sf;
-	int layer = d->layer;
-	if ( sf->layers[layer].order2 )
+
+    if ( fs==ff_woff_ttf || fs==ff_woff2_ttf )
 	    which = 1;			/* truetype */
-	else
+	else if ( fs==ff_woff_otf || fs==ff_woff2_otf )
 	    which = 2;			/* opentype */
-    }
+       
     if ( bf == bf_otb && which==0 )
 	which = 3;		/* postscript options with opentype bitmap options */
     d->sod_which = which;
@@ -1701,31 +1690,11 @@ static int GFD_Options(GGadget *g, GEvent *e) {
 return( true );
 }
 
-static void GFD_dircreated(GIOControl *gio) {
-    struct gfc_data *d = gio->userdata;
-    unichar_t *dir = u_copy(gio->path);
-
-    GFileChooserReplaceIO(d->gfc,NULL);
-    GFileChooserSetDir(d->gfc,dir);
-    free(dir);
-}
-
-static void GFD_dircreatefailed(GIOControl *gio) {
-    /* We couldn't create the directory */
-    struct gfc_data *d = gio->userdata;
-    char *temp;
-
-    ff_post_notice(_("Couldn't create directory"),_("Couldn't create directory: %s"),
-		temp = u2utf8_copy(u_GFileNameTail(gio->path)));
-    free(temp);
-    GFileChooserReplaceIO(d->gfc,NULL);
-}
-
 static int GFD_NewDir(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
 	struct gfc_data *d = GDrawGetUserData(GGadgetGetWindow(g));
 	char *newdir;
-	unichar_t *temp;
+	unichar_t *temp = NULL;
 	newdir = gwwv_ask_string(_("Create directory..."),NULL,_("Directory name?"));
 	if ( newdir==NULL )
 return( true );
@@ -1735,9 +1704,13 @@ return( true );
 	    free(newdir); free(olddir);
 	    newdir = temp;
 	}
-	temp = utf82u_copy(newdir);
-	GIOmkDir(GFileChooserReplaceIO(d->gfc,
-		GIOCreate(temp,d,GFD_dircreated,GFD_dircreatefailed)));
+	if (GFileMkDir(newdir, 0755)) {
+		ff_post_notice(_("Couldn't create directory"),_("Couldn't create directory: %s"),
+			newdir);
+	} else {
+		temp = utf82u_copy(newdir);
+		GFileChooserSetDir(d->gfc, temp);
+	}
 	free(newdir); free(temp);
     }
 return( true );
@@ -1776,7 +1749,7 @@ static int GFD_Format(GGadget *g, GEvent *e) {
 	struct gfc_data *d = GDrawGetUserData(GGadgetGetWindow(g));
 	unichar_t *pt, *dup, *tpt, *ret;
 	int format = GGadgetGetFirstListSelectedItem(d->pstype);
-	int32 len; int bf;
+	int32_t len; int bf;
 	static unichar_t nullstr[] = { 0 };
 	GTextInfo **list;
 	SplineFont *temp;
@@ -2013,7 +1986,7 @@ static GTextInfo *SFUsableLayerNames(SplineFont *sf,int def_layer) {
 	ti[cnt].text = (unichar_t *) sf->layers[layer].name;
 	ti[cnt].text_is_1byte = true;
 	ti[cnt].selected = layer==def_layer;
-	ti[cnt++].userdata = (void *) (intpt) layer;
+	ti[cnt++].userdata = (void *) (intptr_t) layer;
     }
 return( ti );
 }
@@ -2035,7 +2008,7 @@ int SFGenerateFont(SplineFont *sf,int layer,int family,EncMap *map) {
     int familycnt=0;
     int fondcnt = 0, fondmax = 10;
     SFArray *familysfs=NULL;
-    uint16 psstyle;
+    uint16_t psstyle;
     static int done=false;
     extern NameList *force_names_when_saving;
     char **nlnames;
@@ -2052,11 +2025,6 @@ int SFGenerateFont(SplineFont *sf,int layer,int family,EncMap *map) {
 	    formattypes[i].text = (unichar_t *) _((char *) formattypes[i].text);
 	for ( i=0; bitmaptypes[i].text; ++i )
 	    bitmaptypes[i].text = (unichar_t *) _((char *) bitmaptypes[i].text);
-    }
-
-    if ( family==gf_macfamily ) {
-	old_sfnt_flags |=  ttf_flag_applemode;
-	old_sfnt_flags &= ~ttf_flag_otmode;
     }
 
     if ( family ) {
@@ -2354,7 +2322,8 @@ return( 0 );
 	ofs = ff_ttc;
     }
 #ifndef FONTFORGE_CAN_USE_WOFF2
-	formattypes[ff_woff2].disabled = true;
+	formattypes[ff_woff2_ttf].disabled = true;
+	formattypes[ff_woff2_otf].disabled = true;
 #endif
 
     for ( i=0; i<sizeof(formattypes)/sizeof(formattypes[0]); ++i )
@@ -2714,6 +2683,10 @@ return( 0 );
 
     d.ps_flags = old_ps_flags;
     d.sfnt_flags = old_sfnt_flags;
+    if ( family==gf_macfamily ) {
+	d.sfnt_flags |=  ttf_flag_applemode;
+	d.sfnt_flags &= ~ttf_flag_otmode;
+    }
     d.psotb_flags = old_ps_flags | (old_psotb_flags&~ps_flag_mask);
 
     GFD_FigureWhich(&d);

@@ -294,8 +294,8 @@ PST *PSTCopy(PST *base,SplineChar *sc,struct sfmergecontext *mc) {
 	    cur->u.pair.vr[0].adjust = ValDevTabCopy(base->u.pair.vr[0].adjust);
 	    cur->u.pair.vr[1].adjust = ValDevTabCopy(base->u.pair.vr[1].adjust);
 	} else if ( cur->type==pst_lcaret ) {
-	    cur->u.lcaret.carets = malloc(cur->u.lcaret.cnt*sizeof(int16));
-	    memcpy(cur->u.lcaret.carets,base->u.lcaret.carets,cur->u.lcaret.cnt*sizeof(uint16));
+	    cur->u.lcaret.carets = malloc(cur->u.lcaret.cnt*sizeof(int16_t));
+	    memcpy(cur->u.lcaret.carets,base->u.lcaret.carets,cur->u.lcaret.cnt*sizeof(uint16_t));
 	} else if ( cur->type==pst_substitution || cur->type==pst_multiple || cur->type==pst_alternate )
 	    cur->u.subs.variant = copy(cur->u.subs.variant);
 	if ( head==NULL )
@@ -409,8 +409,8 @@ static void ASMsAdd(SplineFont *into, SplineFont *from,struct sfmergecontext *mc
 	memcpy(nsm->state,sm->state,nsm->class_cnt*nsm->state_cnt*sizeof(struct asm_state));
 	if ( nsm->type == asm_kern ) {
 	    for ( i=nsm->class_cnt*nsm->state_cnt-1; i>=0; --i ) {
-		nsm->state[i].u.kern.kerns = malloc(nsm->state[i].u.kern.kcnt*sizeof(int16));
-		memcpy(nsm->state[i].u.kern.kerns,sm->state[i].u.kern.kerns,nsm->state[i].u.kern.kcnt*sizeof(int16));
+		nsm->state[i].u.kern.kerns = malloc(nsm->state[i].u.kern.kcnt*sizeof(int16_t));
+		memcpy(nsm->state[i].u.kern.kerns,sm->state[i].u.kern.kerns,nsm->state[i].u.kern.kcnt*sizeof(int16_t));
 	    }
 	} else if ( nsm->type == asm_context ) {
 	    for ( i=0; i<nsm->class_cnt*nsm->state_cnt; ++i ) {
@@ -531,6 +531,7 @@ SplineChar *SplineCharCopy(SplineChar *sc,SplineFont *into,struct sfmergecontext
     nsc->parent = into;
     nsc->orig_pos = -2;
     nsc->name = copy(sc->name);
+    nsc->comment = copy(sc->comment);
     nsc->hstem = StemInfoCopy(nsc->hstem);
     nsc->vstem = StemInfoCopy(nsc->vstem);
     nsc->dstem = DStemInfoCopy(nsc->dstem);
@@ -539,7 +540,7 @@ SplineChar *SplineCharCopy(SplineChar *sc,SplineFont *into,struct sfmergecontext
 	nsc->countermasks = malloc(sc->countermask_cnt*sizeof(HintMask));
 	memcpy(nsc->countermasks,sc->countermasks,sc->countermask_cnt*sizeof(HintMask));
     }
-    nsc->anchor = AnchorPointsDuplicate(nsc->anchor,nsc);
+    nsc->anchor = into==NULL?NULL:AnchorPointsDuplicate(nsc->anchor,nsc);
     nsc->changed = true;
     /* Fix up dependents later when we know more */
     nsc->dependents = NULL;
@@ -548,8 +549,19 @@ SplineChar *SplineCharCopy(SplineChar *sc,SplineFont *into,struct sfmergecontext
     nsc->vkerns = NULL;
     nsc->possub = PSTCopy(nsc->possub,nsc,mc);
     nsc->altuni = AltUniCopy(nsc->altuni,into);
+    nsc->vert_variants = GlyphVariantsCopy(sc->vert_variants);
+    nsc->horiz_variants = GlyphVariantsCopy(sc->horiz_variants);
+    nsc->italic_adjusts = DeviceTableCopy(sc->italic_adjusts);
+    nsc->top_accent_adjusts = DeviceTableCopy(sc->top_accent_adjusts);
+    nsc->mathkern = MathKernCopy(sc->mathkern);
+    nsc->user_decomp = sc->user_decomp==NULL?NULL:u_copy(sc->user_decomp);
+    nsc->glif_name = copy(sc->glif_name);
     nsc->charinfo = NULL;
     nsc->views = NULL;
+#ifndef _NO_PYTHON
+    nsc->python_sc_object = NULL;
+    nsc->python_temporary = NULL;
+#endif
 return(nsc);
 }
 
@@ -1080,7 +1092,7 @@ static void FVMergeRefigureMapSel(FontViewBase *fv,SplineFont *into,SplineFont *
 }
 
 static void _MergeFont(SplineFont *into,SplineFont *other,struct sfmergecontext *mc) {
-    int i, cnt, doit, emptypos, index, k;
+    int i, cnt, doit, emptypos, index;
     SplineFont *bitmap_into;
     BDFFont *bdf;
     FontViewBase *fvs;
@@ -1299,7 +1311,7 @@ static RefChar *InterpRefs(RefChar *base, RefChar *other, real amount, SplineCha
 		last->next = cur;
 	    last = cur;
 	} else
-	    LogError( _("In character %s, could not find reference to %s\n"),
+	    LogError( _("In character %s, could not find reference to %s"),
 		    sc->name, base->sc->name );
 	base = base->next;
 	if ( test==other && other!=NULL )
@@ -1356,7 +1368,7 @@ return( cur );
 return( cur );
 	}
 	if ( bp->next == NULL || bp->next->to==base->first ) {
-	    LogError( _("In character %s, there are too few points on a path in the base\n"), sc->name);
+	    LogError( _("In character %s, there are too few points on a path in the base"), sc->name);
 	    if ( bp->next!=NULL ) {
 		if ( bp->next->order2 ) {
 		    cur->last->nextcp.x = cur->first->prevcp.x = (cur->last->nextcp.x+cur->first->prevcp.x)/2;
@@ -1367,7 +1379,7 @@ return( cur );
 	    }
 return( cur );
 	} else if ( op->next==NULL || op->next->to==other->first ) {
-	    LogError( _("In character %s, there are too many points on a path in the base\n"), sc->name);
+	    LogError( _("In character %s, there are too many points on a path in the base"), sc->name);
 	    while ( bp->next!=NULL && bp->next->to!=base->first ) {
 		bp = bp->next->to;
 		InterpPoint(cur,bp,op,amount);
@@ -1440,7 +1452,7 @@ return( NULL );
 return( head );
 }
 
-static uint32 InterpColor( uint32 col1,uint32 col2, real amount ) {
+static uint32_t InterpColor( uint32_t col1,uint32_t col2, real amount ) {
     int r1, g1, b1, r2, b2, g2;
 
     r1 = (col1>>16)&0xff;
@@ -1462,61 +1474,61 @@ static void LayerInterpolate(Layer *to,Layer *base,Layer *other,real amount,Spli
     if ( base->dostroke==other->dostroke )
 	to->dostroke = base->dostroke;
     else
-	LogError( _("Different settings on whether to stroke in layer %d of %s\n"), lc, sc->name );
+	LogError( _("Different settings on whether to stroke in layer %d of %s"), lc, sc->name );
     if ( base->dofill==other->dofill )
 	to->dofill = base->dofill;
     else
-	LogError(_("Different settings on whether to fill in layer %d of %s\n"), lc, sc->name );
+	LogError(_("Different settings on whether to fill in layer %d of %s"), lc, sc->name );
     if ( base->fill_brush.col==COLOR_INHERITED && other->fill_brush.col==COLOR_INHERITED )
 	to->fill_brush.col = COLOR_INHERITED;
     else if ( base->fill_brush.col!=COLOR_INHERITED && other->fill_brush.col!=COLOR_INHERITED )
 	to->fill_brush.col = InterpColor( base->fill_brush.col,other->fill_brush.col, amount );
     else
-	LogError(_("Different settings on whether to inherit fill color in layer %d of %s\n"), lc, sc->name );
+	LogError(_("Different settings on whether to inherit fill color in layer %d of %s"), lc, sc->name );
     if ( base->fill_brush.opacity<0 && other->fill_brush.opacity<0 )
 	to->fill_brush.opacity = WIDTH_INHERITED;
     else if ( base->fill_brush.opacity>=0 && other->fill_brush.opacity>=0 )
 	to->fill_brush.opacity = base->fill_brush.opacity + amount*(other->fill_brush.opacity-base->fill_brush.opacity);
     else
-	LogError(_("Different settings on whether to inherit fill opacity in layer %d of %s\n"), lc, sc->name );
+	LogError(_("Different settings on whether to inherit fill opacity in layer %d of %s"), lc, sc->name );
     if ( base->stroke_pen.brush.col==COLOR_INHERITED && other->stroke_pen.brush.col==COLOR_INHERITED )
 	to->stroke_pen.brush.col = COLOR_INHERITED;
     else if ( base->stroke_pen.brush.col!=COLOR_INHERITED && other->stroke_pen.brush.col!=COLOR_INHERITED )
 	to->stroke_pen.brush.col = InterpColor( base->stroke_pen.brush.col,other->stroke_pen.brush.col, amount );
     else
-	LogError(_("Different settings on whether to inherit fill color in layer %d of %s\n"), lc, sc->name );
+	LogError(_("Different settings on whether to inherit fill color in layer %d of %s"), lc, sc->name );
     if ( base->stroke_pen.brush.opacity<0 && other->stroke_pen.brush.opacity<0 )
 	to->stroke_pen.brush.opacity = WIDTH_INHERITED;
     else if ( base->stroke_pen.brush.opacity>=0 && other->stroke_pen.brush.opacity>=0 )
 	to->stroke_pen.brush.opacity = base->stroke_pen.brush.opacity + amount*(other->stroke_pen.brush.opacity-base->stroke_pen.brush.opacity);
     else
-	LogError(_("Different settings on whether to inherit stroke opacity in layer %d of %s\n"), lc, sc->name );
+	LogError(_("Different settings on whether to inherit stroke opacity in layer %d of %s"), lc, sc->name );
     if ( base->stroke_pen.width<0 && other->stroke_pen.width<0 )
 	to->stroke_pen.width = WIDTH_INHERITED;
     else if ( base->stroke_pen.width>=0 && other->stroke_pen.width>=0 )
 	to->stroke_pen.width = base->stroke_pen.width + amount*(other->stroke_pen.width-base->stroke_pen.width);
     else
-	LogError(_("Different settings on whether to inherit stroke width in layer %d of %s\n"), lc, sc->name );
+	LogError(_("Different settings on whether to inherit stroke width in layer %d of %s"), lc, sc->name );
     if ( base->stroke_pen.linecap==other->stroke_pen.linecap )
 	to->stroke_pen.linecap = base->stroke_pen.linecap;
     else
-	LogError(_("Different settings on stroke linecap in layer %d of %s\n"), lc, sc->name );
+	LogError(_("Different settings on stroke linecap in layer %d of %s"), lc, sc->name );
     if ( base->stroke_pen.linejoin==other->stroke_pen.linejoin )
 	to->stroke_pen.linejoin = base->stroke_pen.linejoin;
     else
-	LogError(_("Different settings on stroke linejoin in layer %d of %s\n"), lc, sc->name );
+	LogError(_("Different settings on stroke linejoin in layer %d of %s"), lc, sc->name );
     if ( base->fill_brush.gradient!=NULL || other->fill_brush.gradient!=NULL ||
 	    base->stroke_pen.brush.gradient!=NULL || other->stroke_pen.brush.gradient!=NULL )
-	LogError(_("I can't even imagine how to attempt to interpolate gradients in layer %d of %s\n"), lc, sc->name );
+	LogError(_("I can't even imagine how to attempt to interpolate gradients in layer %d of %s"), lc, sc->name );
     if ( base->fill_brush.pattern!=NULL || other->fill_brush.pattern!=NULL )
-	LogError(_("Different fill patterns in layer %d of %s\n"), lc, sc->name );
+	LogError(_("Different fill patterns in layer %d of %s"), lc, sc->name );
     if ( base->stroke_pen.brush.pattern!=NULL || other->stroke_pen.brush.pattern!=NULL )
-	LogError(_("Different stroke patterns in layer %d of %s\n"), lc, sc->name );
+	LogError(_("Different stroke patterns in layer %d of %s"), lc, sc->name );
 
     to->splines = SplineSetsInterpolate(base->splines,other->splines,amount,sc);
     to->refs = InterpRefs(base->refs,other->refs,amount,sc);
     if ( base->images!=NULL || other->images!=NULL )
-	LogError(_("I can't even imagine how to attempt to interpolate images in layer %d of %s\n"), lc, sc->name );
+	LogError(_("I can't even imagine how to attempt to interpolate images in layer %d of %s"), lc, sc->name );
 }
 
 SplineChar *SplineCharInterpolate(SplineChar *base, SplineChar *other,
@@ -1543,7 +1555,7 @@ return( NULL );
     if ( base->parent->multilayer && other->parent->multilayer ) {
 	int lc = base->layer_cnt;
 	if ( lc!=other->layer_cnt ) {
-	    LogError(_("Different numbers of layers in %s\n"), base->name );
+	    LogError(_("Different numbers of layers in %s"), base->name );
 	    if ( other->layer_cnt<lc ) lc = other->layer_cnt;
 	}
 	if ( lc>2 ) {
@@ -1651,4 +1663,34 @@ return( NULL );
     new->changed = true;
     new->map = EncMapFromEncoding(new,enc);
 return( new );
+}
+
+bool RecomputePitch(int16_t this_width, FontPitch* pitch, int* width) {
+    if (this_width == 0) {
+        /* Zero-width glyphs, such as control characters or diacritical marks
+           don't affect the state. */
+        return true;
+    }
+
+    if (*pitch == pitch_unknown) {
+        *width = this_width;
+        *pitch = pitch_fixed;
+    } else if (*pitch == pitch_fixed) {
+        if (this_width == 2 * (*width)) {
+            *pitch = pitch_dual;
+        } else if (2 * this_width == *width) {
+            *width = this_width;
+            *pitch = pitch_dual;
+        } else if (this_width != *width) {
+            *width = -1;
+            *pitch = pitch_variable;
+            return false; /* no further check necessary */
+        }
+    } else if (*pitch == pitch_dual &&
+               (this_width != *width && this_width != 2 * (*width))) {
+        *width = -1;
+        *pitch = pitch_variable;
+        return false; /* no further check necessary */
+    }
+    return true;
 }

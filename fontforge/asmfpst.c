@@ -99,9 +99,9 @@ return( NULL );
 		    ++cnt;
 		}
 	    }
-	    (&new->rules[i].u.class.ncnt)[j] = cnt;
+	    (&new->rules[i].u.fpc_class.ncnt)[j] = cnt;
 	    if ( cnt!=0 ) {
-		(&new->rules[i].u.class.nclasses)[j] = malloc(cnt*sizeof(uint16));
+		(&new->rules[i].u.fpc_class.nclasses)[j] = malloc(cnt*sizeof(uint16_t));
 		cnt = 0;
 		for ( pt=(&fpst->rules[i].u.glyph.names)[j]; *pt; pt=end ) {
 		    while ( *pt==' ' ) ++pt;
@@ -118,7 +118,7 @@ return( NULL );
 			names[nextclass++] = copy(pt);
 		    }
 		    *end = ch;
-		    (&new->rules[i].u.class.nclasses)[j][cnt++] = k;
+		    (&new->rules[i].u.fpc_class.nclasses)[j][cnt++] = k;
 		}
 	    }
 	}
@@ -179,10 +179,10 @@ return( snum );
 static OTLookup *RuleHasSubsHere(struct fpst_rule *rule,int depth) {
     int i,j;
 
-    if ( depth<rule->u.class.bcnt )
+    if ( depth<rule->u.fpc_class.bcnt )
 return( NULL );
-    depth -= rule->u.class.bcnt;
-    if ( depth>=rule->u.class.ncnt )
+    depth -= rule->u.fpc_class.bcnt;
+    if ( depth>=rule->u.fpc_class.ncnt )
 return( NULL );
     for ( i=0; i<rule->lookup_cnt; ++i ) {
 	if ( rule->lookups[i].seq==depth ) {
@@ -263,7 +263,7 @@ return( true );
 static struct contexttree *_FPST2Tree(FPST *fpst,struct contexttree *parent,int class) {
     struct contexttree *me = chunkalloc(sizeof(struct contexttree));
     int i, rcnt, ccnt, k, thisclass;
-    uint16 *classes;
+    uint16_t *classes;
 
     if ( fpst!=NULL ) {
 	me->depth = -1;
@@ -275,18 +275,18 @@ static struct contexttree *_FPST2Tree(FPST *fpst,struct contexttree *parent,int 
     } else {
 	me->depth = parent->depth+1;
 	for ( i=rcnt=0; i<parent->rule_cnt; ++i )
-	    if ( parent->rules[i].rule->u.class.allclasses[me->depth] == class )
+	    if ( parent->rules[i].rule->u.fpc_class.allclasses[me->depth] == class )
 		++rcnt;
 	me->rule_cnt = rcnt;
 	me->rules = calloc(me->rule_cnt,sizeof(struct ct_subs));
 	for ( i=rcnt=0; i<parent->rule_cnt; ++i )
-	    if ( parent->rules[i].rule->u.class.allclasses[me->depth] == class )
+	    if ( parent->rules[i].rule->u.fpc_class.allclasses[me->depth] == class )
 		me->rules[rcnt++].rule = parent->rules[i].rule;
 	me->parent = parent;
     }
-    classes = malloc(me->rule_cnt*sizeof(uint16));
+    classes = malloc(me->rule_cnt*sizeof(uint16_t));
     for ( i=ccnt=0; i<me->rule_cnt; ++i ) {
-	thisclass = me->rules[i].thisclassnum = me->rules[i].rule->u.class.allclasses[me->depth+1];
+	thisclass = me->rules[i].thisclassnum = me->rules[i].rule->u.fpc_class.allclasses[me->depth+1];
 	if ( thisclass==0xffff ) {
 	    if ( me->ends_here==NULL )
 		me->ends_here = me->rules[i].rule;
@@ -316,19 +316,19 @@ static void FPSTBuildAllClasses(FPST *fpst) {
     int i, off,j;
 
     for ( i=0; i<fpst->rule_cnt; ++i ) {
-	fpst->rules[i].u.class.allclasses = malloc((fpst->rules[i].u.class.bcnt+
-						    fpst->rules[i].u.class.ncnt+
-			                            fpst->rules[i].u.class.fcnt+
-			                            1)*sizeof(uint16));
-	off = fpst->rules[i].u.class.bcnt;
+	fpst->rules[i].u.fpc_class.allclasses = malloc((fpst->rules[i].u.fpc_class.bcnt+
+						    fpst->rules[i].u.fpc_class.ncnt+
+			                            fpst->rules[i].u.fpc_class.fcnt+
+			                            1)*sizeof(uint16_t));
+	off = fpst->rules[i].u.fpc_class.bcnt;
 	for ( j=0; j<off; ++j )
-	    fpst->rules[i].u.class.allclasses[j] = fpst->rules[i].u.class.bclasses[off-1-j];
-	for ( j=0; j<fpst->rules[i].u.class.ncnt; ++j )
-	    fpst->rules[i].u.class.allclasses[off+j] = fpst->rules[i].u.class.nclasses[j];
+	    fpst->rules[i].u.fpc_class.allclasses[j] = fpst->rules[i].u.fpc_class.bclasses[off-1-j];
+	for ( j=0; j<fpst->rules[i].u.fpc_class.ncnt; ++j )
+	    fpst->rules[i].u.fpc_class.allclasses[off+j] = fpst->rules[i].u.fpc_class.nclasses[j];
 	off += j;
-	for ( j=0; j<fpst->rules[i].u.class.fcnt; ++j )
-	    fpst->rules[i].u.class.allclasses[off+j] = fpst->rules[i].u.class.fclasses[j];
-	fpst->rules[i].u.class.allclasses[off+j] = 0xffff;	/* End of rule marker */
+	for ( j=0; j<fpst->rules[i].u.fpc_class.fcnt; ++j )
+	    fpst->rules[i].u.fpc_class.allclasses[off+j] = fpst->rules[i].u.fpc_class.fclasses[j];
+	fpst->rules[i].u.fpc_class.allclasses[off+j] = 0xffff;	/* End of rule marker */
     }
 }
 
@@ -336,8 +336,8 @@ static void FPSTFreeAllClasses(FPST *fpst) {
     int i;
 
     for ( i=0; i<fpst->rule_cnt; ++i ) {
-	free( fpst->rules[i].u.class.allclasses );
-	fpst->rules[i].u.class.allclasses = NULL;
+	free( fpst->rules[i].u.fpc_class.allclasses );
+	fpst->rules[i].u.fpc_class.allclasses = NULL;
     }
 }
 
@@ -508,7 +508,7 @@ static char *BuildMarkClass(SplineFont *sf) {
 return(ret);
 }
 
-static char *BuildClassNames(SplineChar **glyphs,uint16 *map, int classnum) {
+static char *BuildClassNames(SplineChar **glyphs,uint16_t *map, int classnum) {
     int i, len;
     char *ret, *pt;
 
@@ -531,7 +531,7 @@ static char *BuildClassNames(SplineChar **glyphs,uint16 *map, int classnum) {
 return( ret );
 }
 
-static int FindFormLookupsForScript(SplineFont *sf,uint32 script,OTLookup *lookups[4]) {
+static int FindFormLookupsForScript(SplineFont *sf,uint32_t script,OTLookup *lookups[4]) {
     OTLookup *otl;
     FeatureScriptLangList *fl;
     struct scriptlanglist *sl;
@@ -561,7 +561,7 @@ return( true );
 return( false );
 }
 
-ASM *ASMFromOpenTypeForms(SplineFont *sf,uint32 script) {
+ASM *ASMFromOpenTypeForms(SplineFont *sf,uint32_t script) {
     int i, which, cg, mg;
     SplineChar *sc, *rsc, **classglyphs, **markglyphs;
     PST *pst;
@@ -671,11 +671,11 @@ return( sm );
 
 	/* ********************** From Coverage FPST ********************** */
 static SplineChar **morx_cg_FigureClasses(SplineChar ***tables,int match_len,
-	int ***classes, int *cc, uint16 **mp, int *gc,
+	int ***classes, int *cc, uint16_t **mp, int *gc,
 	FPST *fpst,SplineFont *sf,int ordered) {
     int i,j,k, mask, max, class_cnt, gcnt, gtot;
     SplineChar ***temp, *sc, **glyphs, **gall;
-    uint16 *map;
+    uint16_t *map;
     int *nc;
     int *next;
     /* For each glyph used, figure out what coverage tables it gets used in */
@@ -745,7 +745,7 @@ return( NULL );
     }
     *cc = class_cnt+4;
     glyphs = malloc((gcnt+1)*sizeof(SplineChar *));
-    map = malloc((gcnt+1)*sizeof(uint16));
+    map = malloc((gcnt+1)*sizeof(uint16_t));
     gcnt = 0;
     for ( i=0; i<gtot; ++i ) if ( gall[i]!=NULL ) {
 	glyphs[gcnt] = gall[i];
@@ -787,7 +787,7 @@ static ASM *ASMFromCoverageFPST(SplineFont *sf,FPST *fpst,int ordered) {
     struct fpst_rule *r = &fpst->rules[0];
     int subspos = r->u.coverage.bcnt+r->lookups[0].seq;
     OTLookup *substag = r->lookups[0].lookup, *finaltag=NULL;
-    uint16 *map;
+    uint16_t *map;
     ASM *sm;
 
     /* In one very specific case we can support two substitutions */
@@ -887,7 +887,7 @@ static void SMSetState(struct asm_state *trans,struct contexttree *cur,int class
 	if ( cur->branches[i].classnum==class ) {
 	    trans->next_state = cur->branches[i].branch->state;
 	    /* If we go back to state 0, it means we want to start from */
-	    /*  the begining again, and we should check against the */
+	    /*  the beginning again, and we should check against the */
 	    /*  current glyph (which failed for us, but might be useful */
 	    /*  to start a new operation).  Even if we did not fail we */
 	    /*  should still do this (so don't advance the glyph) */
@@ -911,12 +911,12 @@ return;
 
 static struct asm_state *AnyActiveSubstrings(struct contexttree *tree,
 	struct contexttree *cur,int class, struct asm_state *trans, int classcnt) {
-    struct fpc *any = &cur->rules[0].rule->u.class;
+    struct fpc *any = &cur->rules[0].rule->u.fpc_class;
     int i,rc,j, b;
 
     for ( i=1; i<=cur->depth; ++i ) {
 	for ( rc=0; rc<tree->rule_cnt; ++rc ) {
-	    struct fpc *r = &tree->rules[rc].rule->u.class;
+	    struct fpc *r = &tree->rules[rc].rule->u.fpc_class;
 	    int ok = true;
 	    for ( j=0; j<=cur->depth-i; ++j ) {
 		if ( any->allclasses[j+i]!=r->allclasses[j] ) {

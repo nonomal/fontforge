@@ -686,7 +686,8 @@ static void pdf_addpages(struct pdfcontext *pc, int obj) {
     if ( pdf_findobject(pc,obj) && pdf_readdict(pc) ) {
 	if ( (pt=PSDictHasEntry(&pc->pdfdict,"Type"))!=NULL ) {
 	    if ( strcmp(pt,"/Page")==0 ) {
-		pc->pages[pc->pcnt++] = obj;
+		if ( pc->pcnt < pc->ocnt )
+		    pc->pages[pc->pcnt++] = obj;
 	    } else if ( strcmp(pt,"/Pages")==0 ) {
 		if ( (pt=PSDictHasEntry(&pc->pdfdict,"Kids"))!=NULL ) {
 		    char *kids = copy(pt);
@@ -695,8 +696,7 @@ static void pdf_addpages(struct pdfcontext *pc, int obj) {
 			    ++pt;
 			} else {
 			    int o = strtol(pt,&end,10);
-			    int r;
-			    r = strtol(end,&end,10);
+			    strtol(end,&end,10);
 			    if ( pt==end )
 return;
 			    pt = end;
@@ -815,7 +815,7 @@ static int pdf_zfilter(FILE *to,FILE *from) {
     strm.next_in = Z_NULL;
     ret = inflateInit(&strm);
     if (ret != Z_OK) {
-	LogError( _("Flate decompression failed.\n") );
+	LogError( _("Flate decompression failed.") );
 return ret;
     }
     in = malloc(Z_CHUNK); out = malloc(Z_CHUNK);
@@ -824,14 +824,14 @@ return ret;
 	strm.avail_in = fread(in,1,Z_CHUNK,from);
 	if ( strm.avail_in==0 )
     break;
-	strm.next_in = (uint8 *) in;
+	strm.next_in = (uint8_t *) in;
 	do {
 	    strm.avail_out = Z_CHUNK;
-	    strm.next_out = (uint8 *) out;
+	    strm.next_out = (uint8_t *) out;
 	    ret = inflate(&strm, Z_NO_FLUSH);
 	    if ( ret==Z_NEED_DICT || ret==Z_DATA_ERROR || ret==Z_MEM_ERROR ) {
 		(void)inflateEnd(&strm);
-		LogError( _("Flate decompression failed.\n") );
+		LogError( _("Flate decompression failed.") );
 return ret;
 	    }
 	    fwrite(out,1,Z_CHUNK-strm.avail_out,to);
@@ -1201,7 +1201,7 @@ return( pt_number );
 	    if ( !isfinite(*val) ) {
 /* GT: NaN is a concept in IEEE floating point which means "Not a Number" */
 /* GT: it is used to represent errors like 0/0 or sqrt(-1). */
-		LogError( _("Bad number, infinity or nan: %s\n"), tokbuf );
+		LogError( _("Bad number, infinity or nan: %s"), tokbuf );
 		*val = 0;
 	    }
 	    if ( *end=='\0' )		/* It's a real */
@@ -1290,8 +1290,7 @@ static void _InterpretPdf(FILE *in, struct pdfcontext *pc, EntityChar *ec) {
     int gsp = 0;
     Color fore_stroke=COLOR_INHERITED, fore_fill=COLOR_INHERITED;
     int linecap=lc_inherited, linejoin=lj_inherited; real linewidth=WIDTH_INHERITED;
-    DashType dashes[DASH_MAX];
-    int dash_offset = 0;
+    DashType dashes[DASH_MAX] = {0};
     Entity *ent;
     char tokbuf[100];
     const int tokbufsize = 100;
@@ -1340,7 +1339,7 @@ static void _InterpretPdf(FILE *in, struct pdfcontext *pc, EntityChar *ec) {
 		if ( stack[sp-1-i].type==ps_mark )
 	    break;
 	    if ( i==sp )
-		LogError( _("No mark in ] (close array)\n") );
+		LogError( _("No mark in ] (close array)") );
 	    else {
 		struct pskeydict dict;
 		dict.cnt = dict.max = i;
@@ -1384,6 +1383,16 @@ static void _InterpretPdf(FILE *in, struct pdfcontext *pc, EntityChar *ec) {
 			MatMultiply(t,transform,transform);
 		    }
 		}
+		else if ( sp>=6 && stack[sp-1].type==ps_num && stack[sp-2].type==ps_num && stack[sp-3].type==ps_num
+		    && stack[sp-4].type==ps_num && stack[sp-5].type==ps_num && stack[sp-6].type==ps_num) {
+		    t[5] = stack[--sp].u.val;
+		    t[4] = stack[--sp].u.val;
+		    t[3] = stack[--sp].u.val;
+		    t[2] = stack[--sp].u.val;
+		    t[1] = stack[--sp].u.val;
+		    t[0] = stack[--sp].u.val;
+		    MatMultiply(t,transform,transform);
+		}
 	    }
 	  break;
 	  case pt_setmiterlimit:
@@ -1404,7 +1413,6 @@ static void _InterpretPdf(FILE *in, struct pdfcontext *pc, EntityChar *ec) {
 	  case pt_setdash:
 	    if ( sp>=2 && stack[sp-1].type==ps_num && stack[sp-2].type==ps_array ) {
 		sp -= 2;
-		dash_offset = stack[sp+1].u.val;
 		for ( i=0; i<DASH_MAX && i<stack[sp].u.dict.cnt; ++i )
 		    dashes[i] = stack[sp].u.dict.entries[i].u.val;
 		dictfree(&stack[sp].u.dict);
@@ -1513,7 +1521,7 @@ static void _InterpretPdf(FILE *in, struct pdfcontext *pc, EntityChar *ec) {
 		temp1.x += stack[sp-2].u.val;
 		Transform(&temp2,&temp1,transform);
 		second = SplinePointCreate(temp2.x,temp2.y);
-		temp1.y += stack[sp-3].u.val;
+		temp1.y += stack[sp-1].u.val;
 		Transform(&temp2,&temp1,transform);
 		third = SplinePointCreate(temp2.x,temp2.y);
 		temp1.x = stack[sp-4].u.val;
@@ -1565,6 +1573,8 @@ static void _InterpretPdf(FILE *in, struct pdfcontext *pc, EntityChar *ec) {
 		    tok==pt_fillstrokeeo || tok==pt_closefillstrokenz ||
 		    tok==pt_closefillstrokeeo )
 		ent->u.splines.fill.col = fore_fill;
+		// FIXME Where to set?
+		// memcpy(ent->u.splines.stroke.dashes,dashes,sizeof(dashes));
 	    head = NULL; cur = NULL;
 	  break;
 	  case pt_gsave:
@@ -1576,6 +1586,7 @@ static void _InterpretPdf(FILE *in, struct pdfcontext *pc, EntityChar *ec) {
 		gsaves[gsp].linejoin = linejoin;
 		gsaves[gsp].fore_stroke = fore_stroke;
 		gsaves[gsp].fore_fill = fore_fill;
+		memcpy(gsaves[gsp].dashes, dashes, sizeof(dashes));
 		++gsp;
 		/* Unlike PS does not! save current path */
 	    }
@@ -1590,6 +1601,7 @@ static void _InterpretPdf(FILE *in, struct pdfcontext *pc, EntityChar *ec) {
 		linejoin = gsaves[gsp].linejoin;
 		fore_stroke = gsaves[gsp].fore_stroke;
 		fore_fill = gsaves[gsp].fore_fill;
+		memcpy(dashes, gsaves[gsp].dashes, sizeof(dashes));
 	    }
 	  break;
 	  default:
@@ -1829,6 +1841,8 @@ return;
 		    }
 
 		    for (gid=start; gid<=end; gid++) {
+			if (cur >= mappings_length)
+			    break;
 			mappings[cur] = uvals[0] = uni++;
 			add_mapping(basesf, mappings, uvals, 1, gid, pc->cmap_from_cid[font_num], cur);
 			cur++;
@@ -1883,8 +1897,8 @@ return( ret );
 }
 
 static SplineFont *pdf_loadtype3(struct pdfcontext *pc) {
-    char *enc, *cp, *fontmatrix, *name;
-    double emsize;
+    char *enc, *cp, *s_fontmatrix, *name;
+    double fontmatrix[6], emsize;
     SplineFont *sf;
     int flags = -1;
     int i;
@@ -1892,24 +1906,27 @@ static SplineFont *pdf_loadtype3(struct pdfcontext *pc) {
 
     name=PSDictHasEntry(&pc->pdfdict,"Name");
     if ( name==NULL )
-	name=PSDictHasEntry(&pc->pdfdict,"BaseFont");
+        name=PSDictHasEntry(&pc->pdfdict,"BaseFont");
+    if ( name!=NULL )
+        name = copy(name+1);
     if ( (enc=PSDictHasEntry(&pc->pdfdict,"Encoding"))==NULL )
   goto fail;
     if ( (cp=PSDictHasEntry(&pc->pdfdict,"CharProcs"))==NULL )
   goto fail;
-    if ( (fontmatrix=PSDictHasEntry(&pc->pdfdict,"FontMatrix"))==NULL )
+    if ( (s_fontmatrix=PSDictHasEntry(&pc->pdfdict,"FontMatrix"))==NULL )
   goto fail;
-    if ( sscanf(fontmatrix,"[%lg",&emsize)!=1 || emsize==0 )
+    if ( sscanf(s_fontmatrix,"[%lg %lg %lg %lg %lg %lg]", 
+                &fontmatrix[0], &fontmatrix[1], &fontmatrix[2],
+                &fontmatrix[3], &fontmatrix[4], &fontmatrix[5])!=6 )
   goto fail;
     if ( !pdf_getcharprocs(pc,cp))
   goto fail;
 
-    emsize = 1.0/emsize;
+    emsize = PSEmsizeFromFontMatrix(fontmatrix);
     charprocdict = PSDictCopy(&pc->pdfdict);
 
     sf = SplineFontBlank(charprocdict->next);
     if ( name!=NULL ) {
-        name = copy(name+1);
 	free(sf->fontname); free(sf->fullname); free(sf->familyname);
 	sf->fontname = name;
 	sf->familyname = copy(name);
@@ -1940,6 +1957,7 @@ static SplineFont *pdf_loadtype3(struct pdfcontext *pc) {
 return( sf );
 
   fail:
+    free(name);
     LogError( _("Syntax errors while parsing Type3 font headers") );
 return( NULL );
 }
@@ -1961,8 +1979,12 @@ static SplineFont *pdf_loadfont(struct pdfcontext *pc,int font_num) {
     if ( !pdf_findobject(pc,pc->fontobjs[font_num]) || !pdf_readdict(pc) )
 return( NULL );
 
-    if ( (pt=PSDictHasEntry(&pc->pdfdict,"Subtype"))!=NULL && strcmp(pt,"/Type3")==0 )
-return( pdf_loadtype3(pc));
+    if ( (pt=PSDictHasEntry(&pc->pdfdict,"Subtype"))!=NULL && strcmp(pt,"/Type3")==0 ) {
+        sf = pdf_loadtype3(pc);
+        if ( sf != NULL && pc->cmapobjs[font_num] != -1 )
+            pdf_getcmap(pc, sf, font_num);
+        return( sf );
+    }
 
     if ( (pt=PSDictHasEntry(&pc->pdfdict,"FontDescriptor"))==NULL )
   goto fail;
@@ -2167,7 +2189,6 @@ return( sf );
 
 Entity *EntityInterpretPDFPage(FILE *pdf,int select_page) {
     struct pdfcontext pc;
-    char oldloc[24];
     Entity *ent;
     char *ret;
     int choice;

@@ -154,10 +154,9 @@ FontForge.
 
    FontForge deals in pixel sizes, not point sizes. The conversion between
    pixels and points differs on different systems and indeed on different
-   screens. A point is (approximately) 1/72 of an inch, a pixel is however big a
+   screens. A typographic point is 1/72 of an inch, a pixel is however big a
    pixel happens to be on your screen. Usually pixels range from about 1/72 of
-   an inch to about 1/144 of an inch. Different systems support different screen
-   resolutions as "standard", and FontForge tries to know about these standards.
+   an inch to about 1/144 of an inch.
 
    .. list-table:: Some conversions between points and pixels
       :header-rows: 1
@@ -206,19 +205,14 @@ FontForge.
         - 33
         - 40
 
-   Sadly your screen will probably not match one of the standard screens
-   precisely. On X the standard resolutions are 75 and 100dpi, on MS Windows 96
-   and 120dpi, and on the Mac 72dpi. This dialog provides the conversion between
-   pixel size and point sizes at these resolutions.
+   Most modern monitors report their resolution to the OS. This dialog provides
+   the conversion between pixel sizes and point sizes at your resolution, and
+   for the typical 96 PPI monitor.
 
-   Normally the new glyphs are created by rasterizing the outline font. If your
-   system has the freetype2 library installed (and you checked the "Use
-   FreeType" box) then FontForge will use the FreeType rasterizer to generate
-   bitmaps, otherwise it will use FontForge's built-in rasterizer (which isn't
-   as good, but involves a little less overhead).
-
-   Finally, if you have no outline font then the new glyphs will be created by
-   scaling the (bitmap) font displayed in the font view.
+   Normally the new glyphs are created by rasterizing the outline font.
+   FontForge uses the FreeType rasterizer to generate bitmaps. If you have no
+   outline font then the new glyphs will be created by scaling the (bitmap)
+   font displayed in the font view.
 
    If you want to generate a blank strike (one containing no glyphs) then turn
    off the ``[] Create Rasterized Strikes`` checkbox.
@@ -493,7 +487,7 @@ FontForge.
 
 .. object:: Tile Pattern...
 
-   Also not available in the default build, also controled by $
+   Also not available in the default build, also controlled by $
    ``configure --with-tilepath``. :ref:`This command <tilepath.Pattern>` allows
    you to design a pattern which will be layed down on the current layer m*n
    times (where m is the number of horizontal repeats and n the number of
@@ -641,6 +635,15 @@ FontForge.
    value at this point. If the added extrema is extremely close to an already
    existing point, fontforge may remove that point to avoid creating tiny
    splines.
+   
+.. _elementmenu.Add-Inflections:
+
+.. object:: Add Points Of Inflection
+
+   Not in the bitmap view. In the outline view, if any points are selected, 
+   this will add points at all points of inflection on splines between 
+   selected points. In the font view, metrics view (or if nothing is selected 
+   in the outline view) it will add all points of inflection to the splines.
 
 .. _elementmenu.AutoTrace:
 
@@ -735,6 +738,26 @@ FontForge.
       remember which point was selected last, then it will just pick one
       randomly. If you don't want that to happen, select your points and then
       single click on the one you want moved).
+
+.. _elementmenu.Balance:
+
+.. object:: Balance
+
+   Not in the bitmap view. In the outline view, if any points are selected, 
+   this will make the line between the control points parallel to the chord 
+   such that the area is preserved. This is an improved version of the algorithm 
+   known as "tunnify". In the font view, metrics view (or if nothing is selected 
+   in the outline view) it will balance all cubic splines.
+
+.. _elementmenu.Harmonize:
+   
+.. object:: Harmonize
+
+   Not in the bitmap view. In the outline view, if any points are selected, 
+   this will move the smooth on-curve points between its adjacent control 
+   points such that the adjacent curvatures become equal (except for sign 
+   at points of inflection). In the font view, metrics view (or if nothing 
+   is selected in the outline view) it will harmonize all smooth spline points.
 
 .. object:: Round
 
@@ -859,7 +882,7 @@ FontForge.
    Consider the letters "Alpha" and "A". Often these may be represented by the
    same glyph. This command which change the encoding slightly so that the
    encoding for U+0391 will refer to the glyph named "A". Note that this is
-   subtly different from refering to a glyph named "Alpha" which refers to
+   subtly different from referring to a glyph named "Alpha" which refers to
    another glyph named "A".
 
    Adobe suggests that you use a reference rather than giving to unicode code
@@ -964,5 +987,5 @@ FontForge.
    specify two layers within the current font and then checks that they are
    similar. In the outline view a message box pops up to say if the layers are
    the same or different. In the Font View, the view will scroll to the first
-   glyph whch differs, all differing glyphs will be selected and a message box
+   glyph which differs, all differing glyphs will be selected and a message box
    pops up.

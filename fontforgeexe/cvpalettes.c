@@ -29,6 +29,7 @@
 
 #include "cvundoes.h"
 #include "fontforgeui.h"
+#include "gresedit.h"
 #include "spiro.h"
 #include "splinefill.h"
 #include "splineorder2.h"
@@ -38,7 +39,6 @@
 
 #include "charview_private.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "hotkeys.h"
 #include "splinefont.h"
 #include "ustring.h"
@@ -53,14 +53,15 @@ float rr_radius=0;
 int ps_pointcnt=6;
 float star_percent=1.7320508;	/* Regular 6 pointed star */
 extern int interpCPsOnMotion;
+extern Color cvpalettefgcol;
+extern Color cvpalettebgcol;
+extern Color cvpaletteactborcol;
+extern Color cvbutton3dedgelightcol;
+extern Color cvbutton3dedgedarkcol;
 
 static void CVLCheckLayerCount(CharView *cv, int resize);
 
 extern void CVDebugFree(DebugView *dv);
-
-extern GBox _ggadget_Default_Box;
-#define ACTIVE_BORDER   (_ggadget_Default_Box.active_border)
-#define MAIN_FOREGROUND (_ggadget_Default_Box.main_foreground)
 
 extern GDevEventMask input_em[];
 extern const int input_em_cnt;
@@ -104,7 +105,8 @@ static GCursor tools[cvt_max+1] = { ct_pointer }, spirotools[cvt_max+1];
 enum cvtools cv_b1_tool = cvt_pointer, cv_cb1_tool = cvt_pointer,
 	     cv_b2_tool = cvt_magnify, cv_cb2_tool = cvt_ruler;
 
-static GFont *toolsfont=NULL, *layersfont=NULL;
+GResFont toolspalette_font = GRESFONT_INIT("400 10px " SANS_UI_FAMILIES);
+GResFont layerspalette_font = GRESFONT_INIT("400 10px " SANS_UI_FAMILIES);
 
 #define CV_LAYERS_WIDTH		104
 #define CV_LAYERS_HEIGHT	100
@@ -187,7 +189,7 @@ static GWindow CreatePalette(GWindow w, GRect *pos, int (*eh)(GWindow,GEvent *),
     }
     wattrs->mask |= wam_bordcol|wam_bordwidth;
     wattrs->border_width = 1;
-    wattrs->border_color = GDrawGetDefaultForeground(NULL);
+    wattrs->border_color = cvpalettefgcol;
 
     newpos.x = pt.x; newpos.y = pt.y; newpos.width = pos->width; newpos.height = pos->height;
     wattrs->mask|= wam_positioned;
@@ -526,17 +528,18 @@ static int toolask_e_h(GWindow gw, GEvent *event) {
 return( event->type!=et_char );
 }
 
-static int Ask(char *rb1, char *rb2, int rb, char *lab, float *val, int *co,
-	int ispolystar, CharView *cv ) {
+static int Ask(char* rb1, char* rb2, int rb, char* lab, float* val, int* co,
+               int ispolystar, CharView* cv) {
     struct ask_info d;
     char buffer[20], buf[20];
     char cenx[20], ceny[20], radx[20], rady[20], angle[20];
     GRect pos;
     GWindowAttrs wattrs;
-    GGadgetCreateData gcd[19];
+    GGadgetCreateData gcd[19], boxes[7];
+    GGadgetCreateData *varray[7], *shapes[3], *options[5], *buttons[6];
+    GGadgetCreateData* positions[5][4];
     GTextInfo label[19];
-    int off = ((ispolystar&1)?15:0) + ((ispolystar&2)?84:0);
-    int haspos = (ispolystar&2)?1:0;
+    int haspos = (ispolystar & 2) ? 1 : 0;
 
     ispolystar &= 1;
 
@@ -549,229 +552,277 @@ static int Ask(char *rb1, char *rb2, int rb, char *lab, float *val, int *co,
     d.lab = lab;
     d.cv = cv;
 
-	memset(&wattrs,0,sizeof(wattrs));
-	wattrs.mask = wam_events|wam_cursor|wam_utf8_wtitle|wam_undercursor|wam_isdlg|wam_restrict;
-	wattrs.event_masks = ~(1<<et_charup);
-	wattrs.restrict_input_to_me = 1;
-	wattrs.undercursor = 1;
-	wattrs.cursor = ct_pointer;
-	wattrs.utf8_window_title = _("Shape Type");
-	wattrs.is_dlg = true;
-	pos.x = pos.y = 0;
-	pos.width = GGadgetScale(GDrawPointsToPixels(NULL,190));
-	pos.height = GDrawPointsToPixels(NULL,120+off);
-	d.gw = GDrawCreateTopWindow(NULL,&pos,toolask_e_h,&d,&wattrs);
+    memset(&wattrs, 0, sizeof(wattrs));
+    wattrs.mask = wam_events | wam_cursor | wam_utf8_wtitle | wam_undercursor |
+                  wam_isdlg | wam_restrict;
+    wattrs.event_masks = ~(1 << et_charup);
+    wattrs.restrict_input_to_me = 1;
+    wattrs.undercursor = 1;
+    wattrs.cursor = ct_pointer;
+    wattrs.utf8_window_title = _("Shape Type");
+    wattrs.is_dlg = true;
+    pos.x = pos.y = 0;
+    pos.width = 100;
+    pos.height = 100;
+    d.gw = GDrawCreateTopWindow(NULL, &pos, toolask_e_h, &d, &wattrs);
 
-	memset(&label,0,sizeof(label));
-	memset(&gcd,0,sizeof(gcd));
+    memset(&label, 0, sizeof(label));
+    memset(&gcd, 0, sizeof(gcd));
+    memset(boxes, 0, sizeof(boxes));
+    memset(varray, 0, sizeof(varray));
+    memset(shapes, 0, sizeof(shapes));
+    memset(options, 0, sizeof(options));
+    memset(buttons, 0, sizeof(buttons));
+    memset(positions, 0, sizeof(positions));
 
-	label[0].text = (unichar_t *) rb1;
-	label[0].text_is_1byte = true;
-	gcd[0].gd.label = &label[0];
-	gcd[0].gd.pos.x = 5; gcd[0].gd.pos.y = 5; 
-	gcd[0].gd.flags = gg_enabled|gg_visible | (rb==0?gg_cb_on:0);
-	gcd[0].creator = GRadioCreate;
+    label[0].text = (unichar_t*)rb1;
+    label[0].text_is_1byte = true;
+    gcd[0].gd.label = &label[0];
+    gcd[0].gd.flags =
+        gg_enabled | gg_visible | gg_rad_startnew | (rb == 0 ? gg_cb_on : 0);
+    gcd[0].creator = GRadioCreate;
 
-	label[1].text = (unichar_t *) rb2;
-	label[1].text_is_1byte = true;
-	gcd[1].gd.label = &label[1];
-	gcd[1].gd.pos.x = ispolystar?65:75; gcd[1].gd.pos.y = 5; 
-	gcd[1].gd.flags = gg_enabled|gg_visible | (rb==1?gg_cb_on:0);
-	gcd[1].creator = GRadioCreate;
+    label[1].text = (unichar_t*)rb2;
+    label[1].text_is_1byte = true;
+    gcd[1].gd.label = &label[1];
+    gcd[1].gd.flags = gg_enabled | gg_visible | (rb == 1 ? gg_cb_on : 0);
+    gcd[1].creator = GRadioCreate;
 
-	label[2].text = (unichar_t *) lab;
-	label[2].text_is_1byte = true;
-	gcd[2].gd.label = &label[2];
-	gcd[2].gd.pos.x = 5; gcd[2].gd.pos.y = 25; 
-	gcd[2].gd.flags = gg_enabled|gg_visible ;
-	gcd[2].creator = GLabelCreate;
+    label[2].text = (unichar_t*)lab;
+    label[2].text_is_1byte = true;
+    gcd[2].gd.label = &label[2];
+    gcd[2].gd.flags = gg_enabled | gg_visible;
+    gcd[2].creator = GLabelCreate;
 
-	sprintf( buffer, "%g", *val );
-	label[3].text = (unichar_t *) buffer;
-	label[3].text_is_1byte = true;
-	gcd[3].gd.label = &label[3];
-	gcd[3].gd.pos.x = 5; gcd[3].gd.pos.y = 40; 
-	gcd[3].gd.flags = gg_enabled|gg_visible ;
-	gcd[3].gd.cid = CID_ValText;
-	gcd[3].creator = GTextFieldCreate;
+    sprintf(buffer, "%g", *val);
+    label[3].text = (unichar_t*)buffer;
+    label[3].text_is_1byte = true;
+    gcd[3].gd.label = &label[3];
+    gcd[3].gd.flags = gg_enabled | gg_visible;
+    gcd[3].gd.cid = CID_ValText;
+    gcd[3].gd.pos.width = 60;
+    gcd[3].creator = GTextFieldCreate;
+    gcd[4].gd.pos.width = -1;
+    gcd[4].gd.pos.height = 0;
+    gcd[4].gd.flags = gg_visible | gg_enabled | gg_but_default;
+    label[4].text = (unichar_t*)_("_OK");
+    label[4].text_is_1byte = true;
+    label[4].text_in_resource = true;
+    gcd[4].gd.mnemonic = 'O';
+    gcd[4].gd.label = &label[4];
+    gcd[4].gd.handle_controlevent = TA_OK;
+    gcd[4].creator = GButtonCreate;
+    gcd[5].gd.pos.width = -1;
+    gcd[5].gd.pos.height = 0;
+    gcd[5].gd.flags = gg_visible | gg_enabled | gg_but_cancel;
+    label[5].text = (unichar_t*)_("_Cancel");
+    label[5].text_is_1byte = true;
+    label[5].text_in_resource = true;
+    gcd[5].gd.label = &label[5];
+    gcd[5].gd.mnemonic = 'C';
+    gcd[5].gd.handle_controlevent = TA_Cancel;
+    gcd[5].creator = GButtonCreate;
 
-	gcd[4].gd.pos.x = 20-3; gcd[4].gd.pos.y = 85+off;
-	gcd[4].gd.pos.width = -1; gcd[4].gd.pos.height = 0;
-	gcd[4].gd.flags = gg_visible | gg_enabled | gg_but_default;
-	label[4].text = (unichar_t *) _("_OK");
-	label[4].text_is_1byte = true;
-	label[4].text_in_resource = true;
-	gcd[4].gd.mnemonic = 'O';
-	gcd[4].gd.label = &label[4];
-	gcd[4].gd.handle_controlevent = TA_OK;
-	gcd[4].creator = GButtonCreate;
+    if (ispolystar) {
+        label[6].text = (unichar_t*)_("Regular");
+        label[6].text_is_1byte = true;
+        gcd[6].gd.label = &label[6];
+        gcd[6].gd.flags = gg_enabled | gg_visible | gg_rad_startnew |
+                          (rb == 0 ? gg_cb_on : 0);
+        gcd[6].creator = GRadioCreate;
 
-	gcd[5].gd.pos.x = -20; gcd[5].gd.pos.y = 85+3+off;
-	gcd[5].gd.pos.width = -1; gcd[5].gd.pos.height = 0;
-	gcd[5].gd.flags = gg_visible | gg_enabled | gg_but_cancel;
-	label[5].text = (unichar_t *) _("_Cancel");
-	label[5].text_is_1byte = true;
-	label[5].text_in_resource = true;
-	gcd[5].gd.label = &label[5];
-	gcd[5].gd.mnemonic = 'C';
-	gcd[5].gd.handle_controlevent = TA_Cancel;
-	gcd[5].creator = GButtonCreate;
+        label[7].text = (unichar_t*)_("Points:");
+        label[7].text_is_1byte = true;
+        gcd[7].gd.label = &label[7];
+        gcd[7].gd.flags = gg_enabled | gg_visible | (rb == 1 ? gg_cb_on : 0);
+        gcd[7].creator = GRadioCreate;
 
-	if ( ispolystar ) {
-	    label[6].text = (unichar_t *) _("Regular");
-	    label[6].text_is_1byte = true;
-	    gcd[6].gd.label = &label[6];
-	    gcd[6].gd.pos.x = 5; gcd[6].gd.pos.y = 70; 
-	    gcd[6].gd.flags = gg_enabled|gg_visible | (rb==0?gg_cb_on:0);
-	    gcd[6].creator = GRadioCreate;
+        sprintf(buf, "%4g", star_percent * 100);
+        label[8].text = (unichar_t*)buf;
+        label[8].text_is_1byte = true;
+        gcd[8].gd.label = &label[8];
+        gcd[8].gd.pos.width = 50;
+        gcd[8].gd.flags = gg_enabled | gg_visible;
+        gcd[8].gd.cid = CID_PointPercent;
+        gcd[8].creator = GTextFieldCreate;
 
-	    label[7].text = (unichar_t *) _("Points:");
-	    label[7].text_is_1byte = true;
-	    gcd[7].gd.label = &label[7];
-	    gcd[7].gd.pos.x = 65; gcd[7].gd.pos.y = 70; 
-	    gcd[7].gd.flags = gg_enabled|gg_visible | (rb==1?gg_cb_on:0);
-	    gcd[7].creator = GRadioCreate;
+        label[9].text = (unichar_t*)"%";
+        label[9].text_is_1byte = true;
+        gcd[9].gd.label = &label[9];
+        gcd[9].gd.flags = gg_enabled | gg_visible;
+        gcd[9].creator = GLabelCreate;
+    } else {
+        label[6].text = (unichar_t*)_("Bounding Box");
+        label[6].text_is_1byte = true;
+        gcd[6].gd.label = &label[6];
+        gcd[6].gd.flags = gg_enabled | gg_visible | gg_rad_startnew |
+                          (co[rb] == 0 ? gg_cb_on : 0);
+        gcd[6].creator = GRadioCreate;
 
-	    sprintf( buf, "%4g", star_percent*100 );
-	    label[8].text = (unichar_t *) buf;
-	    label[8].text_is_1byte = true;
-	    gcd[8].gd.label = &label[8];
-	    gcd[8].gd.pos.x = 125; gcd[8].gd.pos.y = 70;  gcd[8].gd.pos.width=50;
-	    gcd[8].gd.flags = gg_enabled|gg_visible ;
-	    gcd[8].gd.cid = CID_PointPercent;
-	    gcd[8].creator = GTextFieldCreate;
+        label[7].text = (unichar_t*)_("Center Out");
+        label[7].text_is_1byte = true;
+        gcd[7].gd.label = &label[7];
+        gcd[7].gd.flags =
+            gg_enabled | gg_visible | (co[rb] == 1 ? gg_cb_on : 0);
+        gcd[7].creator = GRadioCreate;
 
-	    label[9].text = (unichar_t *) "%";
-	    label[9].text_is_1byte = true;
-	    gcd[9].gd.label = &label[9];
-	    gcd[9].gd.pos.x = 180; gcd[9].gd.pos.y = 70; 
-	    gcd[9].gd.flags = gg_enabled|gg_visible ;
-	    gcd[9].creator = GLabelCreate;
-	} else {
-	    label[6].text = (unichar_t *) _("Bounding Box");
-	    label[6].text_is_1byte = true;
-	    gcd[6].gd.label = &label[6];
-	    gcd[6].gd.pos.x = 5; gcd[6].gd.pos.y = 65; 
-	    gcd[6].gd.flags = gg_enabled|gg_visible | (co[rb]==0?gg_cb_on:0);
-	    gcd[6].creator = GRadioCreate;
+        if (rb) gcd[3].gd.flags = gg_visible;
+        gcd[0].gd.handle_controlevent = TA_RadChange;
+        gcd[1].gd.handle_controlevent = TA_RadChange;
 
-	    label[7].text = (unichar_t *) _("Center Out");
-	    label[7].text_is_1byte = true;
-	    gcd[7].gd.label = &label[7];
-	    gcd[7].gd.pos.x = 90; gcd[7].gd.pos.y = 65; 
-	    gcd[7].gd.flags = gg_enabled|gg_visible | (co[rb]==1?gg_cb_on:0);
-	    gcd[7].creator = GRadioCreate;
+        if (haspos) {
+            gcd[6].gd.handle_controlevent = TA_CenRadChange;
+            gcd[7].gd.handle_controlevent = TA_CenRadChange;
 
-	    if ( rb )
-		gcd[3].gd.flags = gg_visible;
-	    gcd[0].gd.handle_controlevent = TA_RadChange;
-	    gcd[1].gd.handle_controlevent = TA_RadChange;
+            label[8].text = (unichar_t*)_("_X");
+            label[8].text_is_1byte = true;
+            label[8].text_in_resource = true;
+            gcd[8].gd.label = &label[8];
+            gcd[8].gd.flags = gg_enabled | gg_visible;
+            gcd[8].creator = GLabelCreate;
 
-	    if ( haspos ) {
-		gcd[6].gd.handle_controlevent = TA_CenRadChange;
-		gcd[7].gd.handle_controlevent = TA_CenRadChange;
+            label[9].text = (unichar_t*)_("_Y");
+            label[9].text_is_1byte = true;
+            label[9].text_in_resource = true;
+            gcd[9].gd.label = &label[9];
+            gcd[9].gd.flags = gg_enabled | gg_visible;
+            gcd[9].creator = GLabelCreate;
 
-		label[8].text = (unichar_t *) _("_X");
-		label[8].text_is_1byte = true;
-		label[8].text_in_resource = true;
-		gcd[8].gd.label = &label[8];
-		gcd[8].gd.pos.x = 70; gcd[8].gd.pos.y = gcd[7].gd.pos.y+15;
-		gcd[8].gd.flags = gg_enabled|gg_visible;
-		gcd[8].creator = GLabelCreate;
+            label[10].text = (unichar_t*)(co[rb] ? _("C_enter") : _("C_orner"));
+            label[10].text_is_1byte = true;
+            label[10].text_in_resource = true;
+            gcd[10].gd.label = &label[10];
+            gcd[10].gd.flags = gg_enabled | gg_visible;
+            gcd[10].gd.cid = CID_CentCornLab;
+            gcd[10].creator = GLabelCreate;
 
-		label[9].text = (unichar_t *) _("_Y");
-		label[9].text_is_1byte = true;
-		label[9].text_in_resource = true;
-		gcd[9].gd.label = &label[9];
-		gcd[9].gd.pos.x = 120; gcd[9].gd.pos.y = gcd[8].gd.pos.y;
-		gcd[9].gd.flags = gg_enabled|gg_visible;
-		gcd[9].creator = GLabelCreate;
+            sprintf(cenx, "%g", (double)cv->info.x);
+            label[11].text = (unichar_t*)cenx;
+            label[11].text_is_1byte = true;
+            gcd[11].gd.label = &label[11];
+            gcd[11].gd.pos.width = 40;
+            gcd[11].gd.flags = gg_enabled | gg_visible;
+            gcd[11].gd.cid = CID_CentCornX;
+            gcd[11].creator = GTextFieldCreate;
 
-		label[10].text = (unichar_t *) (co[rb] ? _("C_enter") : _("C_orner") );
-		label[10].text_is_1byte = true;
-		label[10].text_in_resource = true;
-		gcd[10].gd.label = &label[10];
-		gcd[10].gd.pos.x = 5; gcd[10].gd.pos.y = gcd[8].gd.pos.y+17;
-		gcd[10].gd.flags = gg_enabled|gg_visible;
-		gcd[10].gd.cid = CID_CentCornLab;
-		gcd[10].creator = GLabelCreate;
+            sprintf(ceny, "%g", (double)cv->info.y);
+            label[12].text = (unichar_t*)ceny;
+            label[12].text_is_1byte = true;
+            gcd[12].gd.label = &label[12];
+            gcd[12].gd.pos.width = gcd[11].gd.pos.width;
+            gcd[12].gd.flags = gg_enabled | gg_visible;
+            gcd[12].gd.cid = CID_CentCornY;
+            gcd[12].creator = GTextFieldCreate;
 
-		sprintf( cenx, "%g", (double) cv->info.x );
-		label[11].text = (unichar_t *) cenx;
-		label[11].text_is_1byte = true;
-		gcd[11].gd.label = &label[11];
-		gcd[11].gd.pos.x = 60; gcd[11].gd.pos.y = gcd[10].gd.pos.y-4;
-		gcd[11].gd.pos.width = 40;
-		gcd[11].gd.flags = gg_enabled|gg_visible;
-		gcd[11].gd.cid = CID_CentCornX;
-		gcd[11].creator = GTextFieldCreate;
+            label[13].text =
+                (unichar_t*)(co[rb] ? _("Radius:   ") : _("Diameter:"));
+            label[13].text_is_1byte = true;
+            gcd[13].gd.label = &label[13];
+            gcd[13].gd.flags = gg_enabled | gg_visible;
+            gcd[13].gd.cid = CID_RadDiamLab;
+            gcd[13].creator = GLabelCreate;
 
-		sprintf( ceny, "%g", (double) cv->info.y );
-		label[12].text = (unichar_t *) ceny;
-		label[12].text_is_1byte = true;
-		gcd[12].gd.label = &label[12];
-		gcd[12].gd.pos.x = 110; gcd[12].gd.pos.y = gcd[11].gd.pos.y;
-		gcd[12].gd.pos.width = gcd[11].gd.pos.width;
-		gcd[12].gd.flags = gg_enabled|gg_visible;
-		gcd[12].gd.cid = CID_CentCornY;
-		gcd[12].creator = GTextFieldCreate;
+            sprintf(radx, "%g", (double)raddiam_x);
+            label[14].text = (unichar_t*)radx;
+            label[14].text_is_1byte = true;
+            gcd[14].gd.label = &label[14];
+            gcd[14].gd.pos.width = gcd[11].gd.pos.width;
+            gcd[14].gd.flags = gg_enabled | gg_visible;
+            gcd[14].gd.cid = CID_RadDiamX;
+            gcd[14].creator = GTextFieldCreate;
 
-		label[13].text = (unichar_t *) (co[rb] ? _("Radius:   ") : _("Diameter:") );
-		label[13].text_is_1byte = true;
-		gcd[13].gd.label = &label[13];
-		gcd[13].gd.pos.x = 5; gcd[13].gd.pos.y = gcd[10].gd.pos.y+24;
-		gcd[13].gd.flags = gg_enabled|gg_visible;
-		gcd[13].gd.cid = CID_RadDiamLab;
-		gcd[13].creator = GLabelCreate;
+            sprintf(rady, "%g", (double)raddiam_y);
+            label[15].text = (unichar_t*)rady;
+            label[15].text_is_1byte = true;
+            gcd[15].gd.label = &label[15];
+            gcd[15].gd.pos.width = gcd[11].gd.pos.width;
+            gcd[15].gd.flags = gg_enabled | gg_visible;
+            gcd[15].gd.cid = CID_RadDiamY;
+            gcd[15].creator = GTextFieldCreate;
 
-		sprintf( radx, "%g", (double) raddiam_x );
-		label[14].text = (unichar_t *) radx;
-		label[14].text_is_1byte = true;
-		gcd[14].gd.label = &label[14];
-		gcd[14].gd.pos.x = gcd[11].gd.pos.x; gcd[14].gd.pos.y = gcd[13].gd.pos.y-4;
-		gcd[14].gd.pos.width = gcd[11].gd.pos.width;
-		gcd[14].gd.flags = gg_enabled|gg_visible;
-		gcd[14].gd.cid = CID_RadDiamX;
-		gcd[14].creator = GTextFieldCreate;
+            label[16].text = (unichar_t*)_("Angle:");
+            label[16].text_is_1byte = true;
+            gcd[16].gd.label = &label[16];
+            gcd[16].gd.flags = gg_enabled | gg_visible;
+            gcd[16].creator = GLabelCreate;
 
-		sprintf( rady, "%g", (double) raddiam_y );
-		label[15].text = (unichar_t *) rady;
-		label[15].text_is_1byte = true;
-		gcd[15].gd.label = &label[15];
-		gcd[15].gd.pos.x = gcd[12].gd.pos.x; gcd[15].gd.pos.y = gcd[14].gd.pos.y;
-		gcd[15].gd.pos.width = gcd[11].gd.pos.width;
-		gcd[15].gd.flags = gg_enabled|gg_visible;
-		gcd[15].gd.cid = CID_RadDiamY;
-		gcd[15].creator = GTextFieldCreate;
+            sprintf(angle, "%g", (double)rotate_by);
+            label[17].text = (unichar_t*)angle;
+            label[17].text_is_1byte = true;
+            gcd[17].gd.label = &label[17];
+            gcd[17].gd.pos.width = gcd[11].gd.pos.width;
+            gcd[17].gd.flags = gg_enabled | gg_visible;
+            gcd[17].gd.cid = CID_Angle;
+            gcd[17].creator = GTextFieldCreate;
+        }
+    }
+    shapes[0] = &gcd[0];
+    shapes[1] = &gcd[1];
+    boxes[2].gd.flags = gg_enabled | gg_visible;
+    boxes[2].gd.u.boxelements = shapes;
+    boxes[2].creator = GHBoxCreate;
 
-		label[16].text = (unichar_t *) _("Angle:");
-		label[16].text_is_1byte = true;
-		gcd[16].gd.label = &label[16];
-		gcd[16].gd.pos.x = 5; gcd[16].gd.pos.y = gcd[13].gd.pos.y+24;
-		gcd[16].gd.flags = gg_enabled|gg_visible;
-		gcd[16].creator = GLabelCreate;
+    options[0] = &gcd[6];
+    options[1] = &gcd[7];
+    if (ispolystar) {
+        options[2] = &gcd[8];
+        options[3] = &gcd[9];
+    }
+    boxes[3].gd.flags = gg_enabled | gg_visible;
+    boxes[3].gd.u.boxelements = options;
+    boxes[3].creator = GHBoxCreate;
 
-		sprintf( angle, "%g", (double) rotate_by );
-		label[17].text = (unichar_t *) angle;
-		label[17].text_is_1byte = true;
-		gcd[17].gd.label = &label[17];
-		gcd[17].gd.pos.x = 60; gcd[17].gd.pos.y = gcd[16].gd.pos.y-4;
-		gcd[17].gd.pos.width = gcd[11].gd.pos.width;
-		gcd[17].gd.flags = gg_enabled|gg_visible;
-		gcd[17].gd.cid = CID_Angle;
-		gcd[17].creator = GTextFieldCreate;
-	    }
-	}
-	GGadgetsCreate(d.gw,gcd);
+    buttons[0] = GCD_Glue;
+    buttons[1] = &gcd[4];
+    buttons[2] = GCD_Glue;
+    buttons[3] = &gcd[5];
+    buttons[4] = GCD_Glue;
+    boxes[4].gd.flags = gg_enabled | gg_visible;
+    boxes[4].gd.u.boxelements = buttons;
+    boxes[4].creator = GHBoxCreate;
+
+    varray[0] = &boxes[2];
+    varray[1] = &gcd[2];
+    varray[2] = &gcd[3];
+    varray[3] = &boxes[3];
+    if (haspos) {
+        positions[0][0] = GCD_Glue;
+        positions[0][1] = &gcd[8];
+        positions[0][2] = &gcd[9];
+        positions[1][0] = &gcd[10];
+        positions[1][1] = &gcd[11];
+        positions[1][2] = &gcd[12];
+        positions[2][0] = &gcd[13];
+        positions[2][1] = &gcd[14];
+        positions[2][2] = &gcd[15];
+        positions[3][0] = &gcd[16];
+        positions[3][1] = &gcd[17];
+        positions[3][2] = GCD_Glue;
+        boxes[5].gd.flags = gg_enabled | gg_visible;
+        boxes[5].gd.u.boxelements = positions[0];
+        boxes[5].creator = GHVBoxCreate;
+        varray[4] = &boxes[5];
+        varray[5] = &boxes[4];
+    } else {
+        varray[4] = &boxes[4];
+    }
+    boxes[0].gd.pos.x = boxes[0].gd.pos.y = 2;
+    boxes[0].gd.flags = gg_enabled | gg_visible;
+    boxes[0].gd.u.boxelements = varray;
+    boxes[0].creator = GVBoxCreate;
+    GGadgetsCreate(d.gw, boxes);
+    GHVBoxSetExpandableCol(boxes[4].ret, gb_expandgluesame);
+    GHVBoxFitWindow(boxes[0].ret);
     d.rb1 = gcd[0].ret;
     d.reg = gcd[6].ret;
     d.pts = gcd[7].ret;
 
-    GDrawSetVisible(d.gw,true);
-    while ( !d.done )
-	GDrawProcessOneEvent(NULL);
+    GDrawSetVisible(d.gw, true);
+    while (!d.done) {
+        GDrawProcessOneEvent(NULL);
+    }
     GDrawDestroyWindow(d.gw);
-return( d.ret );
+    return (d.ret);
 }
 
 static void CVRectElipse(CharView *cv) {
@@ -948,7 +999,7 @@ typedef void (*visitButtonsVisitor) ( CharView *cv,             // CharView pass
 static void visitButtons( CharView* cv, visitButtonsVisitor v, void* udata ) 
 {
     GImage* (*buttons)[14][2] = (CVInSpiro(cv) ? spirobuttons : normbuttons);
-    int i,j,sel,norm, mi;
+    int i,j,sel, mi;
     int tool = cv->cntrldown?cv->cb1_tool:cv->b1_tool;
     int icony = 1;
     for ( i=0; buttons[0][i][0]; ++i ) {
@@ -957,8 +1008,8 @@ static void visitButtons( CharView* cv, visitButtonsVisitor v, void* udata )
 
 	    mi = i;
 	    sel = (tool == mi*2+j );
-	    if( buttons[0][mi][j] == &GIcon_rect && rectelipse
-		|| buttons[0][mi][j] == &GIcon_poly && polystar )
+	    if( (buttons[0][mi][j] == &GIcon_rect && rectelipse)
+		|| (buttons[0][mi][j] == &GIcon_poly && polystar) )
 	    {
 		sel = (tool == (mi+1)*2+j );
 		mi+=2;
@@ -1010,8 +1061,6 @@ static IJ getIJFromMouse( CharView* cv, int mx, int my )
  */
 
 void cvp_draw_relief(GWindow pixmap, GImage *iconimg, int iconx, int icony, int selected) {
-	extern Color cvbutton3dedgelightcol; // Default 0xe0e0e0.		
-	extern Color cvbutton3dedgedarkcol; // Default 0x707070.
 	int iconw = iconimg->u.image->width;
 	int iconh = iconimg->u.image->height;
 	int norm = !selected;
@@ -1062,18 +1111,16 @@ static void ToolsExpose(GWindow pixmap, CharView *cv, GRect *r) {
 	    { '^', 'M', 's', 'e', '1',  '\0' },
 	    { 'M', 's', 'e', '2',  '\0' },
 	    { '^', 'M', 's', 'e', '2',  '\0' }};
-    int i,j,sel,norm, mi;
-    int tool = cv->cntrldown?cv->cb1_tool:cv->b1_tool;
+    int j;
     int dither = GDrawSetDither(NULL,false);
     GRect temp;
     int canspiro = hasspiro(), inspiro = canspiro && cv->b.sc->inspiro;
-    GImage* (*buttons)[14][2] = (inspiro ? spirobuttons : normbuttons);
     GImage **smalls = inspiro ? spirosmalls : normsmalls;
 
     normbuttons[0][3][1] = canspiro ? &GIcon_spiroup : &GIcon_spirodisabled;
 
     GDrawPushClip(pixmap,r,&old);
-    GDrawFillRect(pixmap,r,GDrawGetDefaultBackground(NULL));
+    GDrawFillRect(pixmap,r,cvpalettebgcol);
     GDrawSetLineWidth(pixmap,0);
 
     ToolsExposeVisitorData d;
@@ -1083,15 +1130,15 @@ static void ToolsExpose(GWindow pixmap, CharView *cv, GRect *r) {
     int bottomOfMainIconsY = d.maxicony + d.lastIconHeight;
     
     
-    GDrawSetFont(pixmap,toolsfont);
+    GDrawSetFont(pixmap,toolspalette_font.fi);
     temp.x = 52-16;
     temp.y = bottomOfMainIconsY;
     temp.width = 16;
     temp.height = 4*12;
-    GDrawFillRect(pixmap,&temp,GDrawGetDefaultBackground(NULL));
+    GDrawFillRect(pixmap,&temp,cvpalettebgcol);
     for ( j=0; j<4; ++j ) {
 	GDrawDrawText(pixmap,2,bottomOfMainIconsY+j*getSmallIconsHeight()+10,
-		      (unichar_t *) _Mouse[j],-1,GDrawGetDefaultForeground(NULL));
+		      (unichar_t *) _Mouse[j],-1,cvpalettefgcol);
 	if ( (&cv->b1_tool)[j]!=cvt_none && smalls[(&cv->b1_tool)[j]])
 	    GDrawDrawImage(pixmap,smalls[(&cv->b1_tool)[j]],NULL,52-16,bottomOfMainIconsY+j*getSmallIconsHeight());
     }
@@ -1144,6 +1191,7 @@ return( event->u.chr.state & ~bit );
 void CVToolsSetCursor(CharView *cv, int state, char *device) {
     int shouldshow;
     int cntrl;
+    int old_showing_tool = cv->showing_tool;
 
     if ( tools[0] == ct_pointer ) {
 	tools[cvt_pointer] = ct_mypointer;
@@ -1214,6 +1262,8 @@ void CVToolsSetCursor(CharView *cv, int state, char *device) {
 		GDrawSetCursor(cvtools,tools[shouldshow]);
 	}
 	cv->showing_tool = shouldshow;
+	if ( old_showing_tool==cvt_scale || shouldshow==cvt_scale )
+	    GDrawRequestExpose(cv->v,NULL,false);
     }
 
     if ( device==NULL || strcmp(device,"stylus")==0 ) {
@@ -1330,7 +1380,7 @@ static void ToolsMouse(CharView *cv, GEvent *event) {
     }
     pos = mi*2 + j;
     GGadgetEndPopup();
-    /* we have two fewer buttons than commands as two bottons each control two commands */
+    /* we have two fewer buttons than commands as two buttons each control two commands */
     if ( pos<0 || pos>=cvt_max )
 	pos = cvt_none;
     if ( event->type == et_mousedown ) {
@@ -1360,7 +1410,15 @@ static void ToolsMouse(CharView *cv, GEvent *event) {
 		    msg = _("Add a next constraint point (sometimes like a tangent)");
 	    }
 	    // We want to display the hotkey for the key in question if possible.
-	    char * mininame = HKTextInfoToUntranslatedTextFromTextInfo(&cvtoollist[pos].ti);
+	    /* cvtoollist has separators, so it can not be indexed by tool */
+	    GMenuItem2 *toolmi = cvtoollist;
+	    while ( toolmi->ti.text!=NULL || toolmi->ti.image!=NULL || toolmi->ti.line ) {
+		if ( !toolmi->ti.line && toolmi->mid==pos )
+		    break;
+		++toolmi;
+	    }
+	    char * mininame = toolmi->ti.text!=NULL || toolmi->ti.image!=NULL ?
+		    HKTextInfoToUntranslatedTextFromTextInfo(&toolmi->ti) : NULL;
 	    char * menuname = NULL;
 	    Hotkey* toolhotkey = NULL;
             if (mininame != NULL) {
@@ -1380,6 +1438,7 @@ static void ToolsMouse(CharView *cv, GEvent *event) {
 	else
 	    cv->pressed_display = cv->pressed_tool;
     } else if ( event->type == et_mouseup ) {
+	int old_b1_tool = cv->b1_tool;
 	if ( pos==cvt_freehand && event->u.mouse.clicks==2 ) {
 	    FreeHandStrokeDlg(CVFreeHandInfo());
 	} else if ( pos==cvt_pointer && event->u.mouse.clicks==2 ) {
@@ -1419,6 +1478,8 @@ static void ToolsMouse(CharView *cv, GEvent *event) {
 	    cv->pressed_tool = cv->pressed_display = cvt_none;
 	}
 	GDrawRequestExpose(cvtools,NULL,false);
+	if ( old_b1_tool!=cv->b1_tool && (old_b1_tool==cvt_scale || cv->b1_tool==cvt_scale) )
+	    GDrawRequestExpose(cv->v,NULL,false);
 	event->u.chr.state &= ~(1<<(7+event->u.mouse.button));
     }
     CVToolsSetCursor(cv,event->u.mouse.state,event->u.mouse.device);
@@ -1471,6 +1532,7 @@ return( true );
       case et_close:
 	SetPaletteVisible(NULL, gw, false);
       break;
+      default: break;
     }
 return( true );
 }
@@ -1478,7 +1540,6 @@ return( true );
 GWindow CVMakeTools(CharView *cv) {
     GRect r;
     GWindowAttrs wattrs;
-    FontRequest rq;
 
     if ( cvtools!=NULL )
 return( cvtools );
@@ -1502,15 +1563,6 @@ return( cvtools );
 
     if ( GDrawRequestDeviceEvents(cvtools,input_em_cnt,input_em)>0 ) {
 	/* Success! They've got a wacom tablet */
-    }
-
-    if ( toolsfont==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = -10;
-	rq.weight = 400;
-	toolsfont = GDrawInstanciateFont(NULL,&rq);
-	toolsfont = GResourceFindFont("ToolsPalette.Font",toolsfont);
     }
 
     if ( cvvisible[1])
@@ -1651,7 +1703,6 @@ static void Layers2Expose(CharView *cv,GWindow pixmap,GEvent *event) {
     GRect r, oldclip;
     struct _GImage base;
     GImage gi;
-    int as = (24*cv->b.sc->parent->ascent)/(cv->b.sc->parent->ascent+cv->b.sc->parent->descent);
     int leftOffset, layerCount;
 
     if ( event->u.expose.rect.y+event->u.expose.rect.height<layer2.header_height )
@@ -1667,7 +1718,7 @@ return;
     r.y = layer2.header_height;
     r.height = r.height - layer2.header_height;
     GDrawPushClip(pixmap, &r, &oldclip);
-    GDrawFillRect(pixmap,&r,GDrawGetDefaultBackground(NULL));
+    GDrawFillRect(pixmap,&r,cvpalettebgcol);
 
     GDrawSetDither(NULL, false);	/* on 8 bit displays we don't want any dithering */
 
@@ -1691,7 +1742,7 @@ return;
             r.width = layer2.sb_start - r.x;
             r.y = layer2.header_height + i * CV_LAYERS2_LINE_HEIGHT;
 	    r.height = CV_LAYERS2_LINE_HEIGHT;
-	    GDrawFillRect(pixmap,&r,GDrawGetDefaultForeground(NULL));
+	    GDrawFillRect(pixmap,&r,cvpalettefgcol);
 	}
         GDrawDrawLine(pixmap, r.x, layer2.header_height + i * CV_LAYERS2_LINE_HEIGHT,
                       r.x + r.width, layer2.header_height + i * CV_LAYERS2_LINE_HEIGHT,
@@ -1699,7 +1750,7 @@ return;
 	if ( i==0 || i==1 ) {
 	    str = i==0?_("Guide") : _("Back");
             GDrawDrawText8(pixmap, r.x + 2, layer2.header_height + i * CV_LAYERS2_LINE_HEIGHT + (CV_LAYERS2_LINE_HEIGHT - 12) / 2 + 12,
-		    (char *) str,-1,ll==layer2.active?0xffffff:GDrawGetDefaultForeground(NULL));
+		    (char *) str,-1,ll==layer2.active?cvpalettebgcol:cvpalettefgcol);
 	} else if ( layer2.offtop+i>=layer2.current_layers ) {
     break;
 	} else if ( layer2.layers[layer2.offtop+i]!=NULL ) {
@@ -1726,7 +1777,7 @@ return;
 	    }
 	    // And this comes from above.
             GDrawDrawText8(pixmap, r.x + 2, layer2.header_height + i * CV_LAYERS2_LINE_HEIGHT + (CV_LAYERS2_LINE_HEIGHT - 12) / 2 + 12,
-		    (char *) layername,-1,ll==layer2.active?0xffffff:GDrawGetDefaultForeground(NULL));
+		    (char *) layername,-1,ll==layer2.active?cvpalettebgcol:cvpalettefgcol);
 #endif // 0
 	}
     }
@@ -1965,7 +2016,6 @@ return(true);
 		    cv->showback[0] |= 1;
 		else
 		    cv->showback[0] &= ~1;
-		cv->back_img_out_of_date = true;
 	      break;
 	      case CID_VGrid:
 		CVShows.showgrids = cv->showgrids = GGadgetIsChecked(event->u.control.g);
@@ -1991,6 +2041,7 @@ return(true);
 	} else
 	    Layer2Scroll(cv,event);
       break;
+      default: break;
     }
 return( true );
 }
@@ -2002,7 +2053,6 @@ static void CVMakeLayers2(CharView *cv) {
     GGadgetCreateData gcd[25];
     GTextInfo label[25];
     static GBox radio_box = { bt_none, bs_rect, 0, 0, 0, 0, 0, 0, 0, 0, COLOR_DEFAULT, COLOR_DEFAULT, 0, 0, 0, 0, 0, 0, 0 };
-    FontRequest rq;
     int i;
     extern int _GScrollBar_Width;
 
@@ -2030,18 +2080,9 @@ return;
     memset(&label,0,sizeof(label));
     memset(&gcd,0,sizeof(gcd));
 
-    if ( layersfont==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = -12;
-	rq.weight = 400;
-	layersfont = GDrawInstanciateFont(cvlayers2,&rq);
-	layersfont = GResourceFindFont("LayersPalette.Font",layersfont);
-    }
-
     for ( i=0; i<sizeof(label)/sizeof(label[0]); ++i )
-	label[i].font = layersfont;
-    layer2.font = layersfont;
+	label[i].font = layerspalette_font.fi;
+    layer2.font = layerspalette_font.fi;
 
     gcd[0].gd.pos.width = GDrawPointsToPixels(cv->gw,_GScrollBar_Width);
     gcd[0].gd.pos.x = CV_LAYERS2_WIDTH-gcd[0].gd.pos.width;
@@ -2236,9 +2277,9 @@ return;
  * Get the offset at the right hand size of the eyeball to show/hide
  * a layer. This is the x offset where the Q/C indicators might be drawn.
  */
-static int32 Layers_getOffsetAtRightOfViewLayer(CharView *cv)
+static int32_t Layers_getOffsetAtRightOfViewLayer(CharView *cv)
 {
-    int32 ret = 64;
+    int32_t ret = 64;
     GGadget *v = GWidgetGetControl(cvlayers,CID_VBack);
     if( v )
     {
@@ -2257,7 +2298,6 @@ static void LayersExpose(CharView *cv,GWindow pixmap,GEvent *event) {
     GRect r;
     struct _GImage base;
     GImage gi;
-    Color mocolor = ACTIVE_BORDER; /* mouse over color */
     int ww;
 
     int yt = .7*layer_height; /* vertical spacer to add when drawing text in the row */
@@ -2314,11 +2354,11 @@ return;
                 r.x = quadcol; r.width = column_width;
                 r.y = y;
                 r.height = layer_height;
-                GDrawFillRect(pixmap,&r,mocolor);
+                GDrawFillRect(pixmap,&r,cvpaletteactborcol);
             }
             str = ( ll>=0 && ll<cv->b.sc->layer_cnt ? (cv->b.sc->layers[ll].order2? "Q" : "C") : " ");
 	    GDrawDrawText8(pixmap, quadcol, y + yt,
-		    (char *) str,-1,GDrawGetDefaultForeground(NULL));
+		    (char *) str,-1,cvpalettefgcol);
         }
 
          /* draw fg/bg toggle */
@@ -2327,11 +2367,11 @@ return;
                 r.x = fgcol; r.width = column_width;
                 r.y = y;
                 r.height = layer_height;
-                GDrawFillRect(pixmap,&r,mocolor);
+                GDrawFillRect(pixmap,&r,cvpaletteactborcol);
             }
             str = ( ll>=0 && ll<cv->b.sc->layer_cnt ? (cv->b.sc->layers[ll].background? "B" : "F") : "#");
 	    GDrawDrawText8(pixmap, fgcol, y + yt,
-		    (char *) str,-1,GDrawGetDefaultForeground(NULL));
+		    (char *) str,-1,cvpalettefgcol);
         }
 
          /* draw layer thumbnail and label */
@@ -2339,18 +2379,18 @@ return;
             r.x = editcol; r.width = ww-r.x;
 	    r.y = y;
 	    r.height = layer_height;
-	    GDrawFillRect(pixmap,&r,GDrawGetDefaultForeground(NULL));
+	    GDrawFillRect(pixmap,&r,cvpalettefgcol);
 	} else if ( layerinfo.mo_layer==ll && layerinfo.mo_col==CID_EBase ) {
             r.x = editcol; r.width = ww-r.x;
             r.y = y;
             r.height = layer_height;
-            GDrawFillRect(pixmap,&r,mocolor);
+            GDrawFillRect(pixmap,&r,cvpaletteactborcol);
         }
         r.x=editcol;
 	if ( ll==-1 || ll==0 || ll==1) {
 	    str = ll==-1 ? _("Guide") : (ll==0 ?_("Back") : _("Fore")) ;
 	    GDrawDrawText8(pixmap,r.x+2,y + yt,
-		    (char *) str,-1,ll==layerinfo.active?0xffffff:GDrawGetDefaultForeground(NULL));
+		    (char *) str,-1,ll==layerinfo.active?cvpalettebgcol:cvpalettefgcol);
 	} else if ( ll>=layerinfo.current_layers ) {
              break; /* no more layers to draw! */
 	} else if ( ll>=0 && layerinfo.layers[ll]!=NULL ) {
@@ -2365,7 +2405,7 @@ return;
             str = cv->b.sc->parent->layers[ll].name;
             if ( !str || !*str ) str="-";
 	    GDrawDrawText8(pixmap, r.x+2, y + yt,
-		        (char *) str,-1,ll==layerinfo.active?0xffffff:GDrawGetDefaultForeground(NULL));
+		        (char *) str,-1,ll==layerinfo.active?cvpalettebgcol:cvpalettefgcol);
 	}
     }
 
@@ -2398,7 +2438,7 @@ static void CVLRemoveEdit(CharView *cv, int save) {
 	GDrawRequestExpose(cvlayers,NULL,false);
 
 	layerinfo.rename_active = 0;
-	CVInfoDrawText(cv,cv->gw);
+	GDrawRequestExpose(cv->gw, NULL, false);
     }
 }
 
@@ -2638,7 +2678,6 @@ static void CVLayerInvoked(GWindow v, GMenuItem *mi, GEvent *e) {
     switch ( mi->mid ) {
       case LMID_Fill:
         cv->showfilled = !cv->showfilled;
-        CVRegenFill(cv);
         GDrawRequestExpose(cv->v,NULL,false);
       break;
 
@@ -2670,7 +2709,6 @@ static void CVLayerInvoked(GWindow v, GMenuItem *mi, GEvent *e) {
         if ( layer!=ly_grid && cv->b.sc->layers[layer].order2 ) {
             SFConvertLayerToOrder3(cv->b.sc->parent, layer);
 	    GDrawRequestExpose(cvlayers,NULL,false);
-            cv->back_img_out_of_date = true;
         }
       break;
 
@@ -2678,7 +2716,6 @@ static void CVLayerInvoked(GWindow v, GMenuItem *mi, GEvent *e) {
         if ( layer!=ly_grid && !cv->b.sc->layers[layer].order2 ) {
             SFConvertLayerToOrder2(cv->b.sc->parent, layer);
 	    GDrawRequestExpose(cvlayers,NULL,false);
-            cv->back_img_out_of_date = true;
         }
       break;
 
@@ -2879,8 +2916,6 @@ static int CVLScanForItem(int x, int y, int *col) {
 
 /* Called in response to some event where we want to change the current layer. */
 void CVLSelectLayer(CharView *cv, int layer) {
-    enum drawmode dm = cv->b.drawmode;
-
     if ( layer<-1 || layer>=cv->b.sc->layer_cnt )
 	return;
 
@@ -2905,13 +2940,10 @@ void CVLSelectLayer(CharView *cv, int layer) {
     }
     layerinfo.active = CVLayer(&cv->b); /* the index of the active layer */
 
-    CVRegenFill(cv);
     GDrawRequestExpose(cv->v,NULL,false);
     if (cvlayers2) GDrawRequestExpose(cvlayers2,NULL,false);
     if (cvlayers)  GDrawRequestExpose(cvlayers,NULL,false);
-    if ( dm!=cv->b.drawmode )
-        GDrawRequestExpose(cv->gw,NULL,false); /* the logo (where the scrollbars join) shows what layer we are in */
-    CVInfoDrawText(cv,cv->gw);
+    GDrawRequestExpose(cv->gw,NULL,false);
 }
 
 static int cvlayers_e_h(GWindow gw, GEvent *event) {
@@ -3004,7 +3036,6 @@ return( true );
                     SFConvertLayerToOrder3(cv->b.sc->parent, l);
                 else
                     SFConvertLayerToOrder2(cv->b.sc->parent, l);
-                cv->back_img_out_of_date = true;
 	        GDrawRequestExpose(cvlayers,NULL,false);
                 GDrawRequestExpose(cv->v,NULL,false);
             }
@@ -3094,7 +3125,6 @@ return ( true );
 		    cv->showback[0] |= 1;
 		else
 		    cv->showback[0] &= ~1;
-		cv->back_img_out_of_date = true;
                 GDrawRequestExpose(cv->v,NULL,false);
 	      break;
 	      case CID_VGrid:
@@ -3133,7 +3163,6 @@ return ( true );
                         cv->showback[cid>>5] |=  (1<<(cid&31));
                     else
                         cv->showback[cid>>5] &= ~(1<<(cid&31));
-                    cv->back_img_out_of_date = true;
 
                     GDrawRequestExpose(cv->v,NULL,false);
                     if ( dm!=cv->b.drawmode )
@@ -3183,7 +3212,6 @@ int CVPaletteMnemonicCheck(GEvent *event) {
     int j, i, ch;
     char *foo;
     GEvent fake;
-    GGadget *g;
     CharView *cv;
     SplineFont *parent;
     int curlayer;
@@ -3197,7 +3225,6 @@ return( false );
     if ( isdigit(event->u.chr.keysym) ) {
 	int off = event->u.chr.keysym - '0';
 
-	g = GWidgetGetControl(cvlayers, CID_EBase+off-1);
 	if ( off-1<parent->layer_cnt && off!=curlayer ) {
             CVLSelectLayer(cv, off);
 	    if ( cv->b.sc->parent->multilayer )
@@ -3254,7 +3281,6 @@ GWindow CVMakeLayers(CharView *cv) {
     GGadgetCreateData gcd[25];
     GTextInfo label[25];
     GGadget *gadget;
-    FontRequest rq;
     extern int _GScrollBar_Width;
     int i=0;
     int viscol=0;
@@ -3265,15 +3291,8 @@ return( cvlayers );
      /* Initialize layerinfo */
     if ( layerinfo.clut==NULL )
 	layerinfo.clut = _BDFClut(4);
-    if ( layersfont==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = -12;
-	rq.weight = 400;
-	layersfont = GDrawInstanciateFont(cvlayers2,&rq);
-	layersfont = GResourceFindFont("LayersPalette.Font",layersfont);
-    }
-    layerinfo.font = layersfont;
+
+    layerinfo.font = layerspalette_font.fi;
 
      /* Initialize palette window */
     memset(&wattrs,0,sizeof(wattrs));
@@ -3297,8 +3316,8 @@ return( cvlayers );
     memset(&label,0,sizeof(label));
     memset(&gcd,0,sizeof(gcd));
 
-    int32 plusw = GDrawGetText8Width(cv->gw,  _("+"), -1);
-    int32 plush = GDrawGetText8Height(cv->gw, _("+"), -1);
+    int32_t plusw = GDrawGetText8Width(cv->gw,  _("+"), -1);
+    int32_t plush = GDrawGetText8Height(cv->gw, _("+"), -1);
     plusw = GDrawPointsToPixels(NULL,plusw+4);
     plush = GDrawPointsToPixels(NULL,plush+4);
     plush = MAX( plush, plusw ); // make it square.
@@ -3395,7 +3414,7 @@ return( cvlayers );
 
     GGadgetGetSize(GWidgetGetControl(cvlayers,CID_VGrid),&size);
     layer_height = size.height;
-    int32 w = GDrawGetText8Width(cvlayers, "W", -1);
+    int32_t w = GDrawGetText8Width(cvlayers, "W", -1);
     layerinfo.column_width = w+6;
 
     layerinfo.active = CVLayer(&cv->b); /* the index of the active layer */
@@ -3984,6 +4003,7 @@ return( true );
 	    GDrawRequestExpose(bv->v,NULL,false);
 	}
       break;
+      default: break;
     }
 return( true );
 }
@@ -3994,7 +4014,6 @@ GWindow BVMakeLayers(BitmapView *bv) {
     GGadgetCreateData gcd[8], boxes[2], *hvarray[5][3];
     GTextInfo label[8];
     static GBox radio_box = { bt_none, bs_rect, 0, 0, 0, 0, 0, 0, 0, 0, COLOR_DEFAULT, COLOR_DEFAULT, 0, 0, 0, 0, 0, 0, 0 };
-    FontRequest rq;
     int i;
 
     if ( bvlayers!=NULL )
@@ -4020,16 +4039,8 @@ return(bvlayers);
     memset(&gcd,0,sizeof(gcd));
     memset(&boxes,0,sizeof(boxes));
 
-    if ( layersfont==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = -12;
-	rq.weight = 400;
-	layersfont = GDrawInstanciateFont(cvlayers2,&rq);
-	layersfont = GResourceFindFont("LayersPalette.Font",layersfont);
-    }
     for ( i=0; i<sizeof(label)/sizeof(label[0]); ++i )
-	label[i].font = layersfont;
+	label[i].font = layerspalette_font.fi;
 
 /* GT: Abbreviation for "Visible" */
     label[0].text = (unichar_t *) _("V");
@@ -4212,6 +4223,7 @@ return( true );
       case et_close:
 	SetPaletteVisible(NULL, gw, false);
       break;
+      default: break;
     }
 return( true );
 }
@@ -4260,7 +4272,7 @@ static void BVToolsExpose(GWindow pixmap, BitmapView *bv, GRect *r) {
     int dither = GDrawSetDither(NULL,false);
 
     GDrawPushClip(pixmap,r,&old);
-    GDrawFillRect(pixmap,r,GDrawGetDefaultBackground(NULL));
+    GDrawFillRect(pixmap,r,cvpalettebgcol);
     GDrawSetLineWidth(pixmap,0);
     for ( i=0; i<sizeof(buttons)/sizeof(buttons[0]); ++i ) for ( j=0; j<2; ++j ) {
 	GDrawDrawImage(pixmap,buttons[i][j],NULL,j*27+1,i*27+1);
@@ -4448,6 +4460,7 @@ return( true );
       case et_close:
 	SetPaletteVisible(NULL, gw, false);
       break;
+      default: break;
     }
 return( true );
 }

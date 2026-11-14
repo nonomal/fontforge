@@ -68,25 +68,25 @@ Font File Formats
   (Sadly different sources have slightly different definitions of less important
   parts of the standard, be warned)
 
-  * `Apple <http://developer.apple.com/fonts/TTRefMan/>`__ (I find Apple's prose
+  * `Apple <http://developer.apple.com/fonts/TrueType-Reference-Manual/>`__ (I find Apple's prose
     difficult, and sometimes misleading. I suggest using a different source when
     possible)
   * `Microsoft <http://www.microsoft.com/typography/tt/tt.htm>`__
   * `random useful site <http://www.truetype.demon.co.uk/ttspec.htm>`__
   * `TTC <http://partners.adobe.com/asn/tech/type/opentype/otff.jsp>`__ -- True Type
     Font Collection
-* `Apple Advanced Typography <http://developer.apple.com/fonts/TTRefMan/RM06/Chap6.html>`__
+* `Apple Advanced Typography <http://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6.html>`__
   extensions to TrueType
 * Apple distortable font (variation tables) -- vaguely equivalent to Multiple
   Master fonts for TrueType
 
-  * `fvar <http://developer.apple.com/fonts/TTRefMan/RM06/Chap6fvar.html>`__ (font
+  * `fvar <http://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6fvar.html>`__ (font
     variations)
-  * `gvar <http://developer.apple.com/fonts/TTRefMan/RM06/Chap6gvar.html>`__ (glyph
+  * `gvar <http://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6gvar.html>`__ (glyph
     variations)
-  * `cvar <http://developer.apple.com/fonts/TTRefMan/RM06/Chap6cvar.html>`__ (cvt
+  * `cvar <http://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6cvar.html>`__ (cvt
     variations)
-  * `avar <http://developer.apple.com/fonts/TTRefMan/RM06/Chap6avar.html>`__ (axis
+  * `avar <http://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6avar.html>`__ (axis
     variations)
 * .. _bibliography.OpenType:
 
@@ -99,7 +99,7 @@ Font File Formats
   * `CFF <http://partners.adobe.com/public/developer/en/font/5176.CFF.pdf>`__
   * `Adobe's version of file format <http://partners.adobe.com/public/developer/opentype/index_spec.html>`__
 
-    * `SING Gaiji extention <http://partners.adobe.com/public/developer/opentype/gdk/topic.html>`__
+    * `SING Gaiji extension <http://partners.adobe.com/public/developer/opentype/gdk/topic.html>`__
       (more information is available in the documentation subdirectory of the Glyphlet
       GDK)
   * `Microsoft's version <http://www.microsoft.com/typography/otspec/default.htm>`__
@@ -141,7 +141,7 @@ Font File Formats
     $ weave pktype.web
 
     $ pdftex pktype.tex
-* `SIL Graphite Fonts <http://scripts.sil.org/cms/scripts/page.php?site_id=nrsi&cat_id=RenderingGraphite>`__
+* `SIL Graphite Fonts <https://graphite.sil.org/>`__
   (smart font extension to TrueType. Additional tables containing rules for
   composing, reordering, spacing, etc. glyphs)
 * Palm pilot fonts (pdb files)
@@ -222,7 +222,7 @@ Unicode
   * `American Mathematical Society's corporate use extensions <http://www.ams.org/STIX/bnb/stix-tbl.asc-2003-10-10>`__
     (0xE000-0xF7D7)
   * MicroSoft uses 0xF000-0xF0FF in their "Symbol" encoding (3,0) when they want to
-    an uninterpretted encoding vector (ie. a mapping from byte to glyph with no
+    an uninterpreted encoding vector (ie. a mapping from byte to glyph with no
     meaning attached to the mapping)
 * `Unicode en français <http://hapax.qc.ca/>`__
 * `Pictures of the characters <http://www.unicode.org/charts/>`__

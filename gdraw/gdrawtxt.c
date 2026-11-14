@@ -29,13 +29,21 @@
 
 #include "fontP.h"
 #include "gdrawP.h"
-#include "gxcdrawP.h"
+#include "gresource.h"
 #include "ustring.h"
+
+extern GResFont _ggadget_default_font;
 
 FontInstance *GDrawSetFont(GWindow gw, FontInstance *fi) {
     FontInstance *old = gw->ggc->fi;
     gw->ggc->fi = fi;
 return( old );
+}
+
+FontInstance *GDrawSetDefaultFont(GWindow gw) {
+    FontInstance *old = gw->ggc->fi;
+    gw->ggc->fi = _ggadget_default_font.fi;
+    return old;
 }
 
 FontInstance *GDrawInstanciateFont(GWindow gw, FontRequest *rq) {
@@ -54,7 +62,6 @@ FontInstance *GDrawInstanciateFont(GWindow gw, FontRequest *rq) {
 
     fi = calloc(1,sizeof(struct font_instance));
     fi->rq = *rq;
-    fi->rq.family_name = u_copy( fi->rq.family_name );
     fi->rq.utf8_family_name = copy( fi->rq.utf8_family_name );
 
 return( fi );
@@ -75,7 +82,7 @@ return( rq );
 
 /* ************************************************************************** */
 
-int32 GDrawDrawText(GWindow gw, int32 x, int32 y, const unichar_t *text, int32 cnt, Color col) {
+int32_t GDrawDrawText(GWindow gw, int32_t x, int32_t y, const unichar_t *text, int32_t cnt, Color col) {
     struct tf_arg arg;
     glong realcnt;
     gchar *temp = g_ucs4_to_utf8((gunichar*)text, cnt, NULL, &realcnt, NULL);
@@ -89,7 +96,7 @@ int32 GDrawDrawText(GWindow gw, int32 x, int32 y, const unichar_t *text, int32 c
     return width;
 }
 
-int32 GDrawGetTextWidth(GWindow gw,const unichar_t *text, int32 cnt) {
+int32_t GDrawGetTextWidth(GWindow gw,const unichar_t *text, int32_t cnt) {
     struct tf_arg arg;
     glong realcnt;
     gchar *temp = g_ucs4_to_utf8((gunichar*)text, cnt, NULL, &realcnt, NULL);
@@ -102,7 +109,7 @@ int32 GDrawGetTextWidth(GWindow gw,const unichar_t *text, int32 cnt) {
     return width;
 }
 
-int32 GDrawGetTextBounds(GWindow gw,const unichar_t *text, int32 cnt, GTextBounds *bounds) {
+int32_t GDrawGetTextBounds(GWindow gw,const unichar_t *text, int32_t cnt, GTextBounds *bounds) {
     int ret = 0;
     struct tf_arg arg = {0};
     glong realcnt;
@@ -119,28 +126,28 @@ int32 GDrawGetTextBounds(GWindow gw,const unichar_t *text, int32 cnt, GTextBound
 
 /* UTF8 routines */
 
-int32 GDrawDrawText8(GWindow gw, int32 x, int32 y, const char *text, int32 cnt, Color col) {
+int32_t GDrawDrawText8(GWindow gw, int32_t x, int32_t y, const char *text, int32_t cnt, Color col) {
     struct tf_arg arg;
 
 return( gw->display->funcs->doText8(gw,x,y,text,cnt,col,tf_drawit,&arg));
 }
 
-int32 GDrawGetText8Width(GWindow gw, const char *text, int32 cnt) {
+int32_t GDrawGetText8Width(GWindow gw, const char *text, int32_t cnt) {
     struct tf_arg arg;
 
 return( gw->display->funcs->doText8(gw,0,0,text,cnt,0x0,tf_width,&arg));
 }
 
-int32 GDrawGetText8Height(GWindow gw, const char *text, int32 cnt)
+int32_t GDrawGetText8Height(GWindow gw, const char *text, int32_t cnt)
 {
     GTextBounds bounds;
-    int32 ret = GDrawGetText8Bounds( gw, text, cnt, &bounds );
+    int32_t ret = GDrawGetText8Bounds( gw, text, cnt, &bounds );
     ret = bounds.as + bounds.ds;
     return ret;
 }
 
 
-int32 GDrawGetText8Bounds(GWindow gw,const char *text, int32 cnt, GTextBounds *bounds) {
+int32_t GDrawGetText8Bounds(GWindow gw,const char *text, int32_t cnt, GTextBounds *bounds) {
     int ret;
     struct tf_arg arg;
 

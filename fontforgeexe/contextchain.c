@@ -100,7 +100,7 @@ Complex version:
 
 /* There are more CIDs used in this file than those listed here */
 /* The CIDs given here are for glyph lists (aw_glyphs & aw_grules) */
-/*  similar controls refering to coverage tables have 100 added to them */
+/*  similar controls referring to coverage tables have 100 added to them */
 /* The CIDs here are also for the "match" aspect of the tabsets */
 /*  those in backtrack get 20 added, those in lookahead get 40 */
 #define CID_GList	305
@@ -208,7 +208,7 @@ return( copy(src));
 return( ret );
 }
 
-static char *classnumbers(int cnt,uint16 *classes, struct matrix_data *classnames, int rows, int cols) {
+static char *classnumbers(int cnt,uint16_t *classes, struct matrix_data *classnames, int rows, int cols) {
     char buf[20];
     int i, len;
     char *pt, *ret;
@@ -240,7 +240,7 @@ static char *classnumbers(int cnt,uint16 *classes, struct matrix_data *classname
 return( ret );
 }
 
-static char *rclassnumbers(int cnt,uint16 *classes, struct matrix_data *classnames, int rows, int cols) {
+static char *rclassnumbers(int cnt,uint16_t *classes, struct matrix_data *classnames, int rows, int cols) {
     char buf[20];
     int i, len;
     char *pt, *ret;
@@ -423,8 +423,8 @@ static char *classruleitem(struct fpst_rule *r,struct matrix_data **classes, int
 
     len = 0;
     for ( i=0; i<3; ++i ) {
-	for ( k=0; k<(&r->u.class.ncnt)[i]; ++k ) {
-	    int c = (&r->u.class.nclasses)[i][k];
+	for ( k=0; k<(&r->u.fpc_class.ncnt)[i]; ++k ) {
+	    int c = (&r->u.fpc_class.nclasses)[i][k];
 	    if ( classes[i][cols*c+0].u.md_str!=NULL && *classes[i][cols*c+0].u.md_str!='\0' )
 		len += strlen(classes[i][cols*c+0].u.md_str)+1;
 	    else {
@@ -435,8 +435,8 @@ static char *classruleitem(struct fpst_rule *r,struct matrix_data **classes, int
     }
 
     ret = pt = malloc((len+8+seqlookuplen(r)) * sizeof(unichar_t));
-    for ( k=r->u.class.bcnt-1; k>=0; --k ) {
-	int c = r->u.class.bclasses[k];
+    for ( k=r->u.fpc_class.bcnt-1; k>=0; --k ) {
+	int c = r->u.fpc_class.bclasses[k];
 	if ( classes[1][cols*c+0].u.md_str!=NULL && *classes[1][cols*c+0].u.md_str!='\0' ) {
 	    strcpy(pt,classes[1][cols*c+0].u.md_str);
 	    pt += strlen( pt );
@@ -447,8 +447,8 @@ static char *classruleitem(struct fpst_rule *r,struct matrix_data **classes, int
 	}
     }
     *pt++ = '|';
-    for ( k=0; k<r->u.class.ncnt; ++k ) {
-	int c = r->u.class.nclasses[k];
+    for ( k=0; k<r->u.fpc_class.ncnt; ++k ) {
+	int c = r->u.fpc_class.nclasses[k];
 	if ( classes[0][cols*c+0].u.md_str!=NULL && *classes[0][cols*c+0].u.md_str!='\0' ) {
 	    strcpy(pt,classes[0][cols*c+0].u.md_str);
 	    pt += strlen( pt );
@@ -460,8 +460,8 @@ static char *classruleitem(struct fpst_rule *r,struct matrix_data **classes, int
     }
     if ( pt[-1]==' ' ) --pt;
     *pt++ = '|';
-    for ( k=0; k<r->u.class.fcnt; ++k ) {
-	int c = r->u.class.fclasses[k];
+    for ( k=0; k<r->u.fpc_class.fcnt; ++k ) {
+	int c = r->u.fpc_class.fclasses[k];
 	if ( classes[2][cols*c+0].u.md_str!=NULL && *classes[2][cols*c+0].u.md_str!='\0' ) {
 	    strcpy(pt,classes[2][cols*c+0].u.md_str);
 	    pt += strlen( pt );
@@ -496,8 +496,8 @@ static void classruleitem2rule(SplineFont *sf,const char *ruletext,struct fpst_r
 	    while ( !isspace(ch) && ch!='|' && ch!=0x21d2 && ch!='\0' )
 		ch = utf8_ildb((const char **) &pt);
 	}
-	(&r->u.class.ncnt)[i] = len;
-	(&r->u.class.nclasses)[i] = malloc(len*sizeof(uint16));
+	(&r->u.fpc_class.ncnt)[i] = len;
+	(&r->u.fpc_class.nclasses)[i] = malloc(len*sizeof(uint16_t));
 	len = 0;
 	if ( ch=='\0' || ch==0x21d2 )
     break;
@@ -522,14 +522,14 @@ static void classruleitem2rule(SplineFont *sf,const char *ruletext,struct fpst_r
 		nstart = pt;
 		ch = utf8_ildb((const char **) &pt);
 	    }
-	    (&r->u.class.nclasses)[i][len] = strtol(start,&end,10);
+	    (&r->u.fpc_class.nclasses)[i][len] = strtol(start,&end,10);
 	    if ( end<nstart ) {		/* Not a number, must be a class name */
 		for ( k=0; k<clen[i]; ++k ) {
 		    if ( classes[i][cols*k+0].u.md_str==NULL )
 		continue;
 		    if ( strlen(classes[i][cols*k+0].u.md_str)==nstart-start &&
 			    strncmp(classes[i][cols*k+0].u.md_str,start,nstart-start)==0 ) {
-			(&r->u.class.nclasses)[i][len] = k;
+			(&r->u.fpc_class.nclasses)[i][len] = k;
 		break;
 		    }
 		}
@@ -546,10 +546,10 @@ static void classruleitem2rule(SplineFont *sf,const char *ruletext,struct fpst_r
 	}
     }
     /* reverse the backtrack */
-    for ( i=0; i<r->u.class.bcnt/2; ++i ) {
-	int temp = r->u.class.bclasses[i];
-	r->u.class.bclasses[i] = r->u.class.bclasses[r->u.class.bcnt-1-i];
-	r->u.class.bclasses[r->u.class.bcnt-1-i] = temp;
+    for ( i=0; i<r->u.fpc_class.bcnt/2; ++i ) {
+	int temp = r->u.fpc_class.bclasses[i];
+	r->u.fpc_class.bclasses[i] = r->u.fpc_class.bclasses[r->u.fpc_class.bcnt-1-i];
+	r->u.fpc_class.bclasses[r->u.fpc_class.bcnt-1-i] = temp;
     }
 
     if ( ch=='\0' || *pt=='\0' )
@@ -635,12 +635,12 @@ static int CCD_ReasonableClassNum(const unichar_t *umatch,GGadget *list,
 return( false );
 	    }
 	    if ( doit )
-		(&r->u.class.nclasses)[which][any] = val;
+		(&r->u.fpc_class.nclasses)[which][any] = val;
 	    ++any;
 	}
 	if ( !doit ) {
-	    (&r->u.class.ncnt)[which] = any;
-	    (&r->u.class.nclasses)[which] = malloc(any*sizeof(uint16));
+	    (&r->u.fpc_class.ncnt)[which] = any;
+	    (&r->u.fpc_class.nclasses)[which] = malloc(any*sizeof(uint16_t));
 	}
     }
 return( true );
@@ -697,14 +697,14 @@ return;
 return;
 	}
 	/* reverse the backtrack */
-	for ( i=0; i<dummy.u.class.bcnt/2; ++i ) {
-	    int temp = dummy.u.class.bclasses[i];
-	    dummy.u.class.bclasses[i] = dummy.u.class.bclasses[dummy.u.class.bcnt-1-i];
-	    dummy.u.class.bclasses[dummy.u.class.bcnt-1-i] = temp;
+	for ( i=0; i<dummy.u.fpc_class.bcnt/2; ++i ) {
+	    int temp = dummy.u.fpc_class.bclasses[i];
+	    dummy.u.fpc_class.bclasses[i] = dummy.u.fpc_class.bclasses[dummy.u.fpc_class.bcnt-1-i];
+	    dummy.u.fpc_class.bclasses[dummy.u.fpc_class.bcnt-1-i] = temp;
 	}
 	for ( i=0; i<dummy.lookup_cnt; ++i ) {
-	    if ( dummy.lookups[i].seq >= dummy.u.class.ncnt ) {
-		ff_post_error(_("Bad Sequence/Lookup List"),_("Sequence number out of bounds, must be less than %d (number of classes in list above)"), dummy.u.class.ncnt );
+	    if ( dummy.lookups[i].seq >= dummy.u.fpc_class.ncnt ) {
+		ff_post_error(_("Bad Sequence/Lookup List"),_("Sequence number out of bounds, must be less than %d (number of classes in list above)"), dummy.u.fpc_class.ncnt );
 return;
 	    }
 	}
@@ -793,7 +793,7 @@ return;
 static int CCD_FromSelection(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
 	struct contextchaindlg *ccd = GDrawGetUserData(GGadgetGetWindow(g));
-	int cid = (intpt) GGadgetGetUserData(g);
+	int cid = (intptr_t) GGadgetGetUserData(g);
 
 	_CCD_FromSelection(ccd,cid);
     }
@@ -830,8 +830,8 @@ static void CCD_NewGlyphRule(GGadget *glyphrules,int r,int c) {
 
     md = calloc(2*dummy.lookup_cnt,sizeof(struct matrix_data));
     for ( j=0; j<dummy.lookup_cnt; ++j ) {
-	md[2*j+0].u.md_ival = (intpt) (void *) dummy.lookups[j].lookup;
-	md[2*j+1].u.md_ival = (intpt) dummy.lookups[j].seq;
+	md[2*j+0].u.md_ival = (intptr_t) (void *) dummy.lookups[j].lookup;
+	md[2*j+1].u.md_ival = (intptr_t) dummy.lookups[j].seq;
     }
     GMatrixEditSet(lookuplist,md,dummy.lookup_cnt,false);
     ccd->aw = aw_glyphs;
@@ -863,19 +863,19 @@ static void CCD_NewClassRule(GGadget *classrules,int r,int c) {
     memset(&dummy,0,sizeof(dummy));
     classruleitem2rule(ccd->sf,rulelist[r].u.md_str,&dummy,classes,clen,ccols);
     GGadgetSetTitle8(GWidgetGetControl(ccd->gw,CID_ClassNumbers),
-	    (temp=classnumbers(dummy.u.class.ncnt,dummy.u.class.nclasses,classes[0],clen[0],ccols)));
+	    (temp=classnumbers(dummy.u.fpc_class.ncnt,dummy.u.fpc_class.nclasses,classes[0],clen[0],ccols)));
     free(temp);
     GGadgetSetTitle8(GWidgetGetControl(ccd->gw,CID_ClassNumbers+20),
-	    (temp=rclassnumbers(dummy.u.class.bcnt,dummy.u.class.bclasses,classes[1],clen[1],ccols)));
+	    (temp=rclassnumbers(dummy.u.fpc_class.bcnt,dummy.u.fpc_class.bclasses,classes[1],clen[1],ccols)));
     free(temp);
     GGadgetSetTitle8(GWidgetGetControl(ccd->gw,CID_ClassNumbers+40),
-	    (temp=classnumbers(dummy.u.class.fcnt,dummy.u.class.fclasses,classes[2],clen[2],ccols)));
+	    (temp=classnumbers(dummy.u.fpc_class.fcnt,dummy.u.fpc_class.fclasses,classes[2],clen[2],ccols)));
     free(temp);
 
     md = calloc(2*dummy.lookup_cnt,sizeof(struct matrix_data));
     for ( j=0; j<dummy.lookup_cnt; ++j ) {
-	md[2*j+0].u.md_ival = (intpt) (void *) dummy.lookups[j].lookup;
-	md[2*j+1].u.md_ival = (intpt) dummy.lookups[j].seq;
+	md[2*j+0].u.md_ival = (intptr_t) (void *) dummy.lookups[j].lookup;
+	md[2*j+1].u.md_ival = (intptr_t) dummy.lookups[j].seq;
     }
     GMatrixEditSet(lookuplist,md,dummy.lookup_cnt,false);
     FPSTRuleContentsFree(&dummy,pst_class);
@@ -1017,8 +1017,8 @@ return;
 	ccols = ClassNamePrep(ccd,classes,clen);
 	for ( i=0; i<len; ++i ) {
 	    classruleitem2rule(ccd->sf,old[i].u.md_str,&fpst->rules[i],classes,clen,ccols);
-	    if ( fpst->rules[i].u.class.bcnt!=0 ) has[1] = true;
-	    if ( fpst->rules[i].u.class.fcnt!=0 ) has[2] = true;
+	    if ( fpst->rules[i].u.fpc_class.bcnt!=0 ) has[1] = true;
+	    if ( fpst->rules[i].u.fpc_class.fcnt!=0 ) has[2] = true;
 	}
 	for ( i=0; i<3; ++i ) {
 	    if ( i!=0 && !has[i] )
@@ -1604,10 +1604,8 @@ return( NULL );
 			ret[cnt] = utf82u_copy(str);
 		    } else {
 			unichar_t *temp = malloc((spt-basept+strlen(str)+4)*sizeof(unichar_t));
-			int len;
 			u_strncpy(temp,basept,spt-basept);
 			utf82u_strcpy(temp+(spt-basept),str);
-			len = u_strlen(temp);
 			ret[cnt] = temp;
 		    }
 		}
@@ -1644,7 +1642,7 @@ static void CCD_FinishCoverageSimpleEdit(GGadget *g,int r, int c, int wasnew) {
     else if ( c==1 && cols==2 ) {	/* The replacement list in a reverse coverage_simple */
 	ME_ListCheck(g, r, c, ccd->sf);
     } else if ( c==1 && cols==4 ) {	/* The lookup in a coverage_simple line (not reverse coverage_simple) */
-	if ( covers[cols*r+c].u.md_addr== (void *) (intpt) -1 ) {
+	if ( covers[cols*r+c].u.md_addr== (void *) (intptr_t) -1 ) {
 	    /* They asked to remove the lookup that was there */
 	    covers[cols*r+c].u.md_addr = NULL;
 	} else if ( covers[cols*r+c].u.md_addr==NULL ) {
@@ -1724,7 +1722,7 @@ static int WhichSections(struct contextchaindlg *ccd, GGadget *g) {
     } else if ( off==20 )
 	sections = 0x1;		/* Backtracking */
     else
-	sections = 0x4;		/* Foreward */
+	sections = 0x4;		/* Forward */
 return( sections );
 }
 
@@ -2061,7 +2059,7 @@ void ContextChainEdit(SplineFont *sf,FPST *fpst,
     addrmlookup_list[1].text = (unichar_t *) S_("Remove Lookup");
     addrmlookup_list[1].text_is_1byte = true;
     addrmlookup_list[1].selected = false;
-    addrmlookup_list[1].userdata = (void *) (intpt) -1;
+    addrmlookup_list[1].userdata = (void *) (intptr_t) -1;
     coveragesimple_ci[1].enum_vals = addrmlookup_list;
     seqlookup_ci[0].enum_vals = lookup_list;
 
@@ -2353,7 +2351,7 @@ void ContextChainEdit(SplineFont *sf,FPST *fpst,
 	glyphs_mi.initial_row_cnt = fpst->rule_cnt;
 	md = calloc(fpst->rule_cnt,sizeof(struct matrix_data));
 	for ( j=0; j<fpst->rule_cnt; ++j ) {
-	    md[j+0].u.md_str = FPSTRule_To_Str(sf,fpst,&fpst->rules[j]);;
+	    md[j+0].u.md_str = FPSTRule_To_Str(sf,fpst,&fpst->rules[j]);
 	}
 	glyphs_mi.matrix_data = md;
     } else {
@@ -2390,10 +2388,7 @@ void ContextChainEdit(SplineFont *sf,FPST *fpst,
     extrabuttonslab[i].text_is_1byte = true;
     extrabuttonsgcd[i].gd.u.list = addlookup_list;
     extrabuttonsgcd[i].gd.label = &extrabuttonslab[i];
-    {
-	extern FontInstance *_ggadget_default_font;
-	GDrawSetFont(ccd->glyphs_simple,_ggadget_default_font);
-    }
+    GDrawSetDefaultFont(ccd->glyphs_simple);
     extrabuttonsgcd[i].gd.pos.width = GDrawPixelsToPoints(ccd->glyphs_simple,
 	    GDrawGetText8Width(ccd->glyphs_simple,(char *)extrabuttonslab[i].text,-1))+50;
     extrabuttonsgcd[i].gd.cid = CID_GAddLookup;
@@ -2418,7 +2413,7 @@ void ContextChainEdit(SplineFont *sf,FPST *fpst,
 	ggcd[i][k].gd.popup_msg = _("Set this glyph list from a selection.");
 	ggcd[i][k].gd.flags = gg_visible | gg_enabled;
 	ggcd[i][k].gd.handle_controlevent = CCD_FromSelection;
-	ggcd[i][k].data=(void *)((intpt)CID_GlyphList+(0*100+i*20));
+	ggcd[i][k].data=(void *)((intptr_t)CID_GlyphList+(0*100+i*20));
 	ggcd[i][k++].creator = GButtonCreate;
 	subvarray[i][0] = &ggcd[i][k-1];
 
@@ -2549,8 +2544,8 @@ void ContextChainEdit(SplineFont *sf,FPST *fpst,
 		    co_seqlookup_mi.initial_row_cnt = r->lookup_cnt;
 		    md = calloc(2*r->lookup_cnt,sizeof(struct matrix_data));
 		    for ( j=0; j<r->lookup_cnt; ++j ) {
-			md[2*j+0].u.md_ival = (intpt) (void *) r->lookups[j].lookup;
-			md[2*j+1].u.md_ival = (intpt) r->lookups[j].seq;
+			md[2*j+0].u.md_ival = (intptr_t) (void *) r->lookups[j].lookup;
+			md[2*j+1].u.md_ival = (intptr_t) r->lookups[j].seq;
 		    }
 		    co_seqlookup_mi.matrix_data = md;
 		} else {
@@ -2593,7 +2588,7 @@ void ContextChainEdit(SplineFont *sf,FPST *fpst,
 		cgcd[i][k].gd.popup_msg = _("Set this glyph list from a selection.");
 		cgcd[i][k].gd.flags = gg_visible | gg_enabled;
 		cgcd[i][k].gd.handle_controlevent = CCD_FromSelection;
-		cgcd[i][k].data = (void *) (intpt) (CID_RplList+100);
+		cgcd[i][k].data = (void *) (intptr_t) (CID_RplList+100);
 		cgcd[i][k++].creator = GButtonCreate;
 		subvarray2[1] = &cgcd[i][k-1];
 		subvarray2[2] = GCD_Glue;
@@ -2934,7 +2929,7 @@ void ContextChainEdit(SplineFont *sf,FPST *fpst,
 	classsimple_mi.initial_row_cnt = tempfpst->rule_cnt;
 	md = calloc(tempfpst->rule_cnt,sizeof(struct matrix_data));
 	for ( j=0; j<tempfpst->rule_cnt; ++j ) {
-	    md[j+0].u.md_str = FPSTRule_To_Str(sf,tempfpst,&tempfpst->rules[j]);;
+	    md[j+0].u.md_str = FPSTRule_To_Str(sf,tempfpst,&tempfpst->rules[j]);
 	}
 	classsimple_mi.matrix_data = md;
     } else {

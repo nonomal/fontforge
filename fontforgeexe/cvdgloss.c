@@ -145,7 +145,7 @@ return(1);
 return(1);
     }
 
-    operator = ((uint8 *) exc->code)[exc->IP];
+    operator = ((uint8_t *) exc->code)[exc->IP];
     if ( operator>=0xc0 && operator <= 0xdf ) {
         scrprintf(&scr," MDRP: Move Direct Relative Point");
 	if ( operator&0x10 )
@@ -584,10 +584,10 @@ return(1);
 	scrprintf(&scr, "CvtCutin: %.2f", exc->GS.control_value_cutin/64.0 );
       break;
       case 0x40:
-	scrprintf(&scr," Push %d Bytes", ((uint8 *) exc->code)[exc->IP+1]);
+	scrprintf(&scr," Push %d Bytes", ((uint8_t *) exc->code)[exc->IP+1]);
       break;
       case 0x41:
-	scrprintf(&scr," Push %d Words", ((uint8 *) exc->code)[exc->IP+1]);
+	scrprintf(&scr," Push %d Words", ((uint8_t *) exc->code)[exc->IP+1]);
       break;
       case 0x42:
         scrprintf(&scr," Write Store" );
@@ -1027,7 +1027,7 @@ return(1);
 		val1&(1<<5) ? "greyscale (result in bit 12)" : "", 
 		val1&(1<<6) ? "ClearType (result in bit 13)" : "", 
 		val1&(1<<7) ? "CT widths compat (result in bit 14)" : "", 
-		val1&(1<<8) ? "CT symetrical smoothing (result in bit 15)" : "",
+		val1&(1<<8) ? "CT symmetrical smoothing (result in bit 15)" : "",
 		val1&(1<<9) ? "CT processes in BGR(1) or RGB(0) (result in bit 16)" : "");
 	if ( val1&1 ) {
 	    scrprintf(&scr, "  Versions: 1 => Mac OS 6" );
@@ -1120,6 +1120,7 @@ static void dvgloss_scroll(DebugView *dv,struct sbevent *sb) {
       case et_sb_thumbrelease:
         newpos = sb->pos;
       break;
+      case et_sb_halfup: case et_sb_halfdown: break;
     }
     if ( newpos>max-size.height/dv->ii.fh )
         newpos = max-size.height/dv->ii.fh;
@@ -1178,6 +1179,7 @@ return( DVChar(dv,event));
 	  case et_scrollbarchange:
 	    dvgloss_scroll(dv,&event->u.control.u.sb);
 	  break;
+	  default: break;
 	}
       break;
       case et_resize:
@@ -1198,6 +1200,7 @@ return( DVChar(dv,event));
       case et_mousemove:
 	GGadgetEndPopup();
       break;
+      default: break;
     }
 return( true );
 }
@@ -1308,7 +1311,7 @@ return;		/* Not running */
     if ( exc->IP>=exc->codeSize || exc->code==NULL )
 return;		/* At end */
 
-    operator = ((uint8 *) exc->code)[exc->IP];
+    operator = ((uint8_t *) exc->code)[exc->IP];
     changing_point = -1;
     basis_point = -1;
 

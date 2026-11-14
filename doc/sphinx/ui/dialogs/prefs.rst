@@ -30,10 +30,11 @@ The Preferences Window...
 
 .. object:: ResourceFile
 
-   FontForge will read :doc:`X Resources </ui/misc/xres>` from a property on the screen.
-   But sometimes this isn't enough. You set this preference item to specify a
-   file from which these resources should be read (those on the screen will also
-   be read and will supersede those in the file).
+   (For historical reasons) this is the name of the file containing appearance
+   configuration directives. You can create and edit this file manually according
+   to the information in :doc:`this document </ui/misc/xres>` but normally you
+   just use the :doc:`File->Appearance Editor </ui/misc/resedit>` to initialize and change
+   this file.
 
 .. _prefs.HelpDir:
 
@@ -63,7 +64,7 @@ The Preferences Window...
 .. object:: FreeTypeAAFillInOutlineView
 
    In the :doc:`outline glyph view </ui/mainviews/charview>`, FontForge can generate glyph
-   filles using many techniques. If FontForge is using the freetype library for
+   fills using many techniques. If FontForge is using the freetype library for
    this, you can enable this option to have FontForge generate fills with anti
    aliased edges. The old default was not to antialias in order to save some
    RAM.
@@ -71,13 +72,6 @@ The Preferences Window...
 .. object:: SplashScreen
 
    Controls whether a splash screen is displayed on start up.
-
-.. object:: UseCairoDrawing
-
-   FontForge can use its own drawing routines, or rely on Cairo library in the
-   :doc:`outline glyph view </ui/mainviews/charview>`. Using Cairo is slower, but gives smooth
-   curves, and subpixel display precision. New setting applies only to windows
-   created afterwards.
 
 .. object:: EnsureCorrectSaveExtension
 
@@ -159,7 +153,7 @@ The Preferences Window...
 .. object:: CompactOnOpen
 
    Whether fontforge should make a font compact when it opens one (does not
-   apply to openning an sfd file which already knows whether it should be
+   apply to opening an sfd file which already knows whether it should be
    compact or not).
 
 .. figure:: /images/prefs-navigation.png
@@ -351,11 +345,6 @@ The Preferences Window...
    Whether accents should be positioned over letters based on the center of of
    the letter, or on the center of the top of the letter.
 
-.. object:: PreferSpacingAccents
-
-   Whether to prefer spacing accents (Unicode 02C0-02FF) or combining accents
-   (0300-036F) when building accented glyphs.
-
 .. figure:: /images/prefs-apps.png
 
 .. _prefs.PreferPotrace:
@@ -543,9 +532,9 @@ postscript hints, but it has also its own options:
    Instructing stems is sometimes not enough. This option makes FontForge to
    interpolate some important points (sharp corners, inflections, curve
    extremes), not affected by other instructions, between stem edges. Both
-   parallel and perpendicular extremes are controlled. Agressive optimization is
+   parallel and perpendicular extremes are controlled. Aggressive optimization is
    employed, to still leave as many points as possible to IUP, but manual review
-   is nevertheless greatly adviced.
+   is nevertheless greatly advised.
 
 .. object:: CounterControl
 
@@ -623,7 +612,7 @@ many languages as you like.
 
 The Mac Mapping dialog allows you to define a mapping between OTF ``GSUB``
 feature tags and Apple's
-`mort/morx <http://developer.apple.com/fonts/TTRefMan/RM06/Chap6morx.html>`__
+`mort/morx <http://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6morx.html>`__
 Feature/Setting codes.
 
 `Apple's published list <http://developer.apple.com/fonts/Registry/index.html>`__

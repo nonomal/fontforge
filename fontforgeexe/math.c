@@ -30,6 +30,7 @@
 #include "fontforgeui.h"
 #include "fvfonts.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "mathconstants.h"
 #include "splineutil.h"
 #include "ustring.h"
@@ -51,6 +52,11 @@ static char *aspectnames[] = {
     N_("Connectors"),
     NULL
 };
+
+GResFont math_font = GRESFONT_INIT("400 12pt " SANS_UI_FAMILIES);
+GResFont math_boldfont = GRESFONT_INIT("700 12pt " SANS_UI_FAMILIES);
+extern GBox _ggadget_Default_Box;
+#define MAIN_FOREGROUND (_ggadget_Default_Box.main_foreground)
 
 static char *GlyphConstruction_Dlg(GGadget *g, int r, int c);
 static char *MKChange_Dlg(GGadget *g, int r, int c);
@@ -121,7 +127,7 @@ struct matrixinit mis[] = {
 static struct col_init extensionpart[] = {
     { me_string , NULL, NULL, NULL, N_("Glyph") },
     { me_enum, NULL, truefalse, NULL, N_("Extender") },
-/* GT: "Len" is an abreviation for "Length" */
+/* GT: "Len" is an abbreviation for "Length" */
     { me_int, NULL, NULL, NULL, N_("StartLen") },
     { me_int, NULL, NULL, NULL, N_("EndLen") },
     { me_int, NULL, NULL, NULL, N_("FullLen") },
@@ -330,9 +336,9 @@ typedef struct mathdlg {
     SplineFont *sf;
     int def_layer;
     struct MATH *math;
-    uint8 done;
-    uint8 ok;
-    uint16 popup_r;
+    uint8_t done;
+    uint8_t ok;
+    uint16_t popup_r;
     GGadget *popup_g;
     /* Used by glyphconstruction_dlg */
     SplineChar *sc;
@@ -365,7 +371,7 @@ static void MATH_Init(MathDlg *math) {
 
     for ( i=0; math_constants_descriptor[i].ui_name!=NULL; ++i ) {
 	GGadget *tf = GWidgetGetControl(math->gw,2*i+1);
-	int16 *pos = (int16 *) (((char *) (math->math)) + math_constants_descriptor[i].offset );
+	int16_t *pos = (int16_t *) (((char *) (math->math)) + math_constants_descriptor[i].offset );
 
 	sprintf( buffer, "%d", *pos );
 	GGadgetSetTitle8(tf,buffer);
@@ -583,7 +589,7 @@ return;
     if ( !wasnew )
 return;
     /* If they added a new glyph to the sequence then set some defaults for it. */
-    /*  only the full advance has any likelyhood of being correct */
+    /*  only the full advance has any likelihood of being correct */
     math = GDrawGetUserData(GGadgetGetWindow(g));
     stuff = GMatrixEditGet(g, &rows);
     cols = GMatrixEditGetColCnt(g);
@@ -614,7 +620,7 @@ return;
     if ( !wasnew )
 return;
     /* If they added a new glyph to the sequence then set some defaults for it. */
-    /*  only the full advance has any likelyhood of being correct */
+    /*  only the full advance has any likelihood of being correct */
     math = GDrawGetUserData(GGadgetGetWindow(g));
     stuff = GMatrixEditGet(g, &rows);
     cols = GMatrixEditGetColCnt(g);
@@ -656,7 +662,7 @@ return;
     if ( !wasnew )
 return;
     /* If they added a new glyph to the sequence then set some defaults for it. */
-    /*  only the full advance has any likelyhood of being correct */
+    /*  only the full advance has any likelihood of being correct */
     math = GDrawGetUserData(GGadgetGetWindow(g));
     stuff = GMatrixEditGet(g, &rows);
     cols = GMatrixEditGetColCnt(g);
@@ -905,7 +911,7 @@ return( true );
 	/* Ok, if we got this far it should be legal */
 	/*********************************************/
 	for ( i=0; math_constants_descriptor[i].ui_name!=NULL; ++i ) {
-	    int16 *pos = (int16 *) (((char *) (math->math)) + math_constants_descriptor[i].offset );
+	    int16_t *pos = (int16_t *) (((char *) (math->math)) + math_constants_descriptor[i].offset );
 	    *pos = GetInt8(math->gw,2*i+1,math_constants_descriptor[i].ui_name,&err);
 
 	    if ( math_constants_descriptor[i].devtab_offset >= 0 ) {
@@ -1290,10 +1296,10 @@ static void MKDDraw(MathKernDlg *mkd, GWindow pixmap, GEvent *event) {
 
 	r.x = 10+i*(mkd->cv_width+mkd->mid_space)-1; r.y=mkd->cv_y-1;
 	r.width = mkd->cv_width+1; r.height = mkd->cv_height+1;
-	GDrawDrawRect(pixmap,&r,0);
+	GDrawDrawRect(pixmap,&r,MAIN_FOREGROUND);
 
 	GDrawSetFont(pixmap,cv->inactive ? mkd->plain : mkd->bold);
-	GDrawDrawText8(pixmap,r.x,5+mkd->as,cornernames[i],-1,0);
+	GDrawDrawText8(pixmap,r.x,5+mkd->as,cornernames[i],-1,MAIN_FOREGROUND);
     }
 }
 
@@ -1359,6 +1365,7 @@ static int mkd_sub_e_h(GWindow gw, GEvent *event) {
       case et_char:
 	MKDChar(mkd,event);
       break;
+      default: break;
     }
 return( true );
 }
@@ -1393,6 +1400,7 @@ static int mkd_e_h(GWindow gw, GEvent *event) {
 	}
 	/* mkd->isvisible = event->u.map.is_visible; */
       break;
+      default: break;
     }
 return( true );
 }
@@ -1719,7 +1727,7 @@ static void MKD_Do_Navigate(struct cvcontainer *cvc, enum nav_type type) {
     SplineChar *sc = NULL;
     int pos;
     GGadget *list = GWidgetGetControl(mkd->gw,CID_Glyph);
-    int32 rows;
+    int32_t rows;
     GTextInfo **tis;
 
     if ( !MKD_Parse(mkd))
@@ -1843,10 +1851,8 @@ void MathKernDialog(SplineChar *sc,int def_layer) {
     GGadgetCreateData cgcd[4][2], tabsetgcd[2];
     GTextInfo label[6];
     GTabInfo aspects[3], corners[5];
-    FontRequest rq;
     int as, ds, ld;
     int i,k;
-    static GFont *mathfont = NULL, *mathbold=NULL;
 
     MathInit();
     MKDInit( &mkd, sc );
@@ -1864,21 +1870,8 @@ void MathKernDialog(SplineChar *sc,int def_layer) {
     pos.height = 400;
     mkd.gw = gw = GDrawCreateTopWindow(NULL,&pos,mkd_e_h,&mkd.cv_topright,&wattrs);
 
-    if ( mathfont==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = 12;
-	rq.weight = 400;
-	mathfont = GDrawInstanciateFont(NULL,&rq);
-	mathfont = GResourceFindFont("Math.Font",mathfont);
-
-	GDrawDecomposeFont(mathfont, &rq);
-	rq.weight = 700;
-	mathbold = GDrawInstanciateFont(NULL,&rq);
-	mathbold = GResourceFindFont("Math.BoldFont",mathbold);
-    }
-    mkd.plain = mathfont;
-    mkd.bold = mathbold;
+    mkd.plain = math_font.fi;
+    mkd.bold = math_boldfont.fi;
     GDrawWindowFontMetrics(mkd.gw,mkd.plain,&as,&ds,&ld);
     mkd.fh = as+ds; mkd.as = as;
 
@@ -1995,10 +1988,6 @@ void MathKernDialog(SplineChar *sc,int def_layer) {
 
     for ( i=0; i<4; ++i ) {
 	CharView *cv = &mkd.cv_topright + i;
-	if ( cv->backimgs!=NULL ) {
-	    GDrawDestroyWindow(cv->backimgs);
-	    cv->backimgs = NULL;
-	}
 	CVPalettesHideIfMine(cv);
     }
     GDrawDestroyWindow(mkd.gw);

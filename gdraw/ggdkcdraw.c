@@ -36,7 +36,6 @@
 
 #include "ggdkdrawP.h"
 
-#ifdef FONTFORGE_CAN_USE_GDK
 
 #include "ustring.h"
 
@@ -48,8 +47,11 @@
 static void _GGDKDraw_CheckAutoPaint(GGDKWindow gw) {
     if (gw->cc == NULL) {
         assert(!gw->is_pixmap);
+        if (!gw->is_in_paint) {
+            assert(false && "No window should be drawing outside of expose calls");
+            Log(LOGWARN, "Dirty window is drawing outside of expose call: 0x%p [%s]", gw, gw->window_title);
+        }
 
-        //Log(LOGWARN, "Dirty dirty window! 0x%p", gw);
         if (gw->display->dirty_window != gw) {
             _GGDKDraw_CleanupAutoPaint(gw->display);
             gw->display->dirty_window = gw;
@@ -76,10 +78,10 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 static void GGDKDraw_StippleMePink(GGDKWindow gw, int ts, Color fg) {
     static unsigned char grey_init[8] = {0x55, 0xaa, 0x55, 0xaa, 0x55, 0xaa, 0x55, 0xaa};
     static unsigned char fence_init[8] = {0x55, 0x22, 0x55, 0x88, 0x55, 0x22, 0x55, 0x88};
-    uint8 *spt;
+    uint8_t *spt;
     int bit, i, j;
-    uint32 *data;
-    static uint32 space[8 * 8];
+    uint32_t *data;
+    static uint32_t space[8 * 8];
     static cairo_pattern_t *pat = NULL;
 
     if ((fg >> 24) != 0xff) {
@@ -102,7 +104,7 @@ static void GGDKDraw_StippleMePink(GGDKWindow gw, int ts, Color fg) {
         }
     }
     if (pat == NULL) {
-        cairo_surface_t *is = cairo_image_surface_create_for_data((uint8 *) space,
+        cairo_surface_t *is = cairo_image_surface_create_for_data((uint8_t *) space,
                               CAIRO_FORMAT_ARGB32, 8, 8, 8 * 4);
         pat = cairo_pattern_create_for_surface(is);
         cairo_surface_destroy(is);
@@ -171,14 +173,7 @@ static PangoFontDescription *_GGDKDraw_configfont(GWindow w, GFont *font) {
         return NULL;
     }
 
-    if (font->rq.utf8_family_name != NULL) {
-        pango_font_description_set_family(fd, font->rq.utf8_family_name);
-    } else {
-        char *temp = u2utf8_copy(font->rq.family_name);
-        pango_font_description_set_family(fd, temp);
-        free(temp);
-    }
-
+    pango_font_description_set_family(fd, font->rq.utf8_family_name);
     pango_font_description_set_style(fd, (font->rq.style & fs_italic) ?
                                      PANGO_STYLE_ITALIC : PANGO_STYLE_NORMAL);
     pango_font_description_set_variant(fd, (font->rq.style & fs_smallcaps) ?
@@ -258,8 +253,8 @@ static void _GGDKDraw_EllipsePath(cairo_t *cc, double cx, double cy, double widt
 static cairo_surface_t *_GGDKDraw_GImage2Surface(GImage *image, GRect *src) {
     struct _GImage *base = (image->list_len == 0) ? image->u.image : image->u.images[0];
     cairo_format_t type;
-    uint8 *pt;
-    uint32 *idata, *ipt, *ito;
+    uint8_t *pt;
+    uint32_t *idata, *ipt, *ito;
     int i, j, jj, tjj, stride;
     int bit, tobit;
     cairo_surface_t *cs;
@@ -285,8 +280,8 @@ static cairo_surface_t *_GGDKDraw_GImage2Surface(GImage *image, GRect *src) {
     /*  premultiply each channel by alpha. We can reuse it for non-transparent*/
     /*  rgb images */
     if (base->image_type == it_true && type == CAIRO_FORMAT_RGB24) {
-        idata = ((uint32 *)(base->data + src->y * base->bytes_per_line)) + src->x;
-        return cairo_image_surface_create_for_data((uint8 *) idata, type,
+        idata = ((uint32_t *)(base->data + src->y * base->bytes_per_line)) + src->x;
+        return cairo_image_surface_create_for_data((uint8_t *) idata, type,
                 src->width, src->height,
                 base->bytes_per_line);
     }
@@ -294,14 +289,14 @@ static cairo_surface_t *_GGDKDraw_GImage2Surface(GImage *image, GRect *src) {
     cs = cairo_image_surface_create(type, src->width, src->height);
     stride = cairo_image_surface_get_stride(cs);
     cairo_surface_flush(cs);
-    idata = (uint32 *)cairo_image_surface_get_data(cs);
+    idata = (uint32_t *)cairo_image_surface_get_data(cs);
 
     if (base->image_type == it_rgba) {
-        ipt = ((uint32 *)(base->data + src->y * base->bytes_per_line)) + src->x;
+        ipt = ((uint32_t *)(base->data + src->y * base->bytes_per_line)) + src->x;
         ito = idata;
         for (i = 0; i < src->height; ++i) {
             for (j = 0; j < src->width; ++j) {
-                uint32 orig = ipt[j];
+                uint32_t orig = ipt[j];
                 int alpha = orig >> 24;
                 if (alpha == 0xff) {
                     ito[j] = orig;
@@ -313,12 +308,12 @@ static cairo_surface_t *_GGDKDraw_GImage2Surface(GImage *image, GRect *src) {
                              ((COLOR_GREEN(orig) * alpha / 255) << 8) |
                              ((COLOR_BLUE(orig) * alpha / 255));
             }
-            ipt = (uint32 *)(((uint8 *) ipt) + base->bytes_per_line);
-            ito = (uint32 *)(((uint8 *) ito) + stride);
+            ipt = (uint32_t *)(((uint8_t *) ipt) + base->bytes_per_line);
+            ito = (uint32_t *)(((uint8_t *) ito) + stride);
         }
     } else if (base->image_type == it_true && base->trans != COLOR_UNKNOWN) {
         Color trans = base->trans;
-        ipt = ((uint32 *)(base->data + src->y * base->bytes_per_line)) + src->x;
+        ipt = ((uint32_t *)(base->data + src->y * base->bytes_per_line)) + src->x;
         ito = idata;
         for (i = 0; i < src->height; ++i) {
             for (j = 0; j < src->width; ++j) {
@@ -328,18 +323,18 @@ static cairo_surface_t *_GGDKDraw_GImage2Surface(GImage *image, GRect *src) {
                     ito[j] = ipt[j] | 0xff000000;
                 }
             }
-            ipt = (uint32 *)(((uint8 *) ipt) + base->bytes_per_line);
-            ito = (uint32 *)(((uint8 *) ito) + stride);
+            ipt = (uint32_t *)(((uint8_t *) ipt) + base->bytes_per_line);
+            ito = (uint32_t *)(((uint8_t *) ito) + stride);
         }
     } else if (base->image_type == it_true) {
-        ipt = ((uint32 *)(base->data + src->y * base->bytes_per_line)) + src->x;
+        ipt = ((uint32_t *)(base->data + src->y * base->bytes_per_line)) + src->x;
         ito = idata;
         for (i = 0; i < src->height; ++i) {
             for (j = 0; j < src->width; ++j) {
                 ito[j] = ipt[j] | 0xff000000;
             }
-            ipt = (uint32 *)(((uint8 *) ipt) + base->bytes_per_line);
-            ito = (uint32 *)(((uint8 *) ito) + stride);
+            ipt = (uint32_t *)(((uint8_t *) ipt) + base->bytes_per_line);
+            ito = (uint32_t *)(((uint8_t *) ito) + stride);
         }
     } else if (base->image_type == it_index && base->clut->trans_index != COLOR_UNKNOWN) {
         int trans = base->clut->trans_index;
@@ -359,7 +354,7 @@ static cairo_surface_t *_GGDKDraw_GImage2Surface(GImage *image, GRect *src) {
                 }
             }
             pt += base->bytes_per_line;
-            ito = (uint32 *)(((uint8 *) ito) + stride);
+            ito = (uint32_t *)(((uint8_t *) ito) + stride);
         }
     } else if (base->image_type == it_index) {
         Color *clut = base->clut->clut;
@@ -371,7 +366,7 @@ static cairo_surface_t *_GGDKDraw_GImage2Surface(GImage *image, GRect *src) {
                 ito[j] = clut[index] | 0xff000000;
             }
             pt += base->bytes_per_line;
-            ito = (uint32 *)(((uint8 *) ito) + stride);
+            ito = (uint32_t *)(((uint8_t *) ito) + stride);
         }
 #ifdef WORDS_BIGENDIAN
     } else if (base->image_type == it_mono && base->clut != NULL &&
@@ -396,7 +391,7 @@ static cairo_surface_t *_GGDKDraw_GImage2Surface(GImage *image, GRect *src) {
                     }
                 }
                 pt += base->bytes_per_line;
-                ito = (uint32 *)(((uint8 *) ito) + stride);
+                ito = (uint32_t *)(((uint8_t *) ito) + stride);
             }
         } else {
             for (i = 0; i < src->height; ++i) {
@@ -416,7 +411,7 @@ static cairo_surface_t *_GGDKDraw_GImage2Surface(GImage *image, GRect *src) {
                     }
                 }
                 pt += base->bytes_per_line;
-                ito = (uint32 *)(((uint8 *) ito) + stride);
+                ito = (uint32_t *)(((uint8_t *) ito) + stride);
             }
         }
 #else
@@ -442,7 +437,7 @@ static cairo_surface_t *_GGDKDraw_GImage2Surface(GImage *image, GRect *src) {
                     }
                 }
                 pt += base->bytes_per_line;
-                ito = (uint32 *)(((uint8 *) ito) + stride);
+                ito = (uint32_t *)(((uint8_t *) ito) + stride);
             }
         } else {
             for (i = 0; i < src->height; ++i) {
@@ -462,7 +457,7 @@ static cairo_surface_t *_GGDKDraw_GImage2Surface(GImage *image, GRect *src) {
                     }
                 }
                 pt += base->bytes_per_line;
-                ito = (uint32 *)(((uint8 *) ito) + stride);
+                ito = (uint32_t *)(((uint8_t *) ito) + stride);
             }
         }
 #endif
@@ -485,7 +480,7 @@ static cairo_surface_t *_GGDKDraw_GImage2Surface(GImage *image, GRect *src) {
                 }
             }
             pt += base->bytes_per_line;
-            ito = (uint32 *)(((uint8 *) ito) + stride);
+            ito = (uint32_t *)(((uint8_t *) ito) + stride);
         }
     }
     cairo_surface_mark_dirty(cs);
@@ -496,7 +491,7 @@ static GImage *_GGDKDraw_GImageExtract(struct _GImage *base, GRect *src, GRect *
                                        double xscale, double yscale) {
     static GImage temp;
     static struct _GImage tbase;
-    static uint8 *data;
+    static uint8_t *data;
     static int dlen;
     int r, c;
 
@@ -524,8 +519,8 @@ static GImage *_GGDKDraw_GImageExtract(struct _GImage *base, GRect *src, GRect *
         memset(data, 0, tbase.height * tbase.bytes_per_line);
         for (r = 0; r < size->height; ++r) {
             int or = ((int) floor((r + size->y) / yscale));
-            uint8 *pt = data + r * tbase.bytes_per_line;
-            uint8 *opt = base->data + or * base->bytes_per_line;
+            uint8_t *pt = data + r * tbase.bytes_per_line;
+            uint8_t *opt = base->data + or * base->bytes_per_line;
             for (c = 0; c < size->width; ++c) {
                 int oc = ((int) floor((c + size->x) / xscale));
                 if (opt[oc >> 3] & (0x80 >> (oc & 7))) {
@@ -536,8 +531,8 @@ static GImage *_GGDKDraw_GImageExtract(struct _GImage *base, GRect *src, GRect *
     } else if (base->image_type == it_index) {
         for (r = 0; r < size->height; ++r) {
             int or = ((int) floor((r + size->y) / yscale));
-            uint8 *pt = data + r * tbase.bytes_per_line;
-            uint8 *opt = base->data + or * base->bytes_per_line;
+            uint8_t *pt = data + r * tbase.bytes_per_line;
+            uint8_t *opt = base->data + or * base->bytes_per_line;
             for (c = 0; c < size->width; ++c) {
                 int oc = ((int) floor((c + size->x) / xscale));
                 *pt++ = opt[oc];
@@ -546,8 +541,8 @@ static GImage *_GGDKDraw_GImageExtract(struct _GImage *base, GRect *src, GRect *
     } else {
         for (r = 0; r < size->height; ++r) {
             int or = ((int) floor((r + size->y) / yscale));
-            uint32 *pt = (uint32 *)(data + r * tbase.bytes_per_line);
-            uint32 *opt = (uint32 *)(base->data + or * base->bytes_per_line);
+            uint32_t *pt = (uint32_t *)(data + r * tbase.bytes_per_line);
+            uint32_t *opt = (uint32_t *)(base->data + or * base->bytes_per_line);
             for (c = 0; c < size->width; ++c) {
                 int oc = ((int) floor((c + size->x) / xscale));
                 *pt++ = opt[oc];
@@ -717,7 +712,7 @@ void GGDKDrawPopClip(GWindow w, GRect *old) {
     }
 }
 
-void GGDKDrawDrawLine(GWindow w, int32 x, int32 y, int32 xend, int32 yend, Color col) {
+void GGDKDrawDrawLine(GWindow w, int32_t x, int32_t y, int32_t xend, int32_t yend, Color col) {
     //Log(LOGDEBUG, " ");
     GGDKWindow gw = (GGDKWindow)w;
     _GGDKDraw_CheckAutoPaint(gw);
@@ -737,7 +732,7 @@ void GGDKDrawDrawLine(GWindow w, int32 x, int32 y, int32 xend, int32 yend, Color
 
 }
 
-void GGDKDrawDrawArrow(GWindow w, int32 x, int32 y, int32 xend, int32 yend, int16 arrows, Color col) {
+void GGDKDrawDrawArrow(GWindow w, int32_t x, int32_t y, int32_t xend, int32_t yend, int16_t arrows, Color col) {
     //Log(LOGDEBUG, " ");
     GGDKWindow gw = (GGDKWindow)w;
     _GGDKDraw_CheckAutoPaint(gw);
@@ -891,7 +886,7 @@ void GGDKDrawFillEllipse(GWindow w, GRect *rect, Color col) {
  *  \param [in] sangle The start angle in degrees * 64 (Cartesian)
  *  \param [in] eangle The angle offset from the start in degrees * 64 (positive CCW)
  */
-void GGDKDrawDrawArc(GWindow w, GRect *rect, int32 sangle, int32 eangle, Color col) {
+void GGDKDrawDrawArc(GWindow w, GRect *rect, int32_t sangle, int32_t eangle, Color col) {
     //Log(LOGDEBUG, " ");
     GGDKWindow gw = (GGDKWindow)w;
     _GGDKDraw_CheckAutoPaint(gw);
@@ -916,7 +911,7 @@ void GGDKDrawDrawArc(GWindow w, GRect *rect, int32 sangle, int32 eangle, Color c
 
 }
 
-void GGDKDrawDrawPoly(GWindow w, GPoint *pts, int16 cnt, Color col) {
+void GGDKDrawDrawPoly(GWindow w, GPoint *pts, int16_t cnt, Color col) {
     //Log(LOGDEBUG, " ");
     GGDKWindow gw = (GGDKWindow)w;
     _GGDKDraw_CheckAutoPaint(gw);
@@ -935,7 +930,7 @@ void GGDKDrawDrawPoly(GWindow w, GPoint *pts, int16 cnt, Color col) {
 
 }
 
-void GGDKDrawFillPoly(GWindow w, GPoint *pts, int16 cnt, Color col) {
+void GGDKDrawFillPoly(GWindow w, GPoint *pts, int16_t cnt, Color col) {
     //Log(LOGDEBUG, " ");
     GGDKWindow gw = (GGDKWindow)w;
     _GGDKDraw_CheckAutoPaint(gw);
@@ -963,7 +958,7 @@ void GGDKDrawFillPoly(GWindow w, GPoint *pts, int16 cnt, Color col) {
 
 }
 
-void GGDKDrawDrawImage(GWindow w, GImage *image, GRect *src, int32 x, int32 y) {
+void GGDKDrawDrawImage(GWindow w, GImage *image, GRect *src, int32_t x, int32_t y) {
     //Log(LOGDEBUG, " ");
     GGDKWindow gw = (GGDKWindow)w;
     _GGDKDraw_CheckAutoPaint(gw);
@@ -1006,7 +1001,7 @@ void GGDKDrawDrawImage(GWindow w, GImage *image, GRect *src, int32 x, int32 y) {
 }
 
 // What we really want to do is use the grey levels as an alpha channel
-void GGDKDrawDrawGlyph(GWindow w, GImage *image, GRect *src, int32 x, int32 y) {
+void GGDKDrawDrawGlyph(GWindow w, GImage *image, GRect *src, int32_t x, int32_t y) {
     //Log(LOGDEBUG, " ");
     GGDKWindow gw = (GGDKWindow)w;
     _GGDKDraw_CheckAutoPaint(gw);
@@ -1018,7 +1013,7 @@ void GGDKDrawDrawGlyph(GWindow w, GImage *image, GRect *src, int32 x, int32 y) {
         GGDKDrawDrawImage(w, image, src, x, y);
     } else {
         int stride = cairo_format_stride_for_width(CAIRO_FORMAT_A8, src->width);
-        uint8 *basedata = malloc(stride * src->height),
+        uint8_t *basedata = malloc(stride * src->height),
                *data = basedata,
                 *srcd = base->data + src->y * base->bytes_per_line + src->x;
         int factor = base->clut->clut_len == 256 ? 1 :
@@ -1051,7 +1046,7 @@ void GGDKDrawDrawGlyph(GWindow w, GImage *image, GRect *src, int32 x, int32 y) {
 
 }
 
-void GGDKDrawDrawImageMagnified(GWindow w, GImage *image, GRect *src, int32 x, int32 y, int32 width, int32 height) {
+void GGDKDrawDrawImageMagnified(GWindow w, GImage *image, GRect *src, int32_t x, int32_t y, int32_t width, int32_t height) {
     //Log(LOGDEBUG, " ");
     GGDKWindow gw = (GGDKWindow)w;
     _GGDKDraw_CheckAutoPaint(gw);
@@ -1118,7 +1113,7 @@ void GGDKDrawDrawImageMagnified(GWindow w, GImage *image, GRect *src, int32 x, i
 
 }
 
-void GGDKDrawDrawPixmap(GWindow w, GWindow pixmap, GRect *src, int32 x, int32 y) {
+void GGDKDrawDrawPixmap(GWindow w, GWindow pixmap, GRect *src, int32_t x, int32_t y) {
     //Log(LOGDEBUG, " ");
     GGDKWindow gw = (GGDKWindow)w, gpixmap = (GGDKWindow)pixmap;
     _GGDKDraw_CheckAutoPaint(gw);
@@ -1130,11 +1125,6 @@ void GGDKDrawDrawPixmap(GWindow w, GWindow pixmap, GRect *src, int32 x, int32 y)
     cairo_set_source_surface(gw->cc, gpixmap->cs, x - src->x, y - src->y);
     cairo_rectangle(gw->cc, x, y, src->width, src->height);
     cairo_fill(gw->cc);
-}
-
-enum gcairo_flags GGDKDrawHasCairo(GWindow UNUSED(w)) {
-    //Log(LOGDEBUG, " ");
-    return gc_all;
 }
 
 void GGDKDrawPathStartNew(GWindow w) {
@@ -1207,7 +1197,7 @@ int GGDKDrawFillRuleSetWinding(GWindow w) {
     return 1;
 }
 
-int GGDKDrawDoText8(GWindow w, int32 x, int32 y, const char *text, int32 cnt, Color col, enum text_funcs drawit,
+int GGDKDrawDoText8(GWindow w, int32_t x, int32_t y, const char *text, int32_t cnt, Color col, enum text_funcs drawit,
                     struct tf_arg *arg) {
     //Log(LOGDEBUG, " ");
 
@@ -1251,17 +1241,22 @@ int GGDKDrawDoText8(GWindow w, int32 x, int32 y, const char *text, int32 cnt, Co
                 // surrogates, not unicode (0xfffe, 0xffff), etc.
                 memset(&arg->size, 0, sizeof(arg->size));
             } else {
+                int baseline = pango_layout_iter_get_baseline(iter) / PANGO_SCALE;
                 fm = pango_font_get_metrics(run->item->analysis.font, NULL);
                 arg->size.fas = pango_font_metrics_get_ascent(fm) / PANGO_SCALE;
                 arg->size.fds = pango_font_metrics_get_descent(fm) / PANGO_SCALE;
-                arg->size.as = ink.y + ink.height - arg->size.fds;
-                arg->size.ds = arg->size.fds - ink.y;
+                // Layout rects have origin in top left corner extending down/right
+                arg->size.as = baseline - ink.y;
+                arg->size.ds = ink.y + ink.height - baseline;
                 if (arg->size.ds < 0) {
+                    Log(LOGDEBUG, "Negative descent fas(%d) fds(%d) as(%d) ds(%d) baseline(%d) ink_x(%d) ink_y(%d) ink_width(%d) ink_height(%d) font(%s %d %d) text(%s)",
+                        arg->size.fas, arg->size.fds, arg->size.as, arg->size.ds,
+                        baseline, ink.x, ink.y, ink.width, ink.height,
+                        fi->rq.utf8_family_name, (int)fi->rq.point_size, (int)fi->rq.weight,
+                        text);
                     --arg->size.as;
                     arg->size.ds = 0;
                 }
-                // In the one case I've looked at fds is one pixel off from rect.y
-                //  I don't know what to make of that
                 pango_font_metrics_unref(fm);
             }
             pango_layout_iter_free(iter);
@@ -1319,7 +1314,7 @@ void GGDKDrawLayoutInit(GWindow w, char *text, int cnt, GFont *fi) {
     pango_layout_set_text(gw->pango_layout, text, cnt);
 }
 
-void GGDKDrawLayoutDraw(GWindow w, int32 x, int32 y, Color fg) {
+void GGDKDrawLayoutDraw(GWindow w, int32_t x, int32_t y, Color fg) {
     //Log(LOGDEBUG, " ");
     GGDKWindow gw = (GGDKWindow)w;
 
@@ -1343,7 +1338,7 @@ int GGDKDrawLayoutXYToIndex(GWindow w, int x, int y) {
     GGDKWindow gw = (GGDKWindow)w;
     int trailing, index;
 
-    // Pango retuns the last character if x is negative, not the first.
+    // Pango returns the last character if x is negative, not the first.
     if (x < 0) {
         x = 0;
     }
@@ -1402,4 +1397,3 @@ int GGDKDrawLayoutLineStart(GWindow w, int l) {
     return line->start_index;
 }
 
-#endif // FONTFORGE_CAN_USE_GDK

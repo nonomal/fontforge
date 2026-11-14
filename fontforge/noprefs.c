@@ -29,7 +29,7 @@
 
 #include "autotrace.h"
 #include "encoding.h"
-#include "ffglib.h"
+#include "ffglib_compat.h"
 #include "fontforge.h"
 #include "gfile.h"
 #include "groups.h"
@@ -43,14 +43,15 @@
 #include "ustring.h"
 
 #include <assert.h>
-#include <dirent.h>
 #include <locale.h>
 #include <stdlib.h>
+#ifndef _MSC_VER
 #include <sys/time.h>
+#endif
 #include <sys/types.h>
 #include <time.h>
 
-#if defined(__MINGW32__)
+#if defined(__MINGW32__) || defined(_MSC_VER)
 #include <windows.h>
 #endif
 
@@ -62,7 +63,6 @@ extern Encoding *default_encoding;
 extern int autohint_before_generate;
 extern int accent_offset;
 extern int GraveAcuteCenterBottom;
-extern int PreferSpacingAccents;
 extern int CharCenterHighest;
 extern int recognizePUA;
 extern int snaptoint;
@@ -131,7 +131,6 @@ static int infowindowdistance=10;		/* in cvruler.c */
 static int loacal_markextrema, loacal_markpoi, loacal_showrulers,
     loacal_showcpinfo, loacal_showsidebearings, loacal_showpoints,
     loacal_showfilled, loacal_showtabs, loacal_showrefnames;
-static int oldsystem=100;
 static int rectelipse=0, polystar=0, regular_star=0;	/* from cvpalettes.c */
 static int center_out[2]={0,0};			/* from cvpalettes.c */
 static float rr_radius=0;				/* from cvpalettes.c */
@@ -171,7 +170,7 @@ static int gfc_showhidden, gfc_dirplace;
 static char *gfc_bookmarks=NULL;
 static char *pixmapdir=NULL;
 
-enum pref_types { pr_int, pr_real, pr_bool, pr_enum, pr_encoding, pr_string,
+enum pref_types { pr_int, pr_real, pr_bool, pr_encoding, pr_string,
 	pr_file, pr_namelist, pr_unicode };
 
 static struct prefs_list {
@@ -204,12 +203,11 @@ static struct prefs_list {
     { N_("UndoDepth"), pr_int, &maxundoes, NULL, NULL, '\0', NULL, 0, N_("The maximum number of Undoes/Redoes stored in a glyph") },
     { N_("AutoWidthSync"), pr_bool, &adjustwidth, NULL, NULL, '\0', NULL, 0, N_("Changing the width of a glyph\nchanges the widths of all accented\nglyphs based on it.") },
     { N_("AutoLBearingSync"), pr_bool, &adjustlbearing, NULL, NULL, '\0', NULL, 0, N_("Changing the left side bearing\nof a glyph adjusts the lbearing\nof other references in all accented\nglyphs based on it.") },
-    { N_("ClearInstrsBigChanges"), pr_bool, &clear_tt_instructions_when_needed, NULL, NULL, 'C', NULL, 0, N_("Instructions in a TrueType font refer to\npoints by number, so if you edit a glyph\nin such a way that some points have different\nnumbers (add points, remove them, etc.) then\nthe instructions will be applied to the wrong\npoints with disasterous results.\n  Normally FontForge will remove the instructions\nif it detects that the points have been renumbered\nin order to avoid the above problem. You may turn\nthis behavior off -- but be careful!") },
+    { N_("ClearInstrsBigChanges"), pr_bool, &clear_tt_instructions_when_needed, NULL, NULL, 'C', NULL, 0, N_("Instructions in a TrueType font refer to\npoints by number, so if you edit a glyph\nin such a way that some points have different\nnumbers (add points, remove them, etc.) then\nthe instructions will be applied to the wrong\npoints with disastrous results.\n  Normally FontForge will remove the instructions\nif it detects that the points have been renumbered\nin order to avoid the above problem. You may turn\nthis behavior off -- but be careful!") },
     { N_("CopyTTFInstrs"), pr_bool, &copyttfinstr, NULL, NULL, '\0', NULL, 0, N_("When copying glyphs from the font view, also copy the\nglyphs' metadata (name, encoding, comment, etc).") },
     { N_("AccentOffsetPercent"), pr_int, &accent_offset, NULL, NULL, '\0', NULL, 0, N_("The percentage of an em by which an accent is offset from its base glyph in Build Accent") },
     { N_("AccentCenterLowest"), pr_bool, &GraveAcuteCenterBottom, NULL, NULL, '\0', NULL, 0, N_("When placing grave and acute accents above letters, should\nFontForge center them based on their full width, or\nshould it just center based on the lowest point\nof the accent.") },
     { N_("CharCenterHighest"), pr_bool, &CharCenterHighest, NULL, NULL, '\0', NULL, 0, N_("When centering an accent over a glyph, should the accent\nbe centered on the highest point(s) of the glyph,\nor the middle of the glyph?") },
-    { N_("PreferSpacingAccents"), pr_bool, &PreferSpacingAccents, NULL, NULL, '\0', NULL, 0, N_("Use spacing accents (Unicode: 02C0-02FF) rather than\ncombining accents (Unicode: 0300-036F) when\nbuilding accented glyphs.") },
     { N_("PreferPotrace"), pr_bool, &preferpotrace, NULL, NULL, '\0', NULL, 0, N_("FontForge supports two different helper applications to do autotracing\n autotrace and potrace\nIf your system only has one it will use that one, if you have both\nuse this option to tell FontForge which to pick.") },
     { N_("AutotraceArgs"), pr_string, NULL, GetAutoTraceArgs, SetAutoTraceArgs, '\0', NULL, 0, N_("Extra arguments for configuring the autotrace program\n(either autotrace or potrace)") },
     { N_("AutotraceAsk"), pr_bool, &autotrace_ask, NULL, NULL, '\0', NULL, 0, N_("Ask the user for autotrace arguments each time autotrace is invoked") },
@@ -293,7 +291,6 @@ extras[] = {
     { "ShowPoints", pr_bool, &loacal_showpoints, NULL, NULL, '\0', NULL, 1, NULL },
     { "ShowFilled", pr_int, &loacal_showfilled, NULL, NULL, '\0', NULL, 1, NULL },
     { "ShowTabs", pr_int, &loacal_showtabs, NULL, NULL, '\0', NULL, 1, NULL },
-    { "DefaultScreenDpiSystem", pr_int, &oldsystem, NULL, NULL, '\0', NULL, 1, NULL },
     { "RegularStar", pr_bool, &regular_star, NULL, NULL, '\0', NULL, 1, NULL },
     { "PolyStar", pr_bool, &polystar, NULL, NULL, '\0', NULL, 1, NULL },
     { "RectEllipse", pr_bool, &rectelipse, NULL, NULL, '\0', NULL, 1, NULL },
@@ -464,13 +461,13 @@ return( NULL );
 return( prefs );
 }
 
-static char *NOUI_getFontForgeShareDir(void) {
+static const char *NOUI_getFontForgeShareDir(void) {
 	return getShareDir();
 }
 
 static void DefaultEncoding(void) {
     const char* charset = NULL;
-    bool is_utf8 = g_get_charset(&charset);
+    bool is_utf8 = ff_get_charset(&charset);
 
     if (!SetupUCharMap(FindUnicharName(), charset, is_utf8)) {
         fprintf(stderr, "Failed to set up unichar<->system local encoding, assuming utf-8 and trying again...\n");
@@ -488,17 +485,12 @@ static void DefaultXUID(void) {
     /* FontForge will use the same scheme */
     int r1, r2;
     char buffer[50];
-    struct timeval tv;
 
-    gettimeofday(&tv,NULL);
-    srand(tv.tv_usec);
     do {
-	r1 = rand()&0x3ff;
-    } while ( r1==0 );		/* I reserve "0" for me! */
-    gettimeofday(&tv,NULL);
-    g_random_set_seed(tv.tv_usec+1);
-    r2 = g_random_int();
-    sprintf( buffer, "1021 %d %d", r1, r2 );
+	r1 = ff_random_int() & 0x3ff;
+    } while (r1 == 0);		/* I reserve "0" for me! */
+    r2 = ff_random_int();
+    sprintf(buffer, "1021 %d %d", r1, r2);
     if (xuid != NULL) free(xuid);
     xuid = copy(buffer);
 }
@@ -515,11 +507,7 @@ static void ParseMacMapping(char *pt,struct macsettingname *ms) {
     if ( *end==',' ) ++end;
     ms->mac_feature_setting = strtol(end,&end,10);
     if ( *end==' ' ) ++end;
-    ms->otf_tag =
-	((end[0]&0xff)<<24) |
-	((end[1]&0xff)<<16) |
-	((end[2]&0xff)<<8) |
-	(end[3]&0xff);
+    ms->otf_tag = CHR(end[0], end[1], end[2], end[3]);
 }
 
 static void ParseNewMacFeature(FILE *p,char *line) {

@@ -27,6 +27,7 @@
 
 #include <fontforge-config.h>
 
+#include "charview_private.h"
 #include "cvundoes.h"
 #include "fontforgeui.h"
 #include "spiro.h"
@@ -44,11 +45,9 @@ extern int interpCPsOnMotion;
 int CVAnySel(CharView *cv, int *anyp, int *anyr, int *anyi, int *anya) {
     int anypoints = 0, anyrefs=0, anyimages=0, anyanchor=0;
     SplinePointList *spl;
-    Spline *spline, *first;
     RefChar *rf;
     ImageList *il;
     AnchorPoint *ap;
-    int i;
 
     for ( spl = cv->b.layerheads[cv->b.drawmode]->splines; spl!=NULL && !anypoints; spl = spl->next ) {
         anypoints = SplinePointListCheckSelected1(spl, cv->b.sc->inspiro && hasspiro(), NULL, true);
@@ -327,82 +326,82 @@ return( false );
 return( true );
 }
 
-static void SplineSetFindSelBounds(SplinePointList *spl, DBounds *bounds,
-	int nosel, int inspiro) {
+/* Expand (possibly empty) bounds rectangle to include another rectangle */
+static void BoundsInclude(DBounds *bounds, bool *found, real minx, real miny,
+                                                        real maxx, real maxy) {
+    if ( !*found ) {
+	bounds->minx = minx; bounds->miny = miny;
+	bounds->maxx = maxx; bounds->maxy = maxy;
+	*found = true;
+	return;
+    }
+    if ( minx<bounds->minx ) bounds->minx = minx;
+    if ( miny<bounds->miny ) bounds->miny = miny;
+    if ( maxx>bounds->maxx ) bounds->maxx = maxx;
+    if ( maxy>bounds->maxy ) bounds->maxy = maxy;
+}
+
+static bool SplineSetFindSelBounds(SplinePointList *spl, DBounds *bounds, int nosel, int inspiro) {
     SplinePoint *sp, *first;
+    bool found = false;
     int i;
 
     for ( ; spl!=NULL; spl = spl->next ) {
 	if ( !inspiro ) {
 	    first = NULL;
 	    for ( sp = spl->first; sp!=first; sp = sp->next->to ) {
-		if ( nosel || sp->selected ) {
-		    if ( bounds->minx==0 && bounds->maxx==0 &&
-			 bounds->miny==0 && bounds->maxy == 0 ) {
-			bounds->minx = bounds->maxx = sp->me.x;
-			bounds->miny = bounds->maxy = sp->me.y;
-		    } else {
-			if ( sp->me.x<bounds->minx ) bounds->minx = sp->me.x;
-			if ( sp->me.x>bounds->maxx ) bounds->maxx = sp->me.x;
-			if ( sp->me.y<bounds->miny ) bounds->miny = sp->me.y;
-			if ( sp->me.y>bounds->maxy ) bounds->maxy = sp->me.y;
-		    }
-		}
+		if ( nosel || sp->selected )
+		    BoundsInclude(bounds, &found, sp->me.x, sp->me.y, sp->me.x, sp->me.y);
 		if ( first==NULL ) first = sp;
-		if ( sp->next==NULL )
-	    break;
+		if ( sp->next==NULL ) break;
 	    }
 	} else {
-	    for ( i=0; i<spl->spiro_cnt-1; ++i ) {
-		if ( nosel || SPIRO_SELECTED(&spl->spiros[i])) {
-		    if ( bounds->minx==0 && bounds->maxx==0 &&
-			 bounds->miny==0 && bounds->maxy == 0 ) {
-			bounds->minx = bounds->maxx = spl->spiros[i].x;
-			bounds->miny = bounds->maxy = spl->spiros[i].y;
-		    } else {
-			if ( spl->spiros[i].x<bounds->minx ) bounds->minx = spl->spiros[i].x;
-			if ( spl->spiros[i].x>bounds->maxx ) bounds->maxx = spl->spiros[i].x;
-			if ( spl->spiros[i].y<bounds->miny ) bounds->miny = spl->spiros[i].y;
-			if ( spl->spiros[i].y>bounds->maxy ) bounds->maxy = spl->spiros[i].y;
-		    }
-		}
-	    }
+	    for ( i=0; i<spl->spiro_cnt-1; ++i )
+		if ( nosel || SPIRO_SELECTED(&spl->spiros[i]) )
+		    BoundsInclude(bounds, &found, spl->spiros[i].x, spl->spiros[i].y,
+				                  spl->spiros[i].x, spl->spiros[i].y);
 	}
     }
+    return( found );
+}
+
+/* Find bounds for selected objects, or all objects when nosel is set */
+static bool CVSelectionBounds(CharView *cv, DBounds *bounds, bool nosel) {
+    bool found;
+    ImageList *img;
+
+    found = SplineSetFindSelBounds(cv->b.layerheads[cv->b.drawmode]->splines,
+	                           bounds, nosel, (cv->b.sc->inspiro && hasspiro()));
+    if ( cv->b.drawmode==dm_fore ) {
+	RefChar *rf;
+	for ( rf=cv->b.layerheads[cv->b.drawmode]->refs; rf!=NULL; rf=rf->next )
+	    if ( nosel || rf->selected )
+		BoundsInclude(bounds, &found, rf->bb.minx, rf->bb.miny,
+		                              rf->bb.maxx, rf->bb.maxy);
+    }
+    for ( img=cv->b.layerheads[cv->b.drawmode]->images; img!=NULL; img=img->next )
+	if ( nosel || img->selected )
+	    BoundsInclude(bounds, &found, img->bb.minx, img->bb.miny,
+	                                  img->bb.maxx, img->bb.maxy);
+
+    return( found );
+}
+
+/* Find scale box bounds, treat no selection as 'all objects selected' */
+bool CVScaleSelectionBounds(CharView *cv, DBounds *bounds) {
+    int anyp, anyr, anyi;
+
+    anyp = anyr = anyi = false;
+    CVAnySel(cv,&anyp,&anyr,&anyi,NULL);
+    return( CVSelectionBounds(cv, bounds, (!anyp && !anyr && !anyi)));
 }
 
 void CVFindCenter(CharView *cv, BasePoint *bp, int nosel) {
     DBounds b;
-    ImageList *img;
 
-    b.minx = b.miny = b.maxx = b.maxy = 0;
-    SplineSetFindSelBounds(cv->b.layerheads[cv->b.drawmode]->splines,&b,nosel,cv->b.sc->inspiro&& hasspiro());
-    if ( cv->b.drawmode==dm_fore ) {
-	RefChar *rf;
-	for ( rf=cv->b.layerheads[cv->b.drawmode]->refs; rf!=NULL; rf=rf->next ) {
-	    if ( nosel || rf->selected ) {
-		if ( b.minx==0 && b.maxx==0 )
-		    b = rf->bb;
-		else {
-		    if ( rf->bb.minx<b.minx ) b.minx = rf->bb.minx;
-		    if ( rf->bb.miny<b.miny ) b.miny = rf->bb.miny;
-		    if ( rf->bb.maxx>b.maxx ) b.maxx = rf->bb.maxx;
-		    if ( rf->bb.maxy>b.maxy ) b.maxy = rf->bb.maxy;
-		}
-	    }
-	}
-    }
-    for ( img=cv->b.layerheads[cv->b.drawmode]->images; img!=NULL; img=img->next ) {
-	if ( nosel || img->selected ) {
-	    if ( b.minx==0 && b.maxx==0 )
-		b = img->bb;
-	    else {
-		if ( img->bb.minx<b.minx ) b.minx = img->bb.minx;
-		if ( img->bb.miny<b.miny ) b.miny = img->bb.miny;
-		if ( img->bb.maxx>b.maxx ) b.maxx = img->bb.maxx;
-		if ( img->bb.maxy>b.maxy ) b.maxy = img->bb.maxy;
-	    }
-	}
+    if ( !CVSelectionBounds(cv, &b, nosel)) {
+	bp->x = bp->y = 0;
+	return;
     }
     bp->x = (b.minx+b.maxx)/2;
     bp->y = (b.miny+b.maxy)/2;
@@ -444,6 +443,56 @@ return( ee_down );
 return( ee_up );
 
 return( ee_none );
+}
+
+
+/* Return exact bounds point represented by scale edge or corner handle */
+void CVScaleHandlePoint(const DBounds *bb, enum expandedge edge, BasePoint *pt) {
+    real midx = (bb->minx+bb->maxx)/2;
+    real midy = (bb->miny+bb->maxy)/2;
+
+    pt->x = edge==ee_nw || edge==ee_sw || edge==ee_left  ? bb->minx :
+            edge==ee_ne || edge==ee_se || edge==ee_right ? bb->maxx : midx;
+    pt->y = edge==ee_sw || edge==ee_se || edge==ee_down  ? bb->miny :
+            edge==ee_nw || edge==ee_ne || edge==ee_up    ? bb->maxy : midy;
+}
+
+/* Hit-test the scale box handles using current point-snapping tolerance */
+static enum expandedge CVScaleHandleAt(real x, real y, real fudge, const DBounds *bb) {
+    int i;
+    static enum expandedge edges[] = { ee_nw, ee_ne, ee_se, ee_sw,           // corners
+                                       ee_up, ee_right, ee_down, ee_left };  // edges
+
+    for ( i=0; i<sizeof(edges)/sizeof(edges[0]); ++i ) {
+	BasePoint pt;
+	CVScaleHandlePoint(bb,edges[i],&pt);
+	if ( x>=pt.x-fudge && x<=pt.x+fudge && 
+	     y>=pt.y-fudge && y<=pt.y+fudge )
+	    return( edges[i] );
+    }
+    return( ee_none );
+}
+
+/* Convert scale-handle click into transform press at that handle point */
+bool CVScaleHandlePress(CharView *cv, real fudge) {
+    BasePoint pt;
+    DBounds bb;
+    enum expandedge edge;
+
+    if ( !CVScaleSelectionBounds(cv,&bb) ||
+	    (edge = CVScaleHandleAt(cv->p.cx,cv->p.cy,fudge,&bb))==ee_none ) {
+	cv->expandedge = ee_none;
+	return( false );
+    }
+    cv->expandedge = edge;
+    CVScaleHandlePoint(&bb,edge,&pt);
+    cv->p.cx     = pt.x;
+    cv->p.cy     = pt.y;
+    cv->p.sp     = NULL;
+    cv->p.spiro  = NULL;
+    cv->p.spline = NULL;
+    cv->p.anysel = true;
+    return( true );
 }
 
 static void SetCur(CharView *cv) {
@@ -496,9 +545,22 @@ void CVCheckResizeCursors(CharView *cv) {
     RefChar *ref;
     ImageList *img;
     int old_ee = cv->expandedge;
-    real fudge = 3.5/tab->scale;
+    real fudge = CVSCALE_HANDLE_FUDGE/tab->scale;    // fudge factor for mouse proximity to resizer handles
 
     cv->expandedge = ee_none;
+    /* Keep scale handle cursors active while scale is selected or dragging */
+    if ( cv->showing_tool==cvt_scale || cv->active_tool==cvt_scale || cv->b1_tool==cvt_scale ) {
+	/* Scale tool's mouse cursor driven by selection box handles */
+	DBounds bb;
+	if ( CVScaleSelectionBounds(cv,&bb) )
+	    cv->expandedge = CVScaleHandleAt(cv->info.x, cv->info.y, fudge, &bb);
+
+	if ( cv->expandedge==ee_none )      // Empty scale-box area?
+	    GDrawSetCursor(cv->v,ct_scale); // ..use "scale cursor", not "pointer cursor"
+	else if ( cv->expandedge!=old_ee )  // Hover changed?
+	    SetCur(cv);                     // ..still use existing "resize cursor"
+	return;
+    }
     if ( cv->b.drawmode!=dm_grid ) {
 	for ( ref=cv->b.layerheads[cv->b.drawmode]->refs; ref!=NULL; ref=ref->next ) if ( ref->selected ) {
 	    if (( cv->expandedge = OnBB(cv,&ref->bb,fudge))!=ee_none )
@@ -697,7 +759,7 @@ return;
 		cv->lbearingsel = true;
 	    if ( cv->lbearingsel ) {
 //		cv->oldlbearing = cv->b.sc->lbearing;
-		fs->p->cx = 0;;
+		fs->p->cx = 0;
 		CVInfoDraw(cv,cv->gw);
 		fs->p->anysel = true;
 		cv->expandedge = ee_left;
@@ -1220,7 +1282,7 @@ static void adjustLBearing( CharView *cv, SplineChar *sc, real val )
 }
 
 /* Move the selection and return whether we did a merge */
-int CVMoveSelection(CharView *cv, real dx, real dy, uint32 input_state) {
+int CVMoveSelection(CharView *cv, real dx, real dy, uint32_t input_state) {
     CharViewTab* tab = CVGetActiveTab(cv);
     real transform[6];
     RefChar *refs;
@@ -1306,14 +1368,13 @@ return(false);
 	img->yoff += transform[5];
 	img->bb.minx += transform[4]; img->bb.maxx += transform[4];
 	img->bb.miny += transform[5]; img->bb.maxy += transform[5];
-	SCOutOfDateBackground(cv->b.sc);
 	changed = true;
     }
     fudge = snapdistance/tab->scale/2;
     if ( cv->widthsel ) {
-	if ( cv->b.sc->width+dx>0 && ((int16) (cv->b.sc->width+dx))<0 )
+	if ( cv->b.sc->width+dx>0 && ((int16_t) (cv->b.sc->width+dx))<0 )
 	    cv->b.sc->width = 32767;
-	else if ( cv->b.sc->width+dx<0 && ((int16) (cv->b.sc->width+dx))>0 )
+	else if ( cv->b.sc->width+dx<0 && ((int16_t) (cv->b.sc->width+dx))>0 )
 	    cv->b.sc->width = -32768;
 	else
 	    cv->b.sc->width += dx;
@@ -1328,9 +1389,9 @@ return(false);
 	changed = true;
     }
     if ( cv->vwidthsel ) {
-	if ( cv->b.sc->vwidth-dy>0 && ((int16) (cv->b.sc->vwidth-dy))<0 )
+	if ( cv->b.sc->vwidth-dy>0 && ((int16_t) (cv->b.sc->vwidth-dy))<0 )
 	    cv->b.sc->vwidth = 32767;
-	else if ( cv->b.sc->vwidth-dy<0 && ((int16) (cv->b.sc->vwidth-dy))>0 )
+	else if ( cv->b.sc->vwidth-dy<0 && ((int16_t) (cv->b.sc->vwidth-dy))>0 )
 	    cv->b.sc->vwidth = -32768;
 	else
 	    cv->b.sc->vwidth -= dy;
@@ -1339,9 +1400,9 @@ return(false);
 	changed = true;
     }
     if ( cv->icsel ) {
-	if ( cv->b.sc->italic_correction+dx>0 && ((int16) (cv->b.sc->italic_correction+dx))<0 )
+	if ( cv->b.sc->italic_correction+dx>0 && ((int16_t) (cv->b.sc->italic_correction+dx))<0 )
 	    cv->b.sc->italic_correction = 32767-1;
-	else if ( cv->b.sc->italic_correction+dx<0 && ((int16) (cv->b.sc->italic_correction+dx))>0 )
+	else if ( cv->b.sc->italic_correction+dx<0 && ((int16_t) (cv->b.sc->italic_correction+dx))>0 )
 	    cv->b.sc->italic_correction = -32768;
 	else
 	    cv->b.sc->italic_correction += dx;
@@ -1350,9 +1411,9 @@ return(false);
 	changed = true;
     }
     if ( cv->tah_sel ) {
-	if ( cv->b.sc->top_accent_horiz+dx>0 && ((int16) (cv->b.sc->top_accent_horiz+dx))<0 )
+	if ( cv->b.sc->top_accent_horiz+dx>0 && ((int16_t) (cv->b.sc->top_accent_horiz+dx))<0 )
 	    cv->b.sc->top_accent_horiz = 32767-1;
-	else if ( cv->b.sc->top_accent_horiz+dx<0 && ((int16) (cv->b.sc->top_accent_horiz+dx))>0 )
+	else if ( cv->b.sc->top_accent_horiz+dx<0 && ((int16_t) (cv->b.sc->top_accent_horiz+dx))>0 )
 	    cv->b.sc->top_accent_horiz = -32768;
 	else
 	    cv->b.sc->top_accent_horiz += dx;
@@ -1398,13 +1459,6 @@ static void touchControlPointsVisitor ( void* key,
     SPTouchControl( sp, which, (int)(intptr_t)udata );
 }
 
-#ifndef MAX
-#define MAX(x,y)   (((x) > (y)) ? (x) : (y))
-#endif
-#ifndef MIN
-#define MIN(x,y)   (((x) < (y)) ? (x) : (y))
-#endif
-
 BasePoint nearest_point_on_line_segment(BasePoint p1, BasePoint p2, BasePoint p3) {
 	double x_diff = p2.x - p1.x;
 	double y_diff = p2.y - p1.y;
@@ -1441,6 +1495,7 @@ int CVMouseMovePointer(CharView *cv, GEvent *event) {
     int needsupdate = false;
     int did_a_merge = false;
     int touch_control_points = false;
+    int no_prev_cp = false, no_next_cp = false;
 
     
     /* if we haven't moved from the original location (ever) then this is a noop */
@@ -1559,26 +1614,53 @@ return( false );
 	touch_control_points = true;
 	// The modifier is wrong.
 	if (cv->p.anysel && cv->p.sp && event->u.mouse.state & ksm_control) {
-		// Identify the individual point clicked. Find its control points. Move the selected point on a line between those control points.
-		tmpp1 = nearest_point_on_line_segment((BasePoint){cv->p.sp->prevcp.x,cv->p.sp->prevcp.y}, \
-			(BasePoint){cv->p.sp->nextcp.x,cv->p.sp->nextcp.y}, (BasePoint){cv->info.x, cv->info.y});
-		// We also need to rebase the original point onto that line segment so that the movement is exactly along the line even if the original click is not.
-		tmpp2 = nearest_point_on_line_segment((BasePoint){cv->p.sp->prevcp.x,cv->p.sp->prevcp.y}, \
-			(BasePoint){cv->p.sp->nextcp.x,cv->p.sp->nextcp.y}, (BasePoint){cv->last_c.x, cv->last_c.y});
+		touch_control_points = false;
+		BasePoint prevref, nextref;
+		if (cv->p.sp->noprevcp && cv->p.sp->prev) {
+		    no_prev_cp = true;
+		    prevref = cv->p.sp->prev->from->me;
+		} else {
+		    prevref = cv->p.sp->prevcp;
+		}
+		if (cv->p.sp->nonextcp && cv->p.sp->next) {
+		    no_next_cp = true;
+		    nextref = cv->p.sp->next->to->me;
+		} else {
+		    nextref = cv->p.sp->nextcp;
+		}
+		// Identify the individual point clicked. Find its control
+		// points. Move the selected point on a line between those
+		// control points.
+		tmpp1 = nearest_point_on_line_segment(prevref, nextref, cv->info);
+		// We also need to rebase the original point onto that line
+		// segment so that the movement is exactly along the line
+		// even if the original click is not.
+		tmpp2 = nearest_point_on_line_segment(prevref, nextref, cv->last_c);
 		xadj = tmpp1.x-tmpp2.x;
 		yadj = tmpp1.y-tmpp2.y;
-		touch_control_points = false; // We will need to move the control points back (but only for the point dragged).
 	}
 	
 	did_a_merge = CVMoveSelection(cv,
 		xadj,yadj,
 		event->u.mouse.state);
-	// Rather than create a new set of functions for moving points without their control points, we instead just restore them if we did not want them moved.
+	// Rather than create a new set of functions for moving points without
+	// their control points, we instead just restore them if we did not want
+	// them moved.
 	if (cv->p.sp && touch_control_points == false) {
-		cv->p.sp->prevcp = cachecp1;
-		cv->p.sp->nextcp = cachecp2;
+		if (no_prev_cp)
+		    cv->p.sp->prevcp = cv->p.sp->me;
+		else
+		    cv->p.sp->prevcp = cachecp1;
+		if (no_next_cp)
+		    cv->p.sp->nextcp = cv->p.sp->me;
+		else
+		    cv->p.sp->nextcp = cachecp2;
+		SplineRefigure(cv->p.sp->prev);
+		SplineRefigure(cv->p.sp->next);
+		// We presumably still trigger this in case we're dragging other
+		// selected points along
 		touch_control_points = true;
-    		AdjustControls(cv->p.sp);
+		// Don't think this is wanted or needed now AdjustControls(cv->p.sp);
 	}
 	needsupdate = true;
 

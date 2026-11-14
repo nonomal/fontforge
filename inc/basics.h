@@ -34,23 +34,18 @@
 #include <limits.h>
 #include <memory.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>		/* for NULL */
 #include <stdlib.h>		/* for free */
 #include <string.h>
 
-typedef int32_t		int32;
-typedef uint32_t	uint32;
-typedef int16_t		int16;
-typedef uint16_t	uint16;
-typedef int8_t		int8;
-typedef uint8_t		uint8;
-
-/* An integral type which can hold a pointer */
-typedef intptr_t	intpt;
-
-typedef uint32 unichar_t;
+typedef uint32_t unichar_t;
 
 #define FF_PI 3.1415926535897932
+
+#if defined(_WIN32) && !defined(LIBINTL_VERSION)
+# define vsnprintf _vsprintf_p
+#endif
 
 /* A macro to mark unused function parameters with. We often
  * have such parameters, because of extensive use of callbacks.
@@ -69,7 +64,7 @@ typedef uint32 unichar_t;
 #ifndef NDEBUG
 #define TRACE(...) fprintf(stderr, __VA_ARGS__)
 #else
-#define TRACE(...) while(0)
+#define TRACE(...) do {} while(0)
 #endif
 
 /* assert() with an otherwise unused variable
@@ -81,7 +76,17 @@ typedef uint32 unichar_t;
 #define VASSERT(v) ((void)(v))
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern void NoMoreMemMessage(void);
+extern void ExpandBuffer(void** p_buf, size_t elem_size, size_t increment,
+                         int* p_maxalloc);
+
+#ifdef __cplusplus
+}
+#endif
 
 static inline int imin(int a, int b)
 {
@@ -113,7 +118,7 @@ static inline int imax(int a, int b)
  * example:
  * MyListObjectType* newfoolast = 0;
  * MyListObjectType* newfoolist = 0;
- * 
+ *
  * for( ... iterate a source collection of foos ... )
  * {
  *    MyListObjectType* foocopy = CopyIt( foo );
@@ -132,5 +137,36 @@ static inline int imax(int a, int b)
 			last = newitem;		       \
 		    }
 
+#ifdef __GNU__
+// This is for GNU Hurd, not GCC.
+// cf. <https://www.gnu.org/software/hurd/community/gsoc/project_ideas/maxpath.html>
+# ifndef PATH_MAX
+#  define PATH_MAX 4096
+# endif
+# ifndef MAXPATHLEN
+#  define MAXPATHLEN 4096
+# endif
+#endif
+
+/* Common MIN/MAX macros */
+#ifndef MAX
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#endif
+#ifndef MIN
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif
+
+/* Assemble a big-endian 32-bit value from four bytes.  The bytes are promoted
+ * to uint32_t before shifting: a byte >= 0x80 (which is negative when it comes
+ * from a plain signed char) would otherwise shift into the sign bit, which is
+ * undefined for a signed type.  The result keeps the signed 32-bit type the
+ * callers already use for tags such as 'GSUB'. */
+#ifndef CHR
+#define CHR(ch1,ch2,ch3,ch4) \
+    ((int32_t)((((uint32_t)(ch1) & 0xff) << 24) | \
+               (((uint32_t)(ch2) & 0xff) << 16) | \
+               (((uint32_t)(ch3) & 0xff) << 8) | \
+               ((uint32_t)(ch4) & 0xff)))
+#endif
 
 #endif /* FONTFORGE_BASICS_H */

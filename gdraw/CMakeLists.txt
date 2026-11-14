@@ -5,6 +5,7 @@
 
 add_library(gdraw STATIC
   choosericons.c
+  ghelp.c
   colorP.h
   ctlvalues.c
   div_tables.c
@@ -22,6 +23,7 @@ add_library(gdraw STATIC
   gdrawtxt.c
   gfilechooser.c
   gfiledlg.c
+  gflowbox.c
   ggadgetP.h
   ggadgets.c
   ggdkcdraw.c
@@ -32,7 +34,6 @@ add_library(gdraw STATIC
   ghvbox.c
   gimageclut.c
   gimagecvt.c
-  gimagexdraw.c
   gkeysym.c
   glist.c
   gmatrixedit.c
@@ -41,37 +42,25 @@ add_library(gdraw STATIC
   gradio.c
   gresedit.c
   gresource.c
-  gresourceimage.c
   gresourceP.h
   gsavefiledlg.c
   gscrollbar.c
+  gscroll1box.c
   gspacer.c
   gtabset.c
   gtextfield.c
   gtextinfo.c
   gwidgetP.h
   gwidgets.c
-  gxcdraw.c
-  gxcdrawP.h
-  gxdraw.c
-  gxdrawP.h
   hotkeys.c
-  xkeysyms_unicode.c
 )
 
 target_link_libraries(gdraw PRIVATE fontforge)
 
-if(ENABLE_X11)
-  target_link_libraries(gdraw PUBLIC
-    X11::X11
-    X11::Xi
-    X11::Xkb
-    Cairo::Cairo
-    Pango::Pango
-  )
-else()
-  if(APPLE)
-    target_sources(gdraw PRIVATE ggdkcocoa.m)
-  endif()
-  target_link_libraries(gdraw PUBLIC GDK3::GDK3)
+if(APPLE)
+  target_sources(gdraw PRIVATE ggdkcocoa.m)
 endif()
+target_link_libraries(gdraw PUBLIC
+  GDK3::GDK3
+  PkgConfig::GTK3
+)

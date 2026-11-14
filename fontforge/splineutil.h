@@ -5,7 +5,11 @@
 #include "psfont.h"
 #include "splinefont.h"
 #include "ttfinstrs.h"
-#include "views.h"
+#include "baseviews.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct quartic {
     bigreal a,b,c,d,e;
@@ -181,7 +185,7 @@ extern void SCRemoveLayerDependents(SplineChar *dependent, int layer);
 extern void SFInstanciateRefs(SplineFont *sf);
 extern void SFReinstanciateRefs(SplineFont *sf);
 extern void SFRemoveAnchorClass(SplineFont *sf, AnchorClass *an);
-extern void SFRemoveSavedTable(SplineFont *sf, uint32 tag);
+extern void SFRemoveSavedTable(SplineFont *sf, uint32_t tag);
 extern void SplineCharFindBounds(SplineChar *sc, DBounds *bounds);
 extern void SplineCharFreeContents(SplineChar *sc);
 extern void SplineCharLayerFindBounds(SplineChar *sc, int layer, DBounds *bounds);
@@ -226,5 +230,9 @@ extern int HashKerningClassNamesFlex(SplineFont *sf, struct glif_name_index * cl
 #define SPLINEPVAL(s, t) (BasePoint) { SPLINE1DPVAL(&(s)->splines[0], t), SPLINE1DPVAL(&(s)->splines[1], t) }
 #define SPLINE1DPTANVAL(s, t) ((3*(s)->a*(t) + 2*(s)->b)*(t) + (s)->c)
 #define SPLINEPTANVAL(s, t) (BasePoint) { SPLINE1DPTANVAL(&(s)->splines[0], t), SPLINE1DPTANVAL(&(s)->splines[1], t) }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* FONTFORGE_SPLINEUTIL_H */

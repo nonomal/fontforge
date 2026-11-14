@@ -3,6 +3,10 @@
 
 #include "splinefont.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define SPIRO_SELECTED(cp)      ((cp)->ty&0x80)
 #define SPIRO_DESELECT(cp)      ((cp)->ty&=~0x80)
 #define SPIRO_SELECT(cp)        ((cp)->ty|=0x80)
@@ -13,9 +17,13 @@
 
 extern char *libspiro_version(void);
 extern int hasspiro(void);
-extern spiro_cp *SpiroCPCopy(spiro_cp *spiros, uint16 *_cnt);
-extern spiro_cp *SplineSet2SpiroCP(SplineSet *ss, uint16 *cnt);
+extern spiro_cp *SpiroCPCopy(spiro_cp *spiros, uint16_t *_cnt);
+extern spiro_cp *SplineSet2SpiroCP(SplineSet *ss, uint16_t *cnt);
 extern SplineSet *SpiroCP2SplineSet(spiro_cp *spiros);
 extern void SSRegenerateFromSpiros(SplineSet *spl);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* FONTFORGE_SPIRO_H */

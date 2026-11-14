@@ -35,7 +35,6 @@
 #include "gfile.h"
 #include "gkeysym.h"
 #include "gresedit.h"
-#include "gresource.h"
 #include "groups.h"
 #include "macenc.h"
 #include "namelist.h"
@@ -46,6 +45,8 @@
 #include "splineutil.h"
 #include "ttf.h"
 #include "ustring.h"
+#include "gtk/simple_dialogs.hpp"
+#include "shapers/shaper_shim.hpp"
 
 #include <assert.h>
 #include <dirent.h>
@@ -58,6 +59,7 @@
 #define RAD2DEG	(180/FF_PI)
 
 static void change_res_filename(const char *newname);
+GResFont prefs_monofont = GRESFONT_INIT("400 12pt " MONO_UI_FAMILIES);
 
 extern int splash;
 extern int adjustwidth;
@@ -70,7 +72,6 @@ extern int OpenCharsInNewWindow;
 extern int ItalicConstrained;
 extern int accent_offset;
 extern int GraveAcuteCenterBottom;
-extern int PreferSpacingAccents;
 extern int CharCenterHighest;
 extern int ask_user_for_resolution;
 #ifndef _NO_LIBPNG
@@ -116,7 +117,6 @@ extern int old_sfnt_flags;		/* in savefont.c */
 extern int old_ps_flags;		/* in savefont.c */
 extern int old_validate;		/* in savefontdlg.c */
 extern int old_fontlog;			/* in savefontdlg.c */
-extern int oldsystem;			/* in bitmapdlg.c */
 extern int preferpotrace;		/* in autotrace.c */
 extern int autotrace_ask;		/* in autotrace.c */
 extern int mf_ask;			/* in autotrace.c */
@@ -186,6 +186,7 @@ extern int AutoSaveFrequency;			/* autosave.c */
 extern int UndoRedoLimitToSave;  /* sfd.c */
 extern int UndoRedoLimitToLoad;  /* sfd.c */
 extern int prefRevisionsToRetain; /* sfd.c */
+extern int SaveEditorState; /* sfd.c */
 extern int prefs_cv_show_control_points_always_initially; /* from charview.c */
 extern int prefs_create_dragging_comparison_outline;      /* from charview.c */
 extern int prefs_cv_outline_thickness; /* from charview.c */
@@ -203,8 +204,6 @@ static int alwaysgenapple=false, alwaysgenopentype=false;
 
 static int gfc_showhidden, gfc_dirplace;
 static char *gfc_bookmarks=NULL;
-
-static int prefs_usecairo = true;
 
 static int pointless;
 
@@ -274,8 +273,8 @@ return( false );
 
 
 /* don't use mnemonics 'C' or 'O' (Cancel & OK) */
-enum pref_types { pr_int, pr_real, pr_bool, pr_enum, pr_encoding, pr_string,
-	pr_file, pr_namelist, pr_unicode, pr_angle };
+enum pref_types { pr_int, pr_real, pr_bool, pr_encoding, pr_string,
+	pr_file, pr_namelist, pr_unicode, pr_angle, pr_shaper };
 struct enums { char *name; int value; };
 
 struct enums fvsize_enums[] = { {NULL, 0} };
@@ -303,17 +302,16 @@ static struct prefs_list {
 	{ N_("FreeTypeInFontView"), pr_bool, &use_freetype_to_rasterize_fv, NULL, NULL, 'O', NULL, 0, N_("Use the FreeType rasterizer (when available)\nto rasterize glyphs in the font view.\nThis generally results in better quality.") },
 	{ N_("FreeTypeAAFillInOutlineView"), pr_bool, &use_freetype_with_aa_fill_cv, NULL, NULL, 'O', NULL, 0, N_("When filling using freetype in the outline view,\nhave freetype render the glyph antialiased.") },
 	{ N_("SplashScreen"), pr_bool, &splash, NULL, NULL, 'S', NULL, 0, N_("Show splash screen on start-up") },
-#ifndef _NO_LIBCAIRO
-	{ N_("UseCairoDrawing"), pr_bool, &prefs_usecairo, NULL, NULL, '\0', NULL, 0, N_("Use the cairo library for drawing (if available)\nThis makes for prettier (anti-aliased) but slower drawing\nThis applies to any windows created AFTER this is set.\nAlready existing windows will continue as they are.") },
-#endif
 	{ N_("ExportClipboard"), pr_bool, &export_clipboard, NULL, NULL, '\0', NULL, 0, N_( "If you are running an X11 clipboard manager you might want\nto turn this off. FF can put things into its internal clipboard\nwhich it cannot export to X11 (things like copying more than\none glyph in the fontview). If you have a clipboard manager\nrunning it will force these to be exported with consequent\nloss of data.") },
 	{ N_("AutoSaveFrequency"), pr_int, &AutoSaveFrequency, NULL, NULL, '\0', NULL, 0, N_( "The number of seconds between autosaves. If you set this to 0 there will be no autosaves.") },
 	{ N_("RevisionsToRetain"), pr_int, &prefRevisionsToRetain, NULL, NULL, '\0', NULL, 0, N_( "When Saving, keep this number of previous versions of the file. file.sfd-01 will be the last saved file, file.sfd-02 will be the file saved before that, and so on. If you set this to 0 then no revisions will be retained.") },
 	{ N_("UndoRedoLimitToSave"), pr_int, &UndoRedoLimitToSave, NULL, NULL, '\0', NULL, 0, N_( "The number of undo and redo operations which will be saved in sfd files.\nIf you set this to 0 undo/redo information is not saved to sfd files.\nIf set to -1 then all available undo/redo information is saved without limit.") },
+	{ N_("SaveEditorState"), pr_bool, &SaveEditorState, NULL, NULL, '\0', NULL, 0, N_( "When saving, keep editor state like window size and position, selected points and references, and open glyphs.") },
 	{ N_("WarnScriptUnsaved"), pr_bool, &warn_script_unsaved, NULL, NULL, '\0', NULL, 0, N_( "Whether or not to warn you if you have an unsaved script in the «Execute Script» dialog.") },
 #ifndef _NO_PYTHON
 	{ N_("UsePlugins"), pr_bool, &use_plugins, NULL, NULL, '\0', NULL, 0, N_( "Whether or not to try to discover and import Python plugins.") },
 #endif
+	{ N_("DefaultShaper"), pr_shaper, NULL, (void * (*)(void))get_default_shaper, (void (*)(void *))set_default_shaper, '\0', NULL, 0, N_( "The default shaper for MetricsView.") },
 	PREFS_LIST_EMPTY
 },
   new_list[] = {
@@ -373,7 +371,7 @@ static struct prefs_list {
 	PREFS_LIST_EMPTY
 },
  tt_list[] = {
-	{ N_("ClearInstrsBigChanges"), pr_bool, &clear_tt_instructions_when_needed, NULL, NULL, 'C', NULL, 0, N_("Instructions in a TrueType font refer to\npoints by number, so if you edit a glyph\nin such a way that some points have different\nnumbers (add points, remove them, etc.) then\nthe instructions will be applied to the wrong\npoints with disasterous results.\n  Normally FontForge will remove the instructions\nif it detects that the points have been renumbered\nin order to avoid the above problem. You may turn\nthis behavior off -- but be careful!") },
+	{ N_("ClearInstrsBigChanges"), pr_bool, &clear_tt_instructions_when_needed, NULL, NULL, 'C', NULL, 0, N_("Instructions in a TrueType font refer to\npoints by number, so if you edit a glyph\nin such a way that some points have different\nnumbers (add points, remove them, etc.) then\nthe instructions will be applied to the wrong\npoints with disastrous results.\n  Normally FontForge will remove the instructions\nif it detects that the points have been renumbered\nin order to avoid the above problem. You may turn\nthis behavior off -- but be careful!") },
 	{ N_("CopyTTFInstrs"), pr_bool, &copyttfinstr, NULL, NULL, '\0', NULL, 0, N_("When copying glyphs from the font view, also copy the\nglyphs' truetype instructions.") },
 	PREFS_LIST_EMPTY
 },
@@ -381,7 +379,6 @@ static struct prefs_list {
 	{ N_("AccentOffsetPercent"), pr_int, &accent_offset, NULL, NULL, '\0', NULL, 0, N_("The percentage of an em by which an accent is offset from its base glyph in Build Accent") },
 	{ N_("AccentCenterLowest"), pr_bool, &GraveAcuteCenterBottom, NULL, NULL, '\0', NULL, 0, N_("When placing grave and acute accents above letters, should\nFontForge center them based on their full width, or\nshould it just center based on the lowest point\nof the accent.") },
 	{ N_("CharCenterHighest"), pr_bool, &CharCenterHighest, NULL, NULL, '\0', NULL, 0, N_("When centering an accent over a glyph, should the accent\nbe centered on the highest point(s) of the glyph,\nor the middle of the glyph?") },
-	{ N_("PreferSpacingAccents"), pr_bool, &PreferSpacingAccents, NULL, NULL, '\0', NULL, 0, N_("Use spacing accents (Unicode: 02C0-02FF) rather than\ncombining accents (Unicode: 0300-036F) when\nbuilding accented glyphs.") },
 	PREFS_LIST_EMPTY
 },
  args_list[] = {
@@ -411,7 +408,7 @@ static struct prefs_list {
 #endif
 
 	{ N_("GenerateHintWidthEqualityTolerance"), pr_real, &GenerateHintWidthEqualityTolerance, NULL, NULL, '\0', NULL, 0, N_( "When generating a font, ignore slight rounding errors for hints that should be at the top or bottom of the glyph. For example, you might like to set this to 0.02 so that 19.999 will be considered 20. But only for the hint width value.") },
-	
+
 	PREFS_LIST_EMPTY
 },
  hints_list[] = {
@@ -436,7 +433,7 @@ static struct prefs_list {
 	PREFS_LIST_EMPTY
 },
 /* These are hidden, so will never appear in preference ui, hence, no "N_(" */
-/*  They are controled elsewhere AntiAlias is a menu item in the font window's View menu */
+/*  They are controlled elsewhere AntiAlias is a menu item in the font window's View menu */
 /*  etc. */
  hidden_list[] = {
 	{ "AntiAlias", pr_bool, &default_fv_antialias, NULL, NULL, '\0', NULL, 1, NULL },
@@ -473,7 +470,6 @@ static struct prefs_list {
 	{ "AlmostHVBound", pr_int, &CVShows.hvoffset, NULL, NULL, '\0', NULL, 1, NULL },
 	{ "CheckSelfIntersects", pr_bool, &CVShows.checkselfintersects, NULL, NULL, '\0', NULL, 1, NULL },
 	{ "ShowDebugChanges", pr_bool, &CVShows.showdebugchanges, NULL, NULL, '\0', NULL, 1, NULL },
-	{ "DefaultScreenDpiSystem", pr_int, &oldsystem, NULL, NULL, '\0', NULL, 1, NULL },
 	{ "DefaultOutputFormat", pr_int, &oldformatstate, NULL, NULL, '\0', NULL, 1, NULL },
 	{ "DefaultBitmapFormat", pr_int, &oldbitmapstate, NULL, NULL, '\0', NULL, 1, NULL },
 	{ "SaveValidate", pr_int, &old_validate, NULL, NULL, '\0', NULL, 1, NULL },
@@ -513,9 +509,6 @@ static struct prefs_list {
 	{ "DefaultBVWidth", pr_int, &bv_width, NULL, NULL, '\0', NULL, 1, NULL },
 	{ "DefaultBVHeight", pr_int, &bv_height, NULL, NULL, '\0', NULL, 1, NULL },
 	{ "AnchorControlPixelSize", pr_int, &aa_pixelsize, NULL, NULL, '\0', NULL, 1, NULL },
-#ifdef _NO_LIBCAIRO
-	{ "UseCairoDrawing", pr_bool, &prefs_usecairo, NULL, NULL, '\0', NULL, 0, N_("Use the cairo library for drawing (if available)\nThis makes for prettier (anti-aliased) but slower drawing\nThis applies to any windows created AFTER this is set.\nAlready existing windows will continue as they are.") },
-#endif
 	{ "CV_B1Tool", pr_int, (int *) &cv_b1_tool, NULL, NULL, '\0', NULL, 1, NULL },
 	{ "CV_CB1Tool", pr_int, (int *) &cv_cb1_tool, NULL, NULL, '\0', NULL, 1, NULL },
 	{ "CV_B2Tool", pr_int, (int *) &cv_b2_tool, NULL, NULL, '\0', NULL, 1, NULL },
@@ -568,6 +561,11 @@ static void FileChooserPrefsChanged(void *pointless) {
 static void ProcessFileChooserPrefs(void) {
     unichar_t **b;
     int i;
+#if _WIN32
+    char *userProfile = getenv("USERPROFILE");
+    unichar_t *u_userProfile = userProfile ? utf82u_copy(userProfile) : NULL;
+    u_GFileNormalizePath(u_userProfile);
+#endif
 
     GFileChooserSetShowHidden(gfc_showhidden);
     GFileChooserSetDirectoryPlacement(gfc_dirplace);
@@ -576,17 +574,21 @@ static void ProcessFileChooserPrefs(void) {
 	i = 0;
 #ifdef __Mac
 	b[i++] = uc_copy("~/Library/Fonts/");
-#endif
-	b[i++] = uc_copy("~/fonts");
-#ifdef __Mac
 	b[i++] = uc_copy("/Library/Fonts/");
 	b[i++] = uc_copy("/System/Library/Fonts/");
-#endif
-#if __CygWin
+#elif _WIN32
+	b[i++] = uc_copy("C:/Windows/Fonts/");
+	if (u_userProfile != NULL) {	
+	    unichar_t *fontsPath = uc_copy("/AppData/Local/Microsoft/Windows/Fonts/");
+	    b[i++] = u_concat(u_userProfile, fontsPath);
+	    free(fontsPath);
+	    free(u_userProfile);
+	}
+#else /* Linux, Unix */
 	b[i++] = uc_copy("/usr/share/fonts/");
 	b[i++] = uc_copy("/usr/share/X11/fonts/");
-#else
-	b[i++] = uc_copy("/usr/X11R6/lib/X11/fonts/");
+	b[i++] = uc_copy("~/.local/share/fonts/");
+	b[i++] = uc_copy("~/.fonts/");
 #endif
 	b[i++] = NULL;
 	GFileChooserSetBookmarks(b);
@@ -661,7 +663,7 @@ static int PrefsUI_GetPrefs(char *name,Val *val) {
 	    if ( pf->type == pr_bool || pf->type == pr_int || pf->type == pr_unicode ) {
 		val->type = v_int;
 		val->u.ival = *((int *) (pf->val));
-	    } else if ( pf->type == pr_string || pf->type == pr_file ) {
+	    } else if ( pf->type == pr_string || pf->type == pr_file || pf->type == pr_shaper) {
 		val->type = v_str;
 
 		char *tmpstr = pf->val ? *((char **) (pf->val)) : (char *) (pf->get)();
@@ -729,7 +731,7 @@ return( -1 );
 		    *((float *) (pf->val)) = (val2==NULL ? val1->u.ival : val1->u.ival / (double) val2->u.ival);
 		if ( pf->type == pr_angle )
 		    *((float *) (pf->val)) /= RAD2DEG;
-	    } else if ( pf->type == pr_string || pf->type == pr_file ) {
+	    } else if ( pf->type == pr_string || pf->type == pr_file || pf->type == pr_shaper) {
 		if ( val1->type!=v_str || val2!=NULL )
 return( -1 );
 		if ( pf->set ) {
@@ -787,7 +789,7 @@ static char *getPfaEditPrefs(void) {
     return prefs;
 }
 
-static char *PrefsUI_getFontForgeShareDir(void) {
+static const char *PrefsUI_getFontForgeShareDir(void) {
     return getShareDir();
 }
 
@@ -950,7 +952,7 @@ static void PrefsUI_LoadPrefs_FromFile( char* filename )
 		if ( pl->type == pr_angle )
 		    *(float *) pl->val /= RAD2DEG;
 	      break;
-	      case pr_string: case pr_file:
+	      case pr_string: case pr_file: case pr_shaper:
 		if ( *pt=='\0' ) pt=NULL;
 		if ( pl->val!=NULL )
 		    *((char **) (pl->val)) = copy(pt);
@@ -966,7 +968,7 @@ static void PrefsUI_LoadPrefs_FromFile( char* filename )
 void Prefs_LoadDefaultPreferences( void )
 {
     char filename[PATH_MAX+1];
-    char* sharedir = getShareDir();
+    const char* sharedir = getShareDir();
 
     snprintf(filename,PATH_MAX,"%s/prefs", sharedir );
     PrefsUI_LoadPrefs_FromFile( filename );
@@ -1072,7 +1074,7 @@ static void PrefsUI_LoadPrefs(void)
 		if ( pl->type == pr_angle )
 		    *(float *) pl->val /= RAD2DEG;
 	      break;
-	      case pr_string: case pr_file:
+	      case pr_string: case pr_file: case pr_shaper:
 		if ( *pt=='\0' ) pt=NULL;
 		if ( pl->val!=NULL )
 		    *((char **) (pl->val)) = copy(pt);
@@ -1109,7 +1111,6 @@ static void PrefsUI_LoadPrefs(void)
 	old_sfnt_flags |= ttf_flag_glyphmap;
     LoadNamelistDir(NULL);
     ProcessFileChooserPrefs();
-    GDrawEnableCairo( prefs_usecairo );
 }
 
 static void PrefsUI_SavePrefs(int not_if_script) {
@@ -1158,6 +1159,11 @@ return;
 		fprintf( p, "%s:\t%s\n", pl->name, temp );
 	    if ( (pl->val)==NULL )
 		free(temp);
+	  break;
+	  case pr_shaper:
+	    temp = (char *) (pl->get());
+	    if ( temp!=NULL )
+		fprintf( p, "%s:\t%s\n", pl->name, temp );
 	  break;
 	  case pr_angle:
 	    fprintf( p, "%s:\t%g\n", pl->name, ((double) *(float *) pl->val) * RAD2DEG );
@@ -1258,7 +1264,7 @@ return( ti );
 }
 
 void GListAddStr(GGadget *list,unichar_t *str, void *ud) {
-    int32 i,len;
+    int32_t i,len;
     GTextInfo **ti = GGadgetGetList(list,&len);
     GTextInfo **replace = malloc((len+2)*sizeof(GTextInfo *));
 
@@ -1276,7 +1282,7 @@ void GListAddStr(GGadget *list,unichar_t *str, void *ud) {
 }
 
 void GListReplaceStr(GGadget *list,int index, unichar_t *str, void *ud) {
-    int32 i,len;
+    int32_t i,len;
     GTextInfo **ti = GGadgetGetList(list,&len);
     GTextInfo **replace = malloc((len+2)*sizeof(GTextInfo *));
 
@@ -1309,7 +1315,7 @@ struct setdata {
 static int set_e_h(GWindow gw, GEvent *event) {
     struct setdata *sd = GDrawGetUserData(gw);
     int i;
-    int32 len;
+    int32_t len;
     GTextInfo **ti;
     const unichar_t *ret1; unichar_t *end;
     int on, feat, val1, val2;
@@ -1388,7 +1394,7 @@ static unichar_t *AskSetting(struct macsettingname *temp,GGadget *list, int inde
     struct setdata sd;
     char buf[20];
     unichar_t ubuf3[6];
-    int32 len, i;
+    int32_t len, i;
     GTextInfo **ti;
 
     memset(&sd,0,sizeof(sd));
@@ -1503,7 +1509,7 @@ return( sd.ret );
 
 static void ChangeSetting(GGadget *list,int index,GGadget *flist) {
     struct macsettingname temp;
-    int32 len;
+    int32_t len;
     GTextInfo **ti = GGadgetGetList(list,&len);
     char *str;
     unichar_t *ustr;
@@ -1556,7 +1562,7 @@ return( true );
 
 static int Pref_MappingSel(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_listselected ) {
-	int32 len;
+	int32_t len;
 	GTextInfo **ti = GGadgetGetList(g,&len);
 	GWindow gw = GGadgetGetWindow(g);
 	int i, sel_cnt=0;
@@ -1576,7 +1582,7 @@ static int Pref_DefaultMapping(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
 	GGadget *list = GWidgetGetControl(GGadgetGetWindow(g),CID_Mapping);
 	GTextInfo *ti, **arr;
-	uint16 cnt;
+	uint16_t cnt;
 
 	ti = Pref_MappingList(false);
 	arr = GTextInfoArrayFromList(ti,&cnt);
@@ -1588,14 +1594,14 @@ return( true );
 
 static int Prefs_Ok(GGadget *g, GEvent *e) {
     int i, j, mi;
-    int err=0, enc;
+    int err=0;
     struct pref_data *p;
     GWindow gw;
     const unichar_t *ret;
     const unichar_t *names[SCRIPT_MENU_MAX], *scripts[SCRIPT_MENU_MAX];
     struct prefs_list *pl;
     GTextInfo **list;
-    int32 len;
+    int32_t len;
     char *buf, *str;
     real dangle;
 
@@ -1667,7 +1673,6 @@ return( true );
 		    e = ParseEncodingNameFromList(GWidgetGetControl(gw,j*CID_PrefsOffset+CID_PrefsBase+i));
 		    if ( e!=NULL )
 			*((Encoding **) (pl->val)) = e;
-		    enc = 1;	/* So gcc doesn't complain about unused. It is unused, but why add the ifdef and make the code even messier? Sigh. icc complains anyway */
 		}
 	      break;
 	      case pr_namelist:
@@ -1681,6 +1686,14 @@ return( true );
 			    ff_post_error(_("Namelist contains non-ASCII names"),_("Glyph names should be limited to characters in the ASCII character set, but there are names in this namelist which use characters outside that range."));
 			else if ( nl!=NULL )
 			    *((NameList **) (pl->val)) = nl;
+		    }
+		}
+	      break;
+	       case pr_shaper: 
+		{ GTextInfo *ti = GGadgetGetListItemSelected(GWidgetGetControl(gw,j*CID_PrefsOffset+CID_PrefsBase+i));
+		  if ( ti!=NULL ) {
+			char *name = ti->userdata;
+			(pl->set)(name);
 		    }
 		}
 	      break;
@@ -1729,7 +1742,7 @@ return( true );
 	if ( xuid!=NULL ) {
 	    char *pt;
 	    for ( pt=xuid; *pt==' ' ; ++pt );
-	    if ( *pt=='[' ) {	/* People who know PS well, might want to put brackets arround the xuid base array, but I don't want them */
+	    if ( *pt=='[' ) {	/* People who know PS well, might want to put brackets around the xuid base array, but I don't want them */
 		pt = copy(pt+1);
 		if (xuid != NULL) free( xuid );
 		xuid = pt;
@@ -1746,7 +1759,6 @@ return( true );
 	}
 	if ( othersubrsfile!=NULL && ReadOtherSubrsFile(othersubrsfile)<=0 )
 	    fprintf( stderr, "Failed to read OtherSubrs from %s\n", othersubrsfile );
-	GDrawEnableCairo(prefs_usecairo);
 
 	int force_redraw_charviews = 0;
 	if( prefs_oldval_cvEditHandleSize != prefs_cvEditHandleSize )
@@ -1819,14 +1831,12 @@ void DoPrefs(void) {
     GGadgetCreateData **hvarray, boxes[2*TOPICS];
     struct pref_data p;
     int i, gc, sgc, j, k, line, line_max, y, y2, ii, si;
-    int32 llen;
+    int32_t llen;
     char buf[20];
     int gcnt[20];
     static unichar_t nullstr[] = { 0 };
     struct prefs_list *pl;
     char *tempstr;
-    FontRequest rq;
-    GFont *font;
 
     PrefsInit();
 
@@ -2142,6 +2152,19 @@ void DoPrefs(void) {
 		hvarray[si++] = GCD_ColSpan; hvarray[si++] = GCD_ColSpan;
 		y += 28;
 	      } break;
+	      case pr_shaper:
+	      {
+		int default_idx = 0;
+		pgcd[gc].gd.u.list = GetShaperList(&default_idx);
+		pgcd[gc].gd.label = pgcd[gc].gd.u.list + default_idx;
+		pgcd[gc].creator = GListFieldCreate;
+		pgcd[gc].gd.pos.width = 160;
+		++gc;
+		hvarray[si++] = &pgcd[gc-1];
+		hvarray[si++] = GCD_ColSpan; hvarray[si++] = GCD_ColSpan;
+		y += 28;
+	      }
+	      break;
 	      case pr_string: case pr_file:
 		if ( pl->set==SetAutoTraceArgs || ((char **) pl->val)==&mf_args )
 		    pgcd[gc].gd.pos.width = 160;
@@ -2334,13 +2357,8 @@ void DoPrefs(void) {
     for ( k=0; k<TOPICS; ++k )
 	GHVBoxSetExpandableRow(boxes[2*k].ret,gb_expandglue);
 
-    memset(&rq,0,sizeof(rq));
-    rq.utf8_family_name = MONO_UI_FAMILIES;
-    rq.point_size = 12;
-    rq.weight = 400;
-    font = GDrawInstanciateFont(gw,&rq);
-    GGadgetSetFont(mfgcd[0].ret,font);
-    GGadgetSetFont(msgcd[0].ret,font);
+    GGadgetSetFont(mfgcd[0].ret,prefs_monofont.fi);
+    GGadgetSetFont(msgcd[0].ret,prefs_monofont.fi);
     GHVBoxFitWindow(mboxes[0].ret);
 
     for ( k=0; visible_prefs_list[k].tab_name!=0; ++k ) for ( gc=0,i=0; visible_prefs_list[k].pl[i].name!=NULL; ++i ) {
@@ -2357,7 +2375,7 @@ void DoPrefs(void) {
 	    list = GGadgetGetList(g,&llen);
 	    for ( j=0; j<llen ; ++j ) {
 		if ( list[j]->text!=NULL &&
-			(void *) (intpt) ( *((int *) pl->val)) == list[j]->userdata )
+			(void *) (intptr_t) ( *((int *) pl->val)) == list[j]->userdata )
 		    list[j]->selected = true;
 		else
 		    list[j]->selected = false;
@@ -2368,7 +2386,7 @@ void DoPrefs(void) {
 	  case pr_namelist:
 	    free(gcd[gc+1].gd.u.list);
 	  break;
-	  case pr_string: case pr_file: case pr_int: case pr_real: case pr_unicode: case pr_angle:
+	  case pr_string: case pr_file: case pr_int: case pr_real: case pr_unicode: case pr_angle: case pr_shaper:
 	    free(plabels[k][gc+1].text);
 	    if ( pl->type==pr_file || pl->type==pr_angle )
 		++gc;
@@ -2454,12 +2472,15 @@ static void change_res_filename(const char *newname) {
 }
 
 void DoXRes(void) {
-    extern GResInfo fontview_ri;
+    extern GResInfo view_ri;
 
     MVColInit();
     CVColInit();
     BVColInit();
-    GResEdit(&fontview_ri,xdefs_filename,change_res_filename);
+    GResEdit(&view_ri,xdefs_filename,change_res_filename);
+
+    // Trigger GTK StyleProvider update
+    update_appearance();
 }
 
 struct prefs_list pointer_dialog_list[] = {
@@ -2481,7 +2502,7 @@ static int PrefsSubSet_Ok(GGadget *g, GEvent *e) {
     struct prefs_list* plist = p->plist;
     struct prefs_list* pl = plist;
     int i=0,j=0;
-    int err=0, enc;
+    int err=0;
     const unichar_t *ret;
 
     p->done = true;
@@ -2505,7 +2526,6 @@ static int PrefsSubSet_Ok(GGadget *g, GEvent *e) {
 		e = ParseEncodingNameFromList(GWidgetGetControl(gw,j*CID_PrefsOffset+CID_PrefsBase+i));
 		if ( e!=NULL )
 		    *((Encoding **) (pl->val)) = e;
-		enc = 1;	/* So gcc doesn't complain about unused. It is unused, but why add the ifdef and make the code even messier? Sigh. icc complains anyway */
 	}
 	break;
 	case pr_namelist:
@@ -2538,6 +2558,10 @@ static int PrefsSubSet_Ok(GGadget *g, GEvent *e) {
 	case pr_angle:
 	    *((float *) (pl->val)) = GetReal8(gw,j*CID_PrefsOffset+CID_PrefsBase+i,pl->name,&err)/RAD2DEG;
 	    break;
+	case pr_shaper:
+	    ff_post_error(_("Preferences"),
+		_("Shaper preference is not implemented in contextual preferences"));
+	    break;
 	}
     }
 
@@ -2558,7 +2582,7 @@ static void PrefsSubSetDlg(CharView *cv,char* windowTitle,struct prefs_list* pli
     GTabInfo aspects[TOPICS+5], subaspects[3];
     GGadgetCreateData **hvarray, boxes[2*TOPICS];
     struct pref_data p;
-    int line = 0,line_max = 3;
+    int line_max = 3;
     int i = 0, gc = 0, ii, y=0, si=0, k=0;
     char buf[20];
     char *tempstr;
@@ -2771,8 +2795,11 @@ static void PrefsSubSetDlg(CharView *cv,char* windowTitle,struct prefs_list* pli
 		hvarray[si++] = GCD_Glue;
 		y += 26;
 	      break;
+	      case pr_shaper:
+		ff_post_error(_("Preferences"),
+		    _("Shaper preference is not implemented in contextual preferences"));
+	      break;
 	    }
-	    ++line;
 	    hvarray[si++] = NULL;
 
     }

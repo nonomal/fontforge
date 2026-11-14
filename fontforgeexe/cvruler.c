@@ -29,6 +29,7 @@
 
 #include "cvruler.h"
 #include "fontforgeui.h"
+#include "gresedit.h"
 #include "splineutil.h"
 #include "splineutil2.h"
 #include "ustring.h"
@@ -314,6 +315,7 @@ static int ruler_e_h(GWindow gw, GEvent *event) {
 	GDrawDestroyWindow(gw);
 	cv->ruler_w = NULL;
       break;
+      default: break;
     }
 return( true );
 }
@@ -334,11 +336,12 @@ static int ruler_linger_e_h(GWindow gw, GEvent *event) {
 	// GDrawDestroyWindow(gw);
 	// cv->ruler_linger_w = NULL;
       break;
+      default: break;
     }
 return( true );
 }
 	
-static GFont *rvfont=NULL;
+GResFont cv_measuretoolfont = GRESFONT_INIT("400 12px " MONO_UI_FAMILIES);
 
 /*
  * Comparison function for use with qsort.
@@ -450,7 +453,6 @@ static void RulerPlace(CharView *cv, GEvent *event) {
     int i,h,w;
     GWindowAttrs wattrs;
     GRect pos;
-    FontRequest rq;
     int as, ds, ld;
 
     if ( cv->ruler_w==NULL ) {
@@ -464,15 +466,7 @@ static void RulerPlace(CharView *cv, GEvent *event) {
 	pos.x = pos.y = 0; pos.width=pos.height = 20;
 	cv->ruler_w = GWidgetCreateTopWindow(NULL,&pos,ruler_e_h,cv,&wattrs);
 
-	if ( rvfont==NULL ) {
-	    memset(&rq,0,sizeof(rq));
-	    rq.utf8_family_name = FIXED_UI_FAMILIES;
-	    rq.point_size = -12;
-	    rq.weight = 400;
-	    rvfont = GDrawInstanciateFont(cv->ruler_w,&rq);
-	    rvfont = GResourceFindFont("CharView.Measure.Font",rvfont);
-	}
-	cv->rfont = rvfont;
+	cv->rfont = cv_measuretoolfont.fi;
 	GDrawWindowFontMetrics(cv->ruler_w,cv->rfont,&as,&ds,&ld);
 	cv->rfh = as+ds; cv->ras = as;
     } else
@@ -530,7 +524,6 @@ static void RulerLingerPlace(CharView *cv, GEvent *event) {
     int i,h,w;
     GWindowAttrs wattrs;
     GRect pos;
-    FontRequest rq;
     int as, ds, ld;
     int line;
     int old_pressed;
@@ -546,15 +539,7 @@ static void RulerLingerPlace(CharView *cv, GEvent *event) {
 	pos.x = pos.y = 0; pos.width=pos.height = 20;
 	cv->ruler_linger_w = GWidgetCreateTopWindow(NULL,&pos,ruler_linger_e_h,cv,&wattrs);
 
-	if ( rvfont==NULL ) {
-	    memset(&rq,0,sizeof(rq));
-	    rq.utf8_family_name = FIXED_UI_FAMILIES;
-	    rq.point_size = -12;
-	    rq.weight = 400;
-	    rvfont = GDrawInstanciateFont(cv->ruler_w,&rq);
-	    rvfont = GResourceFindFont("CharView.Measure.Font",rvfont);
-	}
-	cv->rfont = rvfont;
+	cv->rfont = cv_measuretoolfont.fi;
 	GDrawWindowFontMetrics(cv->ruler_linger_w,cv->rfont,&as,&ds,&ld);
 	cv->rfh = as+ds; cv->ras = as;
     } else
@@ -592,7 +577,7 @@ static void RulerLingerPlace(CharView *cv, GEvent *event) {
     GDrawSetVisible(cv->ruler_linger_w,true);
 }
 
-static void RulerLingerMove(CharView *cv) {
+void CVRulerLingerMove(CharView *cv) {
     CharViewTab* tab = CVGetActiveTab(cv);
     if ( cv->ruler_linger_w ) {
 	int x, y;
@@ -797,15 +782,16 @@ static int cpinfo_e_h(GWindow gw, GEvent *event) {
 	GDrawSetFont(gw,cv->rfont);
 	for ( which = 1; which>=0; --which ) {
 	    for ( line=0; PtInfoText(cv,line,which,buf,sizeof(buf))!=NULL; ++line ) {
-		GDrawDrawText8(gw,2,y,buf,-1,0x000000);
+		GDrawDrawText8(gw,2,y,buf,-1,measuretoolwindowforegroundcol);
 		y += cv->rfh+1;
 	    }
-	    GDrawDrawLine(gw,0,y+2-cv->ras,2000,y+2-cv->ras,0x000000);
+	    GDrawDrawLine(gw,0,y+2-cv->ras,2000,y+2-cv->ras,measuretoolwindowforegroundcol);
 	    y += 4;
 	}
 	if ( PtInfoText(cv,0,-1,buf,sizeof(buf))!=NULL )
-	    GDrawDrawText8(gw,2,y,buf,-1,0x000000);
+	    GDrawDrawText8(gw,2,y,buf,-1,measuretoolwindowforegroundcol);
       break;
+      default: break;
     }
 return( true );
 }
@@ -820,7 +806,6 @@ static void CpInfoPlace(CharView *cv, GEvent *event) {
     int h,w;
     GWindowAttrs wattrs;
     GRect pos;
-    FontRequest rq;
     int as, ds, ld;
     SplinePoint *sp;
 
@@ -829,21 +814,13 @@ static void CpInfoPlace(CharView *cv, GEvent *event) {
 	wattrs.mask = wam_events|wam_cursor|wam_positioned|wam_nodecor|wam_backcol|wam_bordwidth;
 	wattrs.event_masks = (1<<et_expose)|(1<<et_resize)|(1<<et_mousedown);
 	wattrs.cursor = ct_mypointer;
-	wattrs.background_color = 0xe0e0c0;
+	wattrs.background_color = measuretoolwindowbackgroundcol;
 	wattrs.nodecoration = 1;
 	wattrs.border_width = 1;
 	pos.x = pos.y = 0; pos.width=pos.height = 20;
 	cv->ruler_w = GWidgetCreateTopWindow(NULL,&pos,cpinfo_e_h,cv,&wattrs);
 
-	if ( rvfont==NULL ) {
-	    memset(&rq,0,sizeof(rq));
-	    rq.utf8_family_name = FIXED_UI_FAMILIES;
-	    rq.point_size = -12;
-	    rq.weight = 400;
-	    rvfont = GDrawInstanciateFont(cv->ruler_w,&rq);
-	    rvfont = GResourceFindFont("CharView.Measure.Font",rvfont);
-	}
-	cv->rfont = rvfont;
+	cv->rfont = cv_measuretoolfont.fi;
 	GDrawWindowFontMetrics(cv->ruler_w,cv->rfont,&as,&ds,&ld);
 	cv->rfh = as+ds; cv->ras = as;
     } else
@@ -1026,6 +1003,5 @@ return;
 	    }
 	    prev_rect = rect;
 	}
-	RulerLingerMove(cv);	/* in case things are moving or scaling */
     }
 }

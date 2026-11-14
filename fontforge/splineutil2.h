@@ -3,6 +3,11 @@
 
 #include "splinefont.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define NICE_PROPORTION	.39
 enum ae_type { ae_all, ae_between_selected, ae_only_good, ae_only_good_rm_later };
 
 extern bigreal PathLength(SplineSet *ss);
@@ -41,6 +46,9 @@ extern SplineSet *SplineSetsDetectDir(SplineSet **_base, int *_lastscan);
 extern SplineSet *SplineSetsExtractOpen(SplineSet **tbase);
 extern SplineSet *SSRemoveZeroLengthSplines(SplineSet *base);
 extern Spline *SplineAddExtrema(Spline *s, int always, real lenbound, real offsetbound, DBounds *b);
+extern Spline *SplineAddInflections(Spline *s);
+extern Spline *SplineBalance(Spline *s);
+extern void SplinePointHarmonize(SplinePoint *sp);
 extern void BP_HVForce(BasePoint *vector);
 extern void CanonicalContours(SplineChar *sc, int layer);
 extern void SFIncrementXUID(SplineFont *sf);
@@ -50,6 +58,9 @@ extern void SPAverageCps(SplinePoint *sp);
 extern void SPHVCurveForce(SplinePoint *sp);
 extern void SPLAverageCps(SplinePointList *spl);
 extern void SplineCharAddExtrema(SplineChar *sc, SplineSet *head, enum ae_type between_selected, int emsize);
+extern void SplineCharAddInflections(SplineChar *sc, SplineSet *head, int anysel);
+extern void SplineCharBalance(SplineChar *sc, SplineSet *head, int anysel);
+extern void SplineCharHarmonize(SplineChar *sc, SplineSet *head, int anysel);
 extern void SplineCharDefaultNextCP(SplinePoint *base);
 extern void SplineCharDefaultPrevCP(SplinePoint *base);
 extern void SplineCharMerge(SplineChar *sc, SplineSet **head, int type);
@@ -58,6 +69,9 @@ extern void SplineCharTangentPrevCP(SplinePoint *sp);
 extern void SplinePointListSet(SplinePointList *tobase, SplinePointList *frombase);
 extern void SplinePointListSimplify(SplineChar *sc, SplinePointList *spl, struct simplifyinfo *smpl);
 extern void SplineSetAddExtrema(SplineChar *sc, SplineSet *ss, enum ae_type between_selected, int emsize);
+extern void SplineSetAddInflections(SplineChar *sc, SplineSet *ss, int anysel);
+extern void SplineSetBalance(SplineChar *sc, SplineSet *ss, int anysel);
+extern void SplineSetHarmonize(SplineChar *sc, SplineSet *ss, int anysel);
 extern void SplineSetJoinCpFixup(SplinePoint *sp);
 extern void SplineSetsInsertOpen(SplineSet **tbase, SplineSet *open);
 extern void SplineSetsUntick(SplineSet *spl);
@@ -84,8 +98,8 @@ extern void SPWeightedAverageCps(SplinePoint *sp);
 extern void SSOverlapClusterCpAngles(SplineSet *base, bigreal within);
 extern void SSRemoveStupidControlPoints(SplineSet *base);
 
-static inline int BPWithin(BasePoint bp1, BasePoint bp2, bigreal f) {
-	    return RealWithin(bp1.x, bp2.x, f) && RealWithin(bp1.y, bp2.y, f);
+#ifdef __cplusplus
 }
+#endif
 
 #endif /* FONTFORGE_SPLINEUTIL2_H */

@@ -35,6 +35,10 @@
 
 #include "splinefont.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct epattern {
     struct entity *tile;
     real width, height;
@@ -119,7 +123,7 @@ typedef struct splinedesign {
     EntLayer *layers;
 
     real width, height;		/* in millimeters */
-    int16 hpages, vpages;
+    int16_t hpages, vpages;
     real pwidth, pheight;		/* in millimeters */
     real units;			/* if user wants to see things in */
 	/* centimeters then units will be 10, if inches then 25.4, if points */
@@ -136,13 +140,13 @@ typedef struct entitychar {
     RefChar *refs;
     int width, vwidth;
     SplineChar *sc;
-    uint8 fromtype3;
+    uint8_t fromtype3;
 } EntityChar;
 
 
 struct pskeydict {
-    int16 cnt, max;
-    uint8 is_executable;
+    int16_t cnt, max;
+    uint8_t is_executable;
     struct pskeyval *entries;
 };
 
@@ -189,6 +193,7 @@ typedef struct importparams {
     int clip;			// SVG
     int erasers;		// PS
     int scale;			// Misc
+    int dimensions;		// Misc
     bigreal accuracy_target;
     bigreal default_joinlimit;
 } ImportParams;
@@ -205,5 +210,9 @@ extern void InitImportParams(ImportParams *ip);
 extern ImportParams *ImportParamsState(void);
 extern void InitExportParams(ExportParams *ep);
 extern ExportParams *ExportParamsState(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* FONTFORGE_SD_H */
